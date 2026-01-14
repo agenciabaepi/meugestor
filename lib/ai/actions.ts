@@ -381,9 +381,9 @@ async function handleCreateAppointment(
 
     // Se não tem dados suficientes, tenta extrair da mensagem original
     if ((!title || !scheduledAt) && originalMessage) {
-      console.log('handleCreateAppointment - Tentando extrair da mensagem original...')
+      console.log('handleCreateAppointment - Tentando extrair da mensagem original:', originalMessage)
       const extracted = extractAppointmentFromMessage(originalMessage)
-      console.log('handleCreateAppointment - Dados extraídos:', JSON.stringify(extracted, null, 2))
+      console.log('handleCreateAppointment - Dados extraídos da mensagem:', JSON.stringify(extracted, null, 2))
       
       if (!title && extracted.title) {
         title = extracted.title
@@ -392,6 +392,7 @@ async function handleCreateAppointment(
       if (!scheduledAt && extracted.scheduledAt) {
         scheduledAt = extracted.scheduledAt
         console.log('handleCreateAppointment - scheduledAt atualizado para:', scheduledAt)
+        console.log('handleCreateAppointment - scheduledAt (formato local):', new Date(scheduledAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))
       }
     }
 

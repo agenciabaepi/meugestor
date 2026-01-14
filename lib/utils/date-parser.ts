@@ -349,10 +349,12 @@ export function extractAppointmentFromMessage(message: string): {
 
   // Padrões comuns
   const patterns = [
-    // "marca uma reunião pra mim às 20h de hoje" - padrão mais específico
+    // "marca uma reunião pra mim às 20h de hoje" - padrão mais específico (captura hora no grupo 1)
     /(?:marca|marcar|agenda|agendar)\s+(?:uma\s+)?(?:reunião|consulta|compromisso|encontro|evento)\s+(?:pra\s+)?(?:mim|eu)?\s+(?:às\s*|as\s*)?(\d{1,2})h\s+(?:de\s+)?hoje/i,
-    // "marca reunião às 20h de hoje"
+    // "marca reunião às 20h de hoje" (captura hora no grupo 1)
     /(?:marca|marcar|agenda|agendar)\s+(?:reunião|consulta|compromisso|encontro|evento)\s+(?:às\s*|as\s*)?(\d{1,2})h\s+(?:de\s+)?hoje/i,
+    // "marca reunião pra mim às 20h" (captura hora no grupo 1)
+    /(?:marca|marcar|agenda|agendar)\s+(?:uma\s+)?(?:reunião|consulta|compromisso|encontro|evento)\s+(?:pra\s+)?(?:mim|eu)?\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "tenho reunião hoje às 18h" - padrão mais específico primeiro
     /(?:tenho\s+)?(reunião|consulta|compromisso|encontro|evento)\s+hoje\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "reunião hoje às 18h"
@@ -382,15 +384,23 @@ export function extractAppointmentFromMessage(message: string): {
   let dayOffset = 0
 
   // Tenta encontrar padrões
-  for (const pattern of patterns) {
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i]
     const match = lowerMessage.match(pattern)
     if (match) {
+      console.log(`extractAppointmentFromMessage - Padrão ${i} encontrado:`, {
+        pattern: pattern.toString(),
+        match: match[0],
+        groups: match.slice(1)
+      })
+      
       // Verifica se o primeiro grupo é um título (não é número)
       if (match[1] && !match[1].match(/^\d+$/)) {
         const firstGroup = match[1].toLowerCase()
         // Ignora palavras comuns que não são títulos
         if (!['agendar', 'marcar'].includes(firstGroup)) {
           title = firstGroup.charAt(0).toUpperCase() + firstGroup.slice(1)
+          console.log(`extractAppointmentFromMessage - Título extraído: ${title}`)
         }
       }
       
@@ -398,6 +408,7 @@ export function extractAppointmentFromMessage(message: string): {
       const hourMatch = match.find(m => m && /^\d+$/.test(m))
       if (hourMatch) {
         hour = parseInt(hourMatch)
+        console.log(`extractAppointmentFromMessage - Hora extraída: ${hour}h`)
       }
       
       // Verifica se mencionou "hoje" (garante que é hoje mesmo)
