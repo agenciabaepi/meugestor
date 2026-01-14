@@ -64,7 +64,8 @@ export async function POST(request: NextRequest) {
         errorMessage = 'Email ou senha incorretos'
       } else if (error.message.includes('rate limit') || 
                  error.message.includes('too many requests')) {
-        errorMessage = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.'
+        // Mensagem genérica para rate limit (sem mencionar "muitas tentativas")
+        errorMessage = 'Erro ao fazer login. Tente novamente em alguns instantes.'
       } else {
         errorMessage = error.message || 'Erro ao fazer login'
       }
