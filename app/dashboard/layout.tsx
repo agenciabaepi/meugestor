@@ -1,11 +1,20 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { MobileMenu } from './MobileMenu'
+import { getSession } from '@/lib/utils/auth'
+import LogoutButton from './LogoutButton'
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Verifica autenticação
+  const session = await getSession()
+  
+  if (!session) {
+    redirect('/login?redirect=/dashboard')
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -54,14 +63,15 @@ export default function DashboardLayout({
               </Link>
             </nav>
 
-            {/* Desktop Back Link */}
-            <div className="hidden lg:flex items-center ml-4">
+            {/* Desktop User Menu */}
+            <div className="hidden lg:flex items-center ml-4 space-x-3">
               <Link
-                href="/"
+                href="/dashboard/perfil"
                 className="text-gray-600 hover:text-gray-900 text-sm px-3 py-2 rounded-md hover:bg-gray-100 transition-colors"
               >
-                ← Voltar
+                Perfil
               </Link>
+              <LogoutButton />
             </div>
           </div>
         </div>

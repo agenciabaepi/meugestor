@@ -10,8 +10,11 @@ export interface User {
   id: string
   tenant_id: string
   email: string
+  whatsapp_number: string
   role: 'admin' | 'user'
+  name: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface Financeiro {
@@ -20,8 +23,11 @@ export interface Financeiro {
   amount: number
   description: string
   category: string
+  subcategory: string | null
   date: string
   receipt_image_url: string | null
+  metadata: Record<string, any> | null
+  tags: string[] | null
   created_at: string
 }
 

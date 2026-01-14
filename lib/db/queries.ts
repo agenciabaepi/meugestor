@@ -117,7 +117,10 @@ export async function createFinanceiro(
   description: string,
   category: string,
   date: string,
-  receiptImageUrl?: string | null
+  receiptImageUrl?: string | null,
+  subcategory?: string | null,
+  metadata?: Record<string, any> | null,
+  tags?: string[] | null
 ): Promise<Financeiro | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -135,6 +138,9 @@ export async function createFinanceiro(
       category,
       date,
       receipt_image_url: receiptImageUrl || null,
+      subcategory: subcategory || null,
+      metadata: metadata || {},
+      tags: tags || [],
     })
     .select()
     .single()

@@ -14,6 +14,9 @@ export interface CreateFinanceiroInput {
   category: string
   date: string
   receiptImageUrl?: string | null
+  subcategory?: string | null
+  metadata?: Record<string, any> | null
+  tags?: string[] | null
 }
 
 /**
@@ -48,7 +51,10 @@ export async function createFinanceiroRecord(
     input.description.trim(),
     input.category,
     input.date,
-    input.receiptImageUrl
+    input.receiptImageUrl,
+    input.subcategory,
+    input.metadata,
+    input.tags
   )
 
   if (!record) {
@@ -83,6 +89,84 @@ export async function getFinanceiroByCategoryRecords(
   }
 
   return getFinanceiroByCategory(tenantId, category, startDate, endDate)
+}
+
+/**
+ * Obtém registros financeiros por subcategoria
+ */
+export async function getFinanceiroBySubcategoryRecords(
+  tenantId: string,
+  subcategory: string,
+  startDate?: string,
+  endDate?: string
+): Promise<Financeiro[]> {
+  const { supabaseAdmin } = await import('../db/client')
+  if (!supabaseAdmin) {
+    throw new ValidationError('Supabase admin não configurado')
+  }
+
+  let query = supabaseAdmin
+    .from('financeiro')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('subcategory', subcategory)
+    .order('date', { ascending: false })
+
+  if (startDate) {
+    query = query.gte('date', startDate)
+  }
+
+  if (endDate) {
+    query = query.lte('date', endDate)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching financeiro by subcategory:', error)
+    return []
+  }
+
+  return data || []
+}
+
+/**
+ * Obtém registros financeiros por tags
+ */
+export async function getFinanceiroByTagsRecords(
+  tenantId: string,
+  tags: string[],
+  startDate?: string,
+  endDate?: string
+): Promise<Financeiro[]> {
+  const { supabaseAdmin } = await import('../db/client')
+  if (!supabaseAdmin) {
+    throw new ValidationError('Supabase admin não configurado')
+  }
+
+  let query = supabaseAdmin
+    .from('financeiro')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .contains('tags', tags)
+    .order('date', { ascending: false })
+
+  if (startDate) {
+    query = query.gte('date', startDate)
+  }
+
+  if (endDate) {
+    query = query.lte('date', endDate)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching financeiro by tags:', error)
+    return []
+  }
+
+  return data || []
 }
 
 /**

@@ -7,7 +7,7 @@ import {
   sendTextMessage,
   type WhatsAppWebhookPayload,
 } from '@/lib/modules/whatsapp'
-import { getOrCreateTenantByWhatsApp } from '@/lib/modules/tenant'
+import { getOrCreateTenantByWhatsApp as getTenantByWhatsApp } from '@/lib/modules/auth'
 import { createConversation, getRecentConversations } from '@/lib/db/queries'
 import { processMessage } from '@/lib/ai/conversation'
 import { processAction } from '@/lib/ai/actions'
@@ -88,53 +88,60 @@ async function processWhatsAppMessage(
       return
     }
 
-    // Identifica ou cria tenant pelo número do WhatsApp Business
-    // O phone_number_id identifica qual número do WhatsApp Business recebeu a mensagem
-    // Cada tenant tem um whatsapp_number único associado
-    const tenant = await getOrCreateTenantByWhatsApp(
-      phoneNumberId, // Usa o phone_number_id como identificador do tenant
-      `Tenant ${phoneNumberId}`
-    )
+    // Busca tenant e usuário vinculado ao número do WhatsApp
+    // O número "from" é o número que enviou a mensagem
+    const tenantInfo = await getTenantByWhatsApp(from)
 
-    if (!tenant) {
-      console.error('Erro ao obter/criar tenant')
+    if (!tenantInfo) {
+      console.error('Erro ao obter tenant/usuário')
       return
     }
 
-    // Salva a mensagem do usuário na conversa
-    if (message.type === 'text' && message.text?.body) {
-      const userMessage = message.text.body.toLowerCase().trim()
-      
-      // Verifica se é uma saudação inicial (oi, olá, etc)
-      const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
-      if (greetings.includes(userMessage)) {
-        const presentation = `👋 Olá! Tudo bem?\n\n` +
-          `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n` +
-          `📋 *O que eu posso fazer por você:*\n` +
-          `• 💰 Registrar seus gastos e despesas\n` +
-          `• 📅 Criar e gerenciar seus compromissos\n` +
-          `• 📊 Consultar informações financeiras\n` +
-          `• 📈 Gerar relatórios e estatísticas\n` +
-          `• 🖼️ Processar comprovantes de imagem\n` +
-          `• 🎤 Entender seus áudios\n\n` +
-          `*Exemplos de como usar:*\n` +
-          `• "Gastei 50 reais de gasolina"\n` +
-          `• "Tenho reunião amanhã às 10h"\n` +
-          `• "Quanto gastei este mês?"\n\n` +
-          `Pode me enviar uma mensagem e eu te ajudo! 😉`
+    const tenantId = tenantInfo.tenant_id
+    const userId = tenantInfo.user_id
+
+      // Salva a mensagem do usuário na conversa
+      if (message.type === 'text' && message.text?.body) {
+        const userMessage = message.text.body.toLowerCase().trim()
         
-        await sendTextMessage(from, presentation)
-        await createConversation(tenant.id, message.text.body, 'user')
-        await createConversation(tenant.id, presentation, 'assistant')
-        
-        console.log(`Apresentação enviada para ${from}`)
-        return
-      }
+        // Verifica se é uma saudação inicial (oi, olá, etc)
+        const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
+        if (greetings.includes(userMessage)) {
+          let presentation = `👋 Olá! Tudo bem?\n\n` +
+            `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n`
+          
+          // Se não está vinculado a um usuário, sugere vinculação
+          if (!userId) {
+            presentation += `⚠️ *Você ainda não vinculou seu WhatsApp à sua conta.*\n` +
+              `Para ter acesso completo, faça login em: https://seu-dominio.com/login\n` +
+              `E vincule seu número de WhatsApp no seu perfil.\n\n`
+          }
+          
+          presentation += `📋 *O que eu posso fazer por você:*\n` +
+            `• 💰 Registrar seus gastos e despesas\n` +
+            `• 📅 Criar e gerenciar seus compromissos\n` +
+            `• 📊 Consultar informações financeiras\n` +
+            `• 📈 Gerar relatórios e estatísticas\n` +
+            `• 🖼️ Processar comprovantes de imagem\n` +
+            `• 🎤 Entender seus áudios\n\n` +
+            `*Exemplos de como usar:*\n` +
+            `• "Gastei 50 reais de gasolina"\n` +
+            `• "Tenho reunião amanhã às 10h"\n` +
+            `• "Quanto gastei este mês?"\n\n` +
+            `Pode me enviar uma mensagem e eu te ajudo! 😉`
+          
+          await sendTextMessage(from, presentation)
+          await createConversation(tenantId, message.text.body, 'user')
+          await createConversation(tenantId, presentation, 'assistant')
+          
+          console.log(`Apresentação enviada para ${from}`)
+          return
+        }
       
       // Verifica se é confirmação de registro de comprovante
       if (userMessage === 'sim' || userMessage === 's' || userMessage === 'confirmar') {
         // Busca última conversa com dados extraídos
-        const recentMessages = await getRecentConversations(tenant.id, 10)
+        const recentMessages = await getRecentConversations(tenantId, 10)
         const lastImageData = recentMessages.find(m => 
           m.role === 'assistant' && m.message.includes('[Imagem processada]')
         )
@@ -154,7 +161,7 @@ async function processWhatsAppMessage(
               
               // Registra o gasto
               const record = await createFinanceiroRecord({
-                tenantId: tenant.id,
+                tenantId: tenantId,
                 amount: extractedData.amount || 0,
                 description: extractedData.description || extractedData.establishment || 'Gasto do comprovante',
                 category: extractedData.category || 'Outros',
@@ -167,8 +174,8 @@ async function processWhatsAppMessage(
                 `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${extractedData.amount?.toFixed(2) || '0.00'}\n📝 Descrição: ${extractedData.description || extractedData.establishment || 'Gasto do comprovante'}\n🏷️ Categoria: ${extractedData.category || 'Outros'}`
               )
               
-              await createConversation(tenant.id, userMessage, 'user')
-              await createConversation(tenant.id, 'Gasto registrado com sucesso', 'assistant')
+              await createConversation(tenantId, userMessage, 'user')
+              await createConversation(tenantId, 'Gasto registrado com sucesso', 'assistant')
               
               console.log(`Gasto registrado via confirmação de imagem de ${from}`)
               return
@@ -179,62 +186,62 @@ async function processWhatsAppMessage(
         }
       }
       
-      // Salva mensagem do usuário
-      await createConversation(tenant.id, message.text.body, 'user')
-      
-      // Processa ação (registro de gastos, compromissos, etc)
-      const actionResult = await processAction(message.text.body, tenant.id)
-      
-      // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
-      if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
-        await sendTextMessage(from, actionResult.message)
-        await createConversation(tenant.id, actionResult.message, 'assistant')
-      } else {
-        // Processa com IA para gerar resposta conversacional
-        const recentMessages = await getRecentConversations(tenant.id, 5)
-        const aiResponse = await processMessage(message.text.body, {
-          tenantId: tenant.id,
-          recentMessages,
-        })
+        // Salva mensagem do usuário
+        await createConversation(tenantId, message.text.body, 'user')
         
-        // Envia resposta
-        await sendTextMessage(from, aiResponse)
-        await createConversation(tenant.id, aiResponse, 'assistant')
-      }
-      
-      console.log(`Mensagem processada de ${from} para tenant ${tenant.id}`)
+        // Processa ação (registro de gastos, compromissos, etc)
+        const actionResult = await processAction(message.text.body, tenantId)
+        
+        // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
+        if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
+          await sendTextMessage(from, actionResult.message)
+          await createConversation(tenantId, actionResult.message, 'assistant')
+        } else {
+          // Processa com IA para gerar resposta conversacional
+          const recentMessages = await getRecentConversations(tenantId, 5)
+          const aiResponse = await processMessage(message.text.body, {
+            tenantId: tenantId,
+            recentMessages,
+          })
+          
+          // Envia resposta
+          await sendTextMessage(from, aiResponse)
+          await createConversation(tenantId, aiResponse, 'assistant')
+        }
+        
+        console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
     } else if (message.type === 'audio' && message.audio) {
       // Processa áudio com Whisper
       await sendTextMessage(from, '🎤 Processando seu áudio...')
       
       const audioResult = await processWhatsAppAudio(
         message.audio.id,
-        tenant.id,
+        tenantId,
         message.audio.mime_type
       )
 
       if (audioResult.success && audioResult.text) {
         // Salva a transcrição como mensagem do usuário
         await createConversation(
-          tenant.id,
+          tenantId,
           `[Áudio transcrito]: ${audioResult.text}`,
           'user'
         )
 
         // Processa a mensagem transcrita normalmente
-        const actionResult = await processAction(audioResult.text, tenant.id)
+        const actionResult = await processAction(audioResult.text, tenantId)
 
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
-          await createConversation(tenant.id, actionResult.message, 'assistant')
+          await createConversation(tenantId, actionResult.message, 'assistant')
         } else {
-          const recentMessages = await getRecentConversations(tenant.id, 5)
+          const recentMessages = await getRecentConversations(tenantId, 5)
           const aiResponse = await processMessage(audioResult.text, {
-            tenantId: tenant.id,
+            tenantId: tenantId,
             recentMessages,
           })
           await sendTextMessage(from, aiResponse)
-          await createConversation(tenant.id, aiResponse, 'assistant')
+          await createConversation(tenantId, aiResponse, 'assistant')
         }
       } else {
         await sendTextMessage(
@@ -250,7 +257,7 @@ async function processWhatsAppMessage(
       
       const imageResult = await processWhatsAppImage(
         message.image.id,
-        tenant.id,
+        tenantId,
         message.image.mime_type
       )
 
@@ -284,7 +291,7 @@ async function processWhatsAppMessage(
             imageUrl: imageResult.imageUrl,
           }
           await createConversation(
-            tenant.id,
+            tenantId,
             `[Imagem processada]: ${JSON.stringify(dataToSave)}`,
             'assistant'
           )

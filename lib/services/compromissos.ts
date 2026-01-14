@@ -21,12 +21,26 @@ export async function createCompromissoRecord(
 ): Promise<Compromisso> {
   // Validações
   if (!input.title || input.title.trim().length === 0) {
+    console.error('Erro: Título vazio')
     throw new ValidationError('Título é obrigatório')
   }
 
-  if (!isValidDate(input.scheduledAt)) {
-    throw new ValidationError('Data/hora agendada inválida')
+  if (!input.scheduledAt) {
+    console.error('Erro: scheduledAt não fornecido')
+    throw new ValidationError('Data/hora agendada é obrigatória')
   }
+
+  if (!isValidDate(input.scheduledAt)) {
+    console.error('Erro: Data inválida:', input.scheduledAt)
+    throw new ValidationError(`Data/hora agendada inválida: ${input.scheduledAt}`)
+  }
+
+  console.log('Criando compromisso com dados:', {
+    tenantId: input.tenantId,
+    title: input.title,
+    scheduledAt: input.scheduledAt,
+    description: input.description,
+  })
 
   // Cria o compromisso
   const compromisso = await createCompromisso(
@@ -37,9 +51,11 @@ export async function createCompromissoRecord(
   )
 
   if (!compromisso) {
-    throw new ValidationError('Erro ao criar compromisso')
+    console.error('Erro: createCompromisso retornou null')
+    throw new ValidationError('Erro ao criar compromisso no banco de dados')
   }
 
+  console.log('Compromisso criado com sucesso:', compromisso.id)
   return compromisso
 }
 

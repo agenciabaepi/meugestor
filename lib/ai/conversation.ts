@@ -175,27 +175,61 @@ export async function analyzeIntention(
       messages: [
         {
           role: 'system',
-          content: `Analise a mensagem do usuário e identifique a intenção. 
+          content: `Você é um assistente especializado em análise de mensagens financeiras e agendamento.
+
+Analise a mensagem do usuário e identifique a intenção. Extraia TODAS as informações relevantes.
+
 Responda APENAS com JSON no formato:
 {
   "intention": "register_expense" | "create_appointment" | "query" | "report" | "chat",
   "confidence": 0.0-1.0,
   "extractedData": {
-    "amount": número se mencionado,
-    "category": categoria se mencionada,
-    "description": descrição se mencionada,
-    "date": data se mencionada,
-    "title": título se for compromisso,
-    "scheduled_at": data/hora se for compromisso
+    "amount": número se mencionado (extrair valor numérico),
+    "category": categoria principal se mencionada ou inferida,
+    "description": descrição completa e detalhada do gasto,
+    "date": data se mencionada (formato YYYY-MM-DD),
+    "establishment": nome do estabelecimento se mencionado,
+    "paymentMethod": método de pagamento se mencionado (cartão, dinheiro, pix, etc),
+    "title": título do compromisso se for agendamento (ex: "Reunião", "Consulta médica"),
+    "scheduled_at": data/hora completa em ISO 8601 se for compromisso (ex: "2024-01-15T12:00:00.000Z"). Se mencionar apenas horário sem data, use a data de HOJE. Se mencionar "amanhã", use amanhã. Se mencionar dia da semana, calcule a próxima ocorrência,
+    "description": descrição adicional do compromisso se houver,
+    "queryType": tipo de consulta se for query (gasto, categoria, período, etc),
+    "queryCategory": categoria específica se a consulta for sobre uma categoria,
+    "queryPeriod": período se mencionado (mês, semana, ano, etc)
   }
 }
 
 INTENÇÕES:
-- register_expense: usuário quer registrar um gasto
-- create_appointment: usuário quer criar um compromisso
-- query: usuário quer consultar informações
-- report: usuário quer um relatório
-- chat: conversa geral sem ação específica`,
+- register_expense: usuário quer registrar um gasto (ex: "gastei 50 reais de gasolina", "coloquei 50 reais de gasolina")
+- create_appointment: usuário quer criar um compromisso/agendamento (ex: "reunião 12h", "tenho reunião amanhã às 10h", "marcar consulta médica para segunda às 14h")
+- query: usuário quer consultar informações (ex: "quanto gastei de combustível?", "quanto gasto por mês de gasolina?")
+- report: usuário quer um relatório completo
+- chat: conversa geral sem ação específica
+
+CATEGORIAS VÁLIDAS: Alimentação, Transporte, Moradia, Saúde, Educação, Lazer, Outros
+
+IMPORTANTE PARA COMPROMISSOS:
+- Se o usuário mencionar horário sem data, assuma que é HOJE
+- "12h" = hoje às 12:00
+- "amanhã às 10h" = amanhã às 10:00
+- "segunda às 14h" = próxima segunda-feira às 14:00
+- Sempre extraia título (ex: "reunião", "consulta", "compromisso")
+- scheduled_at deve estar em formato ISO 8601 completo (YYYY-MM-DDTHH:mm:ss)
+
+EXEMPLOS:
+- "coloquei 50 reais de gasolina" -> register_expense, amount: 50, description: "Gasolina", category: "Transporte"
+- "quanto gasto por mês de combustível?" -> query, queryType: "categoria", queryCategory: "Transporte", queryPeriod: "mês"
+- "gastei 30 no posto" -> register_expense, amount: 30, description: "Posto", category: "Transporte", establishment: "Posto"
+- "reunião 12h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-15T12:00:00.000Z" (use data de HOJE)
+- "tenho reunião amanhã às 10h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-16T10:00:00.000Z"
+- "marcar consulta médica segunda às 14h" -> create_appointment, title: "Consulta médica", scheduled_at: "2024-01-20T14:00:00.000Z"
+- "agendar reunião" -> create_appointment, title: "Reunião", scheduled_at: (use data/hora atual + 1 hora como padrão)
+
+IMPORTANTE: 
+- scheduled_at DEVE estar em formato ISO 8601 completo com timezone (ex: "2024-01-15T12:00:00.000Z")
+- Se não houver data mencionada, use HOJE
+- Se não houver horário mencionado, use o horário atual + 1 hora
+- SEMPRE retorne scheduled_at, mesmo que tenha que inferir`,
         },
         {
           role: 'user',
