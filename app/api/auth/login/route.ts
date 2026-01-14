@@ -29,6 +29,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Valida configuração do Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    console.log('Configuração Supabase:', {
+      url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'NÃO CONFIGURADO',
+      anonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 10)}...` : 'NÃO CONFIGURADO',
+    })
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Erro: Variáveis de ambiente do Supabase não configuradas')
+      return NextResponse.json(
+        { error: 'Erro de configuração do servidor' },
+        { status: 500 }
+      )
+    }
+
     // Cria cliente Supabase com suporte a cookies
     const supabase = await createServerClient()
 
@@ -40,21 +57,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Tentando fazer login no Supabase Auth...')
+    const emailNormalized = email.trim().toLowerCase()
+    console.log('Tentando fazer login no Supabase Auth...', {
+      email: emailNormalized,
+      emailLength: emailNormalized.length,
+      passwordLength: password.length,
+    })
 
     // Faz login no Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: emailNormalized,
       password,
     })
 
     if (error) {
-      console.error('Erro no Supabase Auth:', {
+      console.error('=== ERRO NO SUPABASE AUTH ===')
+      console.error('Detalhes completos do erro:', {
         message: error.message,
         status: error.status,
         name: error.name,
-        email: email ? `${email.substring(0, 3)}***` : 'não fornecido',
+        email: emailNormalized,
+        errorObject: JSON.stringify(error, Object.getOwnPropertyNames(error)),
       })
+      
+      // Tenta buscar informações adicionais
+      try {
+        const { data: userData } = await supabase.auth.admin.getUserByEmail(emailNormalized)
+        console.log('Informações do usuário (se encontrado):', userData ? 'Usuário existe' : 'Usuário não encontrado')
+      } catch (adminError) {
+        console.log('Não foi possível verificar usuário (normal se não for admin)')
+      }
 
       // Mensagens de erro mais amigáveis
       let errorMessage = 'Email ou senha incorretos'
