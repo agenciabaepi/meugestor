@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
  * GET - Health check e teste manual do job
  * Permite testar o cron manualmente via browser ou curl
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     console.log('\n=== TESTE MANUAL DO CRON LEMBRETES ===')
     console.log('Timestamp:', new Date().toISOString())
@@ -78,14 +78,17 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       timestampBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       resultado,
+      message: 'Lembretes processados com sucesso. Verifique os logs para detalhes.',
     })
   } catch (error) {
     console.error('\n=== ERRO NO TESTE MANUAL ===')
     console.error('Erro:', error)
+    console.error('Stack:', error instanceof Error ? error.stack : 'N/A')
     return NextResponse.json({
       status: 'error',
       service: 'lembretes-cron',
       error: error instanceof Error ? error.message : 'Erro desconhecido',
+      stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
     }, { status: 500 })
   }
