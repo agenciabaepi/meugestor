@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createBrowserClient } from '@/lib/db/client'
+import { createClient } from '@supabase/supabase-js'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -56,20 +56,34 @@ export default function LoginPage() {
       // IMPORTANTE: Salva a sessão no cliente Supabase
       // Isso garante que a sessão seja mantida entre requisições
       if (data.session) {
-        const supabase = createBrowserClient()
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token || '',
-        })
+        // Cria cliente Supabase diretamente no cliente (sem importar createBrowserClient)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+        
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+              storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+              autoRefreshToken: true,
+              persistSession: true,
+              detectSessionInUrl: false,
+            },
+          })
 
-        if (sessionError) {
-          console.error('Erro ao salvar sessão no cliente:', sessionError)
-          setError('Erro ao salvar sessão. Tente novamente.')
-          setLoading(false)
-          return
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token || '',
+          })
+
+          if (sessionError) {
+            console.error('Erro ao salvar sessão no cliente:', sessionError)
+            setError('Erro ao salvar sessão. Tente novamente.')
+            setLoading(false)
+            return
+          }
+
+          console.log('Sessão salva com sucesso no cliente')
         }
-
-        console.log('Sessão salva com sucesso no cliente')
       }
 
       // Redireciona para o dashboard
