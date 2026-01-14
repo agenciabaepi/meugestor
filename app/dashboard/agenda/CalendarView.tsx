@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import type { Compromisso } from '@/lib/db/types'
 
 export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) {
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Navegação de mês
   const goToPreviousMonth = () => {
@@ -106,7 +108,49 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
   // Nomes dos dias da semana
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+  // Abre modal com compromissos do dia
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date)
+    setIsModalOpen(true)
+  }
+
+  // Fecha modal
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setSelectedDate(null)
+  }
+
+  // Compromissos do dia selecionado
+  const selectedDateCompromissos = useMemo(() => {
+    if (!selectedDate) return []
+    
+    const dateKey = selectedDate.toISOString().split('T')[0]
+    return compromissosByDate.get(dateKey) || []
+  }, [selectedDate, compromissosByDate])
+
+  // Formata data para exibição
+  const formatSelectedDate = (date: Date | null): string => {
+    if (!date) return ''
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Hoje'
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Amanhã'
+    } else {
+      return date.toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    }
+  }
+
   return (
+    <>
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       {/* Cabeçalho do calendário */}
       <div className="p-4 sm:p-6 border-b border-gray-200">
@@ -171,15 +215,16 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
             const currentMonth = isCurrentMonth(date)
 
             return (
-              <div
+              <button
                 key={dateKey}
-                className={`aspect-square rounded-lg border-2 p-1 sm:p-2 transition ${
+                onClick={() => handleDateClick(date)}
+                className={`aspect-square rounded-lg border-2 p-1 sm:p-2 transition text-left ${
                   today
-                    ? 'bg-blue-50 border-blue-500'
+                    ? 'bg-blue-50 border-blue-500 hover:bg-blue-100'
                     : currentMonth
-                    ? 'bg-white border-gray-200 hover:border-gray-300'
+                    ? 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                     : 'bg-gray-50 border-gray-100'
-                }`}
+                } ${dayCompromissos.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {/* Número do dia */}
                 <div
@@ -227,11 +272,161 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                     </div>
                   )}
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
       </div>
-    </div>
+
+      {/* Modal de Detalhes */}
+      {isModalOpen && selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 capitalize">
+                  {formatSelectedDate(selectedDate)}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedDateCompromissos.length} {selectedDateCompromissos.length === 1 ? 'compromisso' : 'compromissos'}
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Lista de Compromissos */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {selectedDateCompromissos.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-8 h-8 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500">Nenhum compromisso neste dia</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {selectedDateCompromissos.map((compromisso) => {
+                    const dataHora = new Date(compromisso.scheduled_at)
+                    const hora = dataHora.toLocaleTimeString('pt-BR', {
+                      timeZone: 'America/Sao_Paulo',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                    const data = dataHora.toLocaleDateString('pt-BR', {
+                      timeZone: 'America/Sao_Paulo',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+
+                    return (
+                      <div
+                        key={compromisso.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-sm transition"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg
+                                  className="w-6 h-6 text-indigo-600"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
+                                  {compromisso.title}
+                                </h4>
+                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                  <span className="flex items-center gap-1">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                      />
+                                    </svg>
+                                    {hora}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                      />
+                                    </svg>
+                                    {data}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            {compromisso.description && (
+                              <p className="text-sm text-gray-600 mt-2 pl-15">
+                                {compromisso.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="p-4 sm:p-6 border-t border-gray-200">
+              <button
+                onClick={closeModal}
+                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
