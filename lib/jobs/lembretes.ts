@@ -35,11 +35,20 @@ export async function buscarCompromissosParaLembrete(
   const limiteSuperior = new Date(agora.getTime() + 2 * 60 * 60 * 1000)
 
   // Busca compromissos no intervalo
+  console.log(`buscarCompromissosParaLembrete - Buscando compromissos para tenant ${tenantId}`, {
+    agora: agora.toISOString(),
+    limiteSuperior: limiteSuperior.toISOString(),
+    tipoLembrete: config.tipo,
+    antecedenciaMinutos: config.antecedenciaMinutos,
+  })
+
   const compromissos = await getCompromissosRecords(
     tenantId,
     agora.toISOString(),
     limiteSuperior.toISOString()
   )
+
+  console.log(`buscarCompromissosParaLembrete - Encontrados ${compromissos.length} compromissos no intervalo`)
 
   if (!supabaseAdmin) {
     console.error('Supabase admin client não configurado')
@@ -48,6 +57,8 @@ export async function buscarCompromissosParaLembrete(
 
   // Determina qual campo verificar baseado no tipo de lembrete
   const campoLembrete = `reminder_${config.tipo}_sent` as keyof typeof compromissos[0]
+  
+  console.log(`buscarCompromissosParaLembrete - Verificando campo: ${String(campoLembrete)}`)
 
   // Filtra apenas os que ainda não foram lembrados para este tipo específico
   const compromissosParaLembrar = []
@@ -314,8 +325,19 @@ export async function processarLembretes(): Promise<{
       // Processa lembretes para cada tenant
       for (const tenant of tenants) {
         console.log(`\nProcessando tenant: ${tenant.id} (WhatsApp: ${tenant.whatsapp_number})`)
+        
+        // Verifica se o tenant tem WhatsApp configurado
+        if (!tenant.whatsapp_number) {
+          console.log(`⚠️ Tenant ${tenant.id} não tem WhatsApp configurado, pulando...`)
+          continue
+        }
+        
         const compromissos = await buscarCompromissosParaLembrete(tenant.id, config)
-        console.log(`Encontrados ${compromissos.length} compromissos para lembrete ${tipoLembrete}`)
+        console.log(`Encontrados ${compromissos.length} compromissos para lembrete ${tipoLembrete} no tenant ${tenant.id}`)
+        
+        if (compromissos.length === 0) {
+          console.log(`ℹ️ Nenhum compromisso encontrado para lembrete ${tipoLembrete} no tenant ${tenant.id}`)
+        }
 
         for (const compromisso of compromissos) {
           totalGeral++
