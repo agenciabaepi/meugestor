@@ -281,7 +281,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
 
       {/* Modal de Detalhes */}
       {isModalOpen && selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-30 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Cabeçalho do Modal */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
