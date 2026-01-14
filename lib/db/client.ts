@@ -32,8 +32,10 @@ export async function createServerClient() {
             })
           } catch (error) {
             // Em Server Components, não podemos modificar cookies
-            // Isso é esperado e não é um erro
-            console.debug('Cookie setItem chamado em contexto onde não é permitido modificar cookies')
+            // Isso é esperado e não é um erro - silenciosamente ignora
+            // O Supabase tentará atualizar a sessão, mas em Server Components
+            // isso não é permitido pelo Next.js 16. A sessão será atualizada
+            // quando necessário em Server Actions ou Route Handlers.
           }
         },
         removeItem: (key: string) => {
@@ -44,8 +46,10 @@ export async function createServerClient() {
             cookieStore.delete(key)
           } catch (error) {
             // Em Server Components, não podemos modificar cookies
-            // Isso é esperado e não é um erro
-            console.debug('Cookie removeItem chamado em contexto onde não é permitido modificar cookies')
+            // Isso é esperado e não é um erro - silenciosamente ignora
+            // O Supabase tentará limpar a sessão, mas em Server Components
+            // isso não é permitido pelo Next.js 16. A limpeza será feita
+            // quando necessário em Server Actions ou Route Handlers.
           }
         },
       },

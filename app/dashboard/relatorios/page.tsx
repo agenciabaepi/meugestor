@@ -1,28 +1,8 @@
 import { gerarRelatorioFinanceiro, gerarResumoMensal, gerarResumoSemanal, obterMaioresGastos } from '@/lib/services/relatorios'
-import { supabaseAdmin } from '@/lib/db/client'
-
-async function getTenantId(): Promise<string | null> {
-  if (!supabaseAdmin) {
-    console.error('supabaseAdmin não está configurado')
-    return null
-  }
-  
-  const { data, error } = await supabaseAdmin
-    .from('tenants')
-    .select('id')
-    .limit(1)
-    .single()
-  
-  if (error) {
-    console.error('Error fetching tenant:', error)
-    return null
-  }
-  
-  return data?.id || null
-}
+import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 
 async function getRelatoriosData() {
-  const tenantId = await getTenantId()
+  const tenantId = await getAuthenticatedTenantId()
   
   if (!tenantId) {
     return {

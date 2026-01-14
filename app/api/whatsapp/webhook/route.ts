@@ -104,7 +104,11 @@ async function processWhatsAppMessage(
 
     // Busca tenant e usuário vinculado ao número do WhatsApp
     // O número "from" é o número que enviou a mensagem
+    console.log('=== WHATSAPP WEBHOOK ===')
+    console.log('Número recebido (from):', message.from)
+    console.log('Número normalizado:', from)
     const tenantInfo = await getTenantByWhatsApp(from)
+    console.log('Resultado da busca:', tenantInfo ? { tenant_id: tenantInfo.tenant_id, user_id: tenantInfo.user_id } : 'null')
 
     // SEGURANÇA: Bloqueia uso do bot se o número não estiver vinculado a um usuário autenticado
     if (!tenantInfo || !tenantInfo.user_id) {

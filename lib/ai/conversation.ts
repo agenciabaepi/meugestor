@@ -262,10 +262,13 @@ SUBCATEGORIAS POR CATEGORIA:
 IMPORTANTE PARA COMPROMISSOS:
 - Se o usuário mencionar horário sem data, assuma que é HOJE
 - "12h" = hoje às 12:00
-- "amanhã às 10h" = amanhã às 10:00
+- "amanhã às 10h" = amanhã às 10:00 (calcule a data de amanhã corretamente)
+- "tenho reunião amanhã às 9h" = amanhã às 09:00 (calcule a data de amanhã)
 - "segunda às 14h" = próxima segunda-feira às 14:00
 - Sempre extraia título (ex: "reunião", "consulta", "compromisso")
-- scheduled_at deve estar em formato ISO 8601 completo (YYYY-MM-DDTHH:mm:ss)
+- scheduled_at deve estar em formato ISO 8601 completo com timezone UTC (ex: "2024-01-16T09:00:00.000Z")
+- Se mencionar "amanhã", calcule a data de amanhã baseado na data atual
+- SEMPRE retorne scheduled_at, mesmo que tenha que inferir a data
 
 EXEMPLOS DE RECEITAS (register_revenue):
 - "recebi 2000 de salário" -> register_revenue, amount: 2000, description: "Salário", category: "Trabalho e Negócios"

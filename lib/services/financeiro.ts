@@ -72,9 +72,32 @@ export async function createFinanceiroRecord(
 export async function getFinanceiroRecords(
   tenantId: string,
   startDate?: string,
+  endDate?: string,
+  transactionType?: 'expense' | 'revenue'
+): Promise<Financeiro[]> {
+  return getFinanceiroByTenant(tenantId, startDate, endDate, transactionType)
+}
+
+/**
+ * Obtém apenas despesas de um tenant
+ */
+export async function getDespesasRecords(
+  tenantId: string,
+  startDate?: string,
   endDate?: string
 ): Promise<Financeiro[]> {
-  return getFinanceiroByTenant(tenantId, startDate, endDate)
+  return getFinanceiroByTenant(tenantId, startDate, endDate, 'expense')
+}
+
+/**
+ * Obtém apenas receitas de um tenant
+ */
+export async function getReceitasRecords(
+  tenantId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<Financeiro[]> {
+  return getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue')
 }
 
 /**
@@ -179,8 +202,33 @@ export async function calculateTotalSpent(
   startDate?: string,
   endDate?: string
 ): Promise<number> {
-  const records = await getFinanceiroByTenant(tenantId, startDate, endDate)
+  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'expense')
   return records.reduce((total, record) => total + Number(record.amount), 0)
+}
+
+/**
+ * Calcula total de receitas em um período
+ */
+export async function calculateTotalRevenue(
+  tenantId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<number> {
+  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue')
+  return records.reduce((total, record) => total + Number(record.amount), 0)
+}
+
+/**
+ * Calcula saldo (receitas - despesas) em um período
+ */
+export async function calculateBalance(
+  tenantId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<number> {
+  const receitas = await calculateTotalRevenue(tenantId, startDate, endDate)
+  const despesas = await calculateTotalSpent(tenantId, startDate, endDate)
+  return receitas - despesas
 }
 
 /**

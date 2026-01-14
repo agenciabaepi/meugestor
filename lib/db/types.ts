@@ -39,7 +39,9 @@ export interface Compromisso {
   description: string | null
   scheduled_at: string
   created_at: string
-  reminder_sent?: boolean
+  reminder_1h_sent?: boolean
+  reminder_30min_sent?: boolean
+  reminder_10min_sent?: boolean
 }
 
 export interface Conversation {

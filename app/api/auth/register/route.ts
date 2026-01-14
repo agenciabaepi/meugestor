@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
     const supabase = await createServerClient()
 
     // Registra no Supabase Auth
+    console.log('=== REGISTRO DE USUÁRIO ===')
+    console.log('Email:', email)
+    console.log('WhatsApp normalizado:', normalizedWhatsApp)
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -66,18 +69,48 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
+      console.error('Erro no signUp:', error)
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
       )
     }
 
-    // Atualiza o whatsapp_number no registro do usuário (o trigger cria o usuário, mas podemos garantir)
+    console.log('SignUp bem-sucedido. User ID:', data.user?.id)
+
+    // Verifica se o registro foi criado na tabela users (o trigger deveria criar)
     if (data.user && supabaseAdmin) {
-      await supabaseAdmin
+      // Aguarda um pouco para o trigger executar
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Verifica se o registro existe
+      const { data: existingUser, error: checkError } = await supabaseAdmin
         .from('users')
-        .update({ whatsapp_number: normalizedWhatsApp })
+        .select('id, whatsapp_number, tenant_id')
         .eq('id', data.user.id)
+        .single()
+
+      if (checkError || !existingUser) {
+        console.error('Erro: Registro não foi criado na tabela users pelo trigger:', checkError)
+        // Tenta criar manualmente se o trigger falhou
+        // (Mas isso não deveria acontecer se o trigger estiver funcionando)
+      } else {
+        console.log('Registro encontrado na tabela users:', existingUser)
+        // Atualiza o whatsapp_number se necessário (o trigger deveria ter criado com o número correto)
+        if (existingUser.whatsapp_number !== normalizedWhatsApp) {
+          console.log('Atualizando whatsapp_number no registro:', { old: existingUser.whatsapp_number, new: normalizedWhatsApp })
+          const { error: updateError } = await supabaseAdmin
+            .from('users')
+            .update({ whatsapp_number: normalizedWhatsApp })
+            .eq('id', data.user.id)
+          
+          if (updateError) {
+            console.error('Erro ao atualizar whatsapp_number:', updateError)
+          } else {
+            console.log('whatsapp_number atualizado com sucesso')
+          }
+        }
+      }
     }
 
     return NextResponse.json({

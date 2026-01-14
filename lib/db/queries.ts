@@ -189,7 +189,8 @@ export async function createFinanceiro(
 export async function getFinanceiroByTenant(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  transactionType?: 'expense' | 'revenue'
 ): Promise<Financeiro[]> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -212,11 +213,53 @@ export async function getFinanceiroByTenant(
     query = query.lte('date', endDate)
   }
 
+  // Filtra por tipo de transação se fornecido
+  // Tenta filtrar, mas se o campo não existir (migration não aplicada), ignora o filtro
+  if (transactionType) {
+    try {
+      query = query.eq('transaction_type', transactionType)
+    } catch (e) {
+      // Se o campo não existir, continua sem filtro
+      console.warn('Campo transaction_type não disponível, retornando todos os registros')
+    }
+  }
+
   const { data, error } = await query
 
   if (error) {
+    // Se o erro for sobre transaction_type não existir, tenta sem o filtro
+    if (error.message?.includes('transaction_type') || error.code === '42703') {
+      console.warn('Campo transaction_type não existe, buscando sem filtro')
+      let retryQuery = client
+        .from('financeiro')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('date', { ascending: false })
+      
+      if (startDate) {
+        retryQuery = retryQuery.gte('date', startDate)
+      }
+      if (endDate) {
+        retryQuery = retryQuery.lte('date', endDate)
+      }
+      
+      const retryResult = await retryQuery
+      return retryResult.data || []
+    }
+    
     console.error('Error fetching financeiro:', error)
     return []
+  }
+
+  // Se transactionType foi fornecido mas não há campo, filtra manualmente
+  if (transactionType && data) {
+    return data.filter((item: any) => {
+      // Se o campo não existe, assume que tudo é despesa (comportamento antigo)
+      if (!item.transaction_type) {
+        return transactionType === 'expense'
+      }
+      return item.transaction_type === transactionType
+    })
   }
 
   return data || []

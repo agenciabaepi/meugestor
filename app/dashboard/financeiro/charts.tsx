@@ -7,9 +7,17 @@ interface ChartsProps {
   dadosGrafico: Array<{ date: string; total: number }>
   dadosPorCategoria: Array<{ name: string; value: number }>
   cores: string[]
+  tituloGrafico?: string
+  tituloCategoria?: string
 }
 
-export function Charts({ dadosGrafico, dadosPorCategoria, cores }: ChartsProps) {
+export function Charts({ 
+  dadosGrafico, 
+  dadosPorCategoria, 
+  cores,
+  tituloGrafico = 'Gastos dos Últimos 7 Dias',
+  tituloCategoria = 'Gastos por Categoria'
+}: ChartsProps) {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -28,7 +36,7 @@ export function Charts({ dadosGrafico, dadosPorCategoria, cores }: ChartsProps) 
       {/* Gráfico de Barras - Últimos 7 dias */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-          Gastos dos Últimos 7 Dias
+          {tituloGrafico}
         </h2>
         <div className="w-full" style={{ height: isMobile ? '220px' : '250px' }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -58,7 +66,7 @@ export function Charts({ dadosGrafico, dadosPorCategoria, cores }: ChartsProps) 
       {/* Gráfico de Pizza - Por Categoria */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-          Gastos por Categoria
+          {tituloCategoria}
         </h2>
         {dadosPorCategoria.length > 0 ? (
           <div className="w-full" style={{ height: isMobile ? '220px' : '250px' }}>

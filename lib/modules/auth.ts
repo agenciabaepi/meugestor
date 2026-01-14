@@ -58,22 +58,40 @@ export async function getUserByWhatsApp(
 ): Promise<{ id: string; tenant_id: string } | null> {
   try {
     if (!supabaseAdmin) {
+      console.error('getUserByWhatsApp: supabaseAdmin não configurado')
       return null
     }
 
     const normalized = whatsappNumber.replace(/\D/g, '')
+    console.log('getUserByWhatsApp: Buscando usuário com número normalizado:', normalized)
 
     const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, tenant_id')
+      .select('id, tenant_id, whatsapp_number, email')
       .eq('whatsapp_number', normalized)
       .single()
 
-    if (error || !data) {
+    if (error) {
+      console.error('getUserByWhatsApp: Erro na query:', error)
+      // Tenta buscar sem .single() para ver se há algum registro
+      const { data: allData, error: listError } = await supabaseAdmin
+        .from('users')
+        .select('id, tenant_id, whatsapp_number, email')
+        .limit(10)
+      
+      if (!listError && allData) {
+        console.log('getUserByWhatsApp: Usuários existentes na tabela:', allData.map(u => ({ email: u.email, whatsapp: u.whatsapp_number })))
+      }
       return null
     }
 
-    return data
+    if (!data) {
+      console.log('getUserByWhatsApp: Nenhum usuário encontrado para o número:', normalized)
+      return null
+    }
+
+    console.log('getUserByWhatsApp: Usuário encontrado:', { id: data.id, email: data.email, whatsapp: data.whatsapp_number })
+    return { id: data.id, tenant_id: data.tenant_id }
   } catch (error) {
     console.error('Erro ao buscar usuário por WhatsApp:', error)
     return null

@@ -28,6 +28,31 @@ export async function getCurrentUser() {
 }
 
 /**
+ * Obtém o tenant_id do usuário autenticado
+ * CRÍTICO: Usa a sessão do usuário para garantir isolamento multi-tenant
+ */
+export async function getAuthenticatedTenantId(): Promise<string | null> {
+  const session = await getSession()
+  if (!session || !session.user) {
+    return null
+  }
+
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', session.user.id)
+    .single()
+
+  if (error || !data) {
+    console.error('Error fetching tenant_id for user:', error)
+    return null
+  }
+
+  return data.tenant_id
+}
+
+/**
  * Faz logout (para uso no servidor)
  */
 export async function logout() {

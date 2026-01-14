@@ -1,63 +1,84 @@
-import { getFinanceiroRecords, calculateTotalSpent, calculateTotalByCategory } from '@/lib/services/financeiro'
-import { gerarRelatorioFinanceiro } from '@/lib/services/relatorios'
-import { supabaseAdmin } from '@/lib/db/client'
-import { Charts } from './charts'
-
-async function getTenantId(): Promise<string | null> {
-  if (!supabaseAdmin) {
-    console.error('supabaseAdmin não está configurado')
-    return null
-  }
-  
-  const { data, error } = await supabaseAdmin
-    .from('tenants')
-    .select('id')
-    .limit(1)
-    .single()
-  
-  if (error) {
-    console.error('Error fetching tenant:', error)
-    return null
-  }
-  
-  return data?.id || null
-}
+import { 
+  getFinanceiroRecords, 
+  getDespesasRecords,
+  getReceitasRecords,
+  calculateTotalSpent, 
+  calculateTotalRevenue,
+  calculateBalance,
+  calculateTotalByCategory 
+} from '@/lib/services/financeiro'
+import { getAuthenticatedTenantId } from '@/lib/utils/auth'
+import { FinanceiroTabs } from './tabs'
 
 async function getFinanceiroData() {
-  const tenantId = await getTenantId()
+  const tenantId = await getAuthenticatedTenantId()
   
   if (!tenantId) {
     return {
-      gastosMes: [],
-      totalMes: 0,
-      totalMesAnterior: 0,
-      dadosPorCategoria: [],
-      dadosGrafico: [],
+      despesasMes: [],
+      receitasMes: [],
+      todasTransacoes: [],
+      totalDespesas: 0,
+      totalReceitas: 0,
+      saldo: 0,
+      totalDespesasAnterior: 0,
+      totalReceitasAnterior: 0,
+      dadosPorCategoriaDespesas: [],
+      dadosPorCategoriaReceitas: [],
+      dadosGraficoDespesas: [],
+      dadosGraficoReceitas: [],
       cores: [],
     }
   }
+  
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
-  const gastosMes = await getFinanceiroRecords(
+  // Busca despesas e receitas separadamente
+  const despesasMes = await getDespesasRecords(
     tenantId,
     startOfMonth.toISOString().split('T')[0]
   )
   
-  const totalMes = await calculateTotalSpent(
+  const receitasMes = await getReceitasRecords(
     tenantId,
     startOfMonth.toISOString().split('T')[0]
   )
   
-  const totalMesAnterior = await calculateTotalSpent(
+  const todasTransacoes = await getFinanceiroRecords(
+    tenantId,
+    startOfMonth.toISOString().split('T')[0]
+  )
+  
+  // Calcula totais
+  const totalDespesas = await calculateTotalSpent(
+    tenantId,
+    startOfMonth.toISOString().split('T')[0]
+  )
+  
+  const totalReceitas = await calculateTotalRevenue(
+    tenantId,
+    startOfMonth.toISOString().split('T')[0]
+  )
+  
+  const saldo = totalReceitas - totalDespesas
+  
+  // Totais do mês anterior
+  const totalDespesasAnterior = await calculateTotalSpent(
+    tenantId,
+    startOfLastMonth.toISOString().split('T')[0],
+    endOfLastMonth.toISOString().split('T')[0]
+  )
+  
+  const totalReceitasAnterior = await calculateTotalRevenue(
     tenantId,
     startOfLastMonth.toISOString().split('T')[0],
     endOfLastMonth.toISOString().split('T')[0]
   )
 
-  // Dados por categoria
+  // Dados por categoria (despesas)
   const categorias = [
     'Alimentação',
     'Moradia',
@@ -74,13 +95,29 @@ async function getFinanceiroData() {
     'Trabalho e Negócios',
     'Outros',
   ]
-  const dadosPorCategoria = await Promise.all(
+  
+  const dadosPorCategoriaDespesas = await Promise.all(
     categorias.map(async (cat) => {
-      const total = await calculateTotalByCategory(
+      const despesas = await getDespesasRecords(
         tenantId,
-        cat,
         startOfMonth.toISOString().split('T')[0]
       )
+      const total = despesas
+        .filter(d => d.category === cat)
+        .reduce((sum, d) => sum + Number(d.amount), 0)
+      return { name: cat, value: Number(total) }
+    })
+  )
+  
+  const dadosPorCategoriaReceitas = await Promise.all(
+    categorias.map(async (cat) => {
+      const receitas = await getReceitasRecords(
+        tenantId,
+        startOfMonth.toISOString().split('T')[0]
+      )
+      const total = receitas
+        .filter(r => r.category === cat)
+        .reduce((sum, r) => sum + Number(r.amount), 0)
       return { name: cat, value: Number(total) }
     })
   )
@@ -92,10 +129,21 @@ async function getFinanceiroData() {
     return date.toISOString().split('T')[0]
   })
 
-  const dadosGrafico = await Promise.all(
+  const dadosGraficoDespesas = await Promise.all(
     ultimos7Dias.map(async (date) => {
-      const gastos = await getFinanceiroRecords(tenantId, date, date)
-      const total = gastos.reduce((sum, g) => sum + Number(g.amount), 0)
+      const despesas = await getDespesasRecords(tenantId, date, date)
+      const total = despesas.reduce((sum, d) => sum + Number(d.amount), 0)
+      return {
+        date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
+        total: Number(total),
+      }
+    })
+  )
+  
+  const dadosGraficoReceitas = await Promise.all(
+    ultimos7Dias.map(async (date) => {
+      const receitas = await getReceitasRecords(tenantId, date, date)
+      const total = receitas.reduce((sum, r) => sum + Number(r.amount), 0)
       return {
         date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
         total: Number(total),
@@ -106,19 +154,31 @@ async function getFinanceiroData() {
   const cores = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280']
 
   return {
-    gastosMes,
-    totalMes,
-    totalMesAnterior,
-    dadosPorCategoria: dadosPorCategoria.filter(d => d.value > 0),
-    dadosGrafico,
+    despesasMes,
+    receitasMes,
+    todasTransacoes,
+    totalDespesas,
+    totalReceitas,
+    saldo,
+    totalDespesasAnterior,
+    totalReceitasAnterior,
+    dadosPorCategoriaDespesas: dadosPorCategoriaDespesas.filter(d => d.value > 0),
+    dadosPorCategoriaReceitas: dadosPorCategoriaReceitas.filter(d => d.value > 0),
+    dadosGraficoDespesas,
+    dadosGraficoReceitas,
     cores,
   }
 }
 
 export default async function FinanceiroPage() {
   const data = await getFinanceiroData()
-  const variacao = data.totalMesAnterior > 0 
-    ? ((data.totalMes - data.totalMesAnterior) / data.totalMesAnterior * 100).toFixed(1)
+  
+  const variacaoDespesas = data.totalDespesasAnterior > 0 
+    ? ((data.totalDespesas - data.totalDespesasAnterior) / data.totalDespesasAnterior * 100).toFixed(1)
+    : '0'
+    
+  const variacaoReceitas = data.totalReceitasAnterior > 0 
+    ? ((data.totalReceitas - data.totalReceitasAnterior) / data.totalReceitasAnterior * 100).toFixed(1)
     : '0'
 
   return (
@@ -126,85 +186,69 @@ export default async function FinanceiroPage() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Financeiro</h1>
         <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-          Controle seus gastos e visualize suas finanças
+          Controle suas despesas e receitas
         </p>
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Saldo */}
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Total do Mês</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2 break-words">
-            R$ {data.totalMes.toFixed(2)}
+          <p className="text-xs sm:text-sm font-medium text-gray-500">Saldo do Mês</p>
+          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 break-words ${data.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {data.saldo >= 0 ? '+' : ''}R$ {data.saldo.toFixed(2)}
           </p>
-          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacao) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-            {Number(variacao) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacao))}% vs mês anterior
+          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+            {data.totalReceitas >= 0 ? 'Receitas' : 'Despesas'} - {data.totalDespesas >= 0 ? 'Despesas' : 'Receitas'}
           </p>
         </div>
 
+        {/* Receitas */}
+        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500">Receitas</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2 break-words">
+            R$ {data.totalReceitas.toFixed(2)}
+          </p>
+          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoReceitas) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {Number(variacaoReceitas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoReceitas))}% vs mês anterior
+          </p>
+        </div>
+
+        {/* Despesas */}
+        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500">Despesas</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2 break-words">
+            R$ {data.totalDespesas.toFixed(2)}
+          </p>
+          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoDespesas) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+            {Number(variacaoDespesas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoDespesas))}% vs mês anterior
+          </p>
+        </div>
+
+        {/* Registros */}
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Registros</p>
           <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">
-            {data.gastosMes.length}
+            {data.todasTransacoes.length}
           </p>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Este mês</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Média Diária</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2 break-words">
-            R$ {(data.totalMes / new Date().getDate()).toFixed(2)}
+          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+            {data.receitasMes.length} receitas • {data.despesasMes.length} despesas
           </p>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Gasto médio por dia</p>
         </div>
       </div>
 
-      {/* Gráficos */}
-      <Charts 
-        dadosGrafico={data.dadosGrafico}
-        dadosPorCategoria={data.dadosPorCategoria}
+      {/* Componente de Abas */}
+      <FinanceiroTabs 
+        despesas={data.despesasMes}
+        receitas={data.receitasMes}
+        todasTransacoes={data.todasTransacoes}
+        dadosGraficoDespesas={data.dadosGraficoDespesas}
+        dadosGraficoReceitas={data.dadosGraficoReceitas}
+        dadosPorCategoriaDespesas={data.dadosPorCategoriaDespesas}
+        dadosPorCategoriaReceitas={data.dadosPorCategoriaReceitas}
         cores={data.cores}
       />
-
-      {/* Lista de Gastos */}
-      <div className="bg-white rounded-lg shadow-sm sm:shadow">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Todos os Gastos do Mês</h2>
-        </div>
-        <div className="p-3 sm:p-4 lg:p-6">
-          {data.gastosMes.length > 0 ? (
-            <div className="space-y-2 sm:space-y-3">
-              {data.gastosMes.map((gasto) => (
-                <div
-                  key={gasto.id}
-                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
-                >
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{gasto.description}</p>
-                    <div className="flex items-center flex-wrap gap-2 sm:gap-4 mt-1">
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        {gasto.category}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        {new Date(gasto.date).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-semibold text-sm sm:text-base lg:text-lg text-gray-900 whitespace-nowrap">
-                      R$ {Number(gasto.amount).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
-              Nenhum gasto registrado este mês
-            </p>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
+

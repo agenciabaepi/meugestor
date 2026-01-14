@@ -1,35 +1,12 @@
 import { getFinanceiroRecords, calculateTotalSpent } from '@/lib/services/financeiro'
 import { getTodayCompromissos, getCompromissosRecords } from '@/lib/services/compromissos'
 import { gerarResumoMensal } from '@/lib/services/relatorios'
-import { supabaseAdmin } from '@/lib/db/client'
+import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
 
-// Busca o primeiro tenant disponível usando admin (bypass RLS)
-// Na implementação completa, isso virá da autenticação
-async function getTenantId(): Promise<string | null> {
-  if (!supabaseAdmin) {
-    console.error('supabaseAdmin não está configurado')
-    return null
-  }
-  
-  const { data, error } = await supabaseAdmin
-    .from('tenants')
-    .select('id')
-    .limit(1)
-    .single()
-  
-  if (error) {
-    console.error('Error fetching tenant:', error)
-    return null
-  }
-  
-  return data?.id || null
-}
-
 async function getDashboardData() {
-  // TODO: Obter tenant_id da sessão autenticada
-  // Por enquanto, vamos buscar o primeiro tenant disponível
-  const tenantId = await getTenantId()
+  // Obtém tenant_id do usuário autenticado
+  const tenantId = await getAuthenticatedTenantId()
   
   if (!tenantId) {
     // Retorna dados vazios se não houver tenant

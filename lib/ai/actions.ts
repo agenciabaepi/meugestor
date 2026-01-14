@@ -10,7 +10,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getCompromissosRecords, getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
-import { parseScheduledAt, extractAppointmentFromMessage } from '../utils/date-parser'
+import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil } from '../utils/date-parser'
 
 export interface ActionResult {
   success: boolean
@@ -92,6 +92,14 @@ export async function processAction(
 
     console.log('processAction - Intenção detectada:', intention)
     console.log('processAction - Dados extraídos:', JSON.stringify(extractedData, null, 2))
+    
+    // Log específico para compromissos
+    if (intention === 'create_appointment') {
+      console.log('processAction - COMPROMISSO DETECTADO')
+      console.log('processAction - extractedData.title:', extractedData?.title)
+      console.log('processAction - extractedData.scheduled_at:', extractedData?.scheduled_at)
+      console.log('processAction - Mensagem original:', message)
+    }
 
     // Valida e corrige a intenção baseado em palavras-chave
     const correctedIntention = validateAndCorrectIntention(message, intention, extractedData)
@@ -357,17 +365,33 @@ async function handleCreateAppointment(
   originalMessage?: string
 ): Promise<ActionResult> {
   try {
+    console.log('=== handleCreateAppointment INICIADO ===')
+    console.log('handleCreateAppointment - Dados recebidos:', JSON.stringify(data, null, 2))
+    console.log('handleCreateAppointment - Mensagem original:', originalMessage)
+    console.log('handleCreateAppointment - TenantId:', tenantId)
+    
     let title = data?.title
     let scheduledAt = data?.scheduled_at ? parseScheduledAt(data.scheduled_at) : null
 
+    console.log('handleCreateAppointment - Após parseScheduledAt:', {
+      title,
+      scheduledAt,
+      scheduled_at_original: data?.scheduled_at
+    })
+
     // Se não tem dados suficientes, tenta extrair da mensagem original
     if ((!title || !scheduledAt) && originalMessage) {
+      console.log('handleCreateAppointment - Tentando extrair da mensagem original...')
       const extracted = extractAppointmentFromMessage(originalMessage)
+      console.log('handleCreateAppointment - Dados extraídos:', JSON.stringify(extracted, null, 2))
+      
       if (!title && extracted.title) {
         title = extracted.title
+        console.log('handleCreateAppointment - Título atualizado para:', title)
       }
       if (!scheduledAt && extracted.scheduledAt) {
         scheduledAt = extracted.scheduledAt
+        console.log('handleCreateAppointment - scheduledAt atualizado para:', scheduledAt)
       }
     }
 
@@ -383,16 +407,23 @@ async function handleCreateAppointment(
 
     // Se ainda não tem data/hora, retorna erro
     if (!scheduledAt) {
+      console.error('handleCreateAppointment - ERRO: scheduledAt não encontrado')
+      console.error('handleCreateAppointment - Dados finais:', {
+        title,
+        scheduledAt,
+        data_scheduled_at: data?.scheduled_at,
+        originalMessage
+      })
       return {
         success: false,
         message: 'Preciso saber quando será o compromisso. Qual data e horário? (ex: "reunião 12h", "amanhã às 10h")',
       }
     }
 
-    // Valida se a data não é no passado
+    // Valida se a data não é no passado (usando timezone do Brasil)
     const scheduledDate = new Date(scheduledAt)
-    const now = new Date()
-    if (scheduledDate < now) {
+    const now = getNowInBrazil()
+    if (!isFutureInBrazil(scheduledDate, now)) {
       return {
         success: false,
         message: 'Não é possível agendar compromissos no passado. Por favor, informe uma data/hora futura.',

@@ -16,16 +16,38 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      // Validação básica
+      if (!email || !password) {
+        setError('Por favor, preencha todos os campos')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email: email.trim().toLowerCase(), 
+          password 
+        }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        setError(data.error || 'Erro ao fazer login')
+        // Mensagens de erro mais específicas
+        let errorMessage = data.error || 'Erro ao fazer login'
+        
+        if (response.status === 401) {
+          if (errorMessage.includes('rate limit') || errorMessage.includes('muitas tentativas')) {
+            errorMessage = 'Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.'
+          } else if (errorMessage.includes('incorretos')) {
+            errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
+          }
+        }
+        
+        setError(errorMessage)
+        setLoading(false)
         return
       }
 
@@ -33,8 +55,8 @@ export default function LoginPage() {
       router.push('/dashboard')
       router.refresh()
     } catch (err) {
-      setError('Erro ao fazer login. Tente novamente.')
-    } finally {
+      console.error('Erro no login:', err)
+      setError('Erro ao conectar com o servidor. Verifique sua conexão e tente novamente.')
       setLoading(false)
     }
   }

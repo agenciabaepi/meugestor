@@ -1,26 +1,6 @@
 import { getCompromissosRecords } from '@/lib/services/compromissos'
-import { supabaseAdmin } from '@/lib/db/client'
+import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import type { Compromisso } from '@/lib/db/types'
-
-async function getTenantId(): Promise<string | null> {
-  if (!supabaseAdmin) {
-    console.error('supabaseAdmin não está configurado')
-    return null
-  }
-  
-  const { data, error } = await supabaseAdmin
-    .from('tenants')
-    .select('id')
-    .limit(1)
-    .single()
-  
-  if (error) {
-    console.error('Error fetching tenant:', error)
-    return null
-  }
-  
-  return data?.id || null
-}
 
 // Agrupa compromissos por data (formato YYYY-MM-DD)
 function groupCompromissosByDate(compromissos: Compromisso[]): Map<string, Compromisso[]> {
@@ -72,7 +52,7 @@ function formatDateLabel(dateKey: string, date: Date): string {
 }
 
 async function getAgendaData() {
-  const tenantId = await getTenantId()
+  const tenantId = await getAuthenticatedTenantId()
   
   if (!tenantId) {
     return {
