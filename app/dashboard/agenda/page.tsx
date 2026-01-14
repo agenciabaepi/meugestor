@@ -37,38 +37,38 @@ export default async function AgendaPage() {
   const data = await getAgendaData()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Agenda</h1>
+        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
           Gerencie seus compromissos e eventos
         </p>
       </div>
 
       {/* Compromissos de Hoje */}
       {data.hoje.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white rounded-lg shadow-sm sm:shadow">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-blue-50">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">
               Hoje ({new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })})
             </h2>
           </div>
-          <div className="p-6">
-            <div className="space-y-4">
+          <div className="p-3 sm:p-4 lg:p-6">
+            <div className="space-y-2 sm:space-y-3">
               {data.hoje.map((compromisso) => (
                 <div
                   key={compromisso.id}
-                  className="flex items-start p-4 bg-blue-50 rounded-lg border border-blue-200"
+                  className="flex items-start p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200"
                 >
-                  <div className="flex-shrink-0 w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-semibold">
+                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-semibold text-xs sm:text-sm">
                       {new Date(compromisso.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="ml-4 flex-1">
-                    <p className="font-semibold text-gray-900">{compromisso.title}</p>
+                  <div className="ml-3 sm:ml-4 flex-1 min-w-0">
+                    <p className="font-semibold text-sm sm:text-base text-gray-900 truncate">{compromisso.title}</p>
                     {compromisso.description && (
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">
                         {compromisso.description}
                       </p>
                     )}
@@ -81,13 +81,13 @@ export default async function AgendaPage() {
       )}
 
       {/* Próximos Compromissos */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Próximos Compromissos</h2>
+      <div className="bg-white rounded-lg shadow-sm sm:shadow">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Próximos Compromissos</h2>
         </div>
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
           {data.proximos.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-3">
               {data.proximos.map((compromisso) => {
                 const dataCompromisso = new Date(compromisso.scheduled_at)
                 const hoje = new Date()
@@ -109,18 +109,18 @@ export default async function AgendaPage() {
                 return (
                   <div
                     key={compromisso.id}
-                    className="flex items-start p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                    className="flex items-start p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
                   >
-                    <div className="flex-shrink-0 w-20 text-center">
-                      <p className="text-sm font-medium text-gray-500">{dataLabel}</p>
+                    <div className="flex-shrink-0 w-16 sm:w-20 text-center">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">{dataLabel}</p>
                       <p className="text-xs text-gray-400 mt-1">
                         {dataCompromisso.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
-                    <div className="ml-4 flex-1">
-                      <p className="font-semibold text-gray-900">{compromisso.title}</p>
+                    <div className="ml-3 sm:ml-4 flex-1 min-w-0">
+                      <p className="font-semibold text-sm sm:text-base text-gray-900 truncate">{compromisso.title}</p>
                       {compromisso.description && (
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">
                           {compromisso.description}
                         </p>
                       )}
@@ -130,7 +130,7 @@ export default async function AgendaPage() {
               })}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
               Nenhum compromisso futuro agendado
             </p>
           )}
@@ -138,11 +138,11 @@ export default async function AgendaPage() {
       </div>
 
       {/* Todos os Compromissos */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Todos os Compromissos</h2>
+      <div className="bg-white rounded-lg shadow-sm sm:shadow">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Todos os Compromissos</h2>
         </div>
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
           {data.todos.length > 0 ? (
             <div className="space-y-2">
               {data.todos.map((compromisso) => (
@@ -150,9 +150,9 @@ export default async function AgendaPage() {
                   key={compromisso.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  <div>
-                    <p className="font-medium text-gray-900">{compromisso.title}</p>
-                    <p className="text-sm text-gray-500">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{compromisso.title}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       {new Date(compromisso.scheduled_at).toLocaleString('pt-BR')}
                     </p>
                   </div>
@@ -160,7 +160,7 @@ export default async function AgendaPage() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
               Nenhum compromisso registrado
             </p>
           )}
