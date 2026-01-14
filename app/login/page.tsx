@@ -39,10 +39,11 @@ export default function LoginPage() {
         let errorMessage = data.error || 'Erro ao fazer login'
         
         if (response.status === 401) {
-          if (errorMessage.includes('rate limit') || errorMessage.includes('muitas tentativas')) {
-            errorMessage = 'Muitas tentativas de login. Aguarde alguns minutos antes de tentar novamente.'
-          } else if (errorMessage.includes('incorretos')) {
+          // Mensagem genérica para erros de autenticação
+          if (errorMessage.includes('incorretos')) {
             errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
+          } else {
+            errorMessage = 'Erro ao fazer login. Verifique suas credenciais e tente novamente.'
           }
         }
         
