@@ -92,13 +92,15 @@ export async function POST(request: NextRequest) {
       let errorMessage = 'Email ou senha incorretos'
       
       // Verifica tipos específicos de erro
-      if (error.message.includes('Invalid login credentials')) {
+      if (error.status === 429 || 
+          error.message.includes('rate limit') || 
+          error.message.includes('too many requests') ||
+          error.message.includes('Request rate limit reached')) {
+        errorMessage = 'Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.'
+      } else if (error.message.includes('Invalid login credentials')) {
         errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
       } else if (error.message.includes('Email not confirmed')) {
         errorMessage = 'Email não confirmado. Verifique sua caixa de entrada.'
-      } else if (error.message.includes('rate limit') || 
-                 error.message.includes('too many requests')) {
-        errorMessage = 'Erro ao fazer login. Tente novamente em alguns instantes.'
       } else if (error.message) {
         // Para outros erros, usa a mensagem do Supabase mas de forma genérica
         errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
