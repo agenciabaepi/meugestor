@@ -422,15 +422,14 @@ async function handleCreateAppointment(
 
     // Valida se a data não é no passado (usando timezone do Brasil)
     const scheduledDate = new Date(scheduledAt)
-    const now = getNowInBrazil()
+    const now = new Date() // Usa data atual do sistema
     
-    // Calcula diferença em minutos para log
-    const diferencaMinutos = (scheduledDate.getTime() - now.getTime()) / (1000 * 60)
     console.log('handleCreateAppointment - Validação de data:', {
       scheduledAt,
+      scheduledDateISO: scheduledDate.toISOString(),
       scheduledDateLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      nowISO: now.toISOString(),
       nowLocal: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-      diferencaMinutos: Math.round(diferencaMinutos),
     })
     
     if (!isFutureInBrazil(scheduledDate, now)) {

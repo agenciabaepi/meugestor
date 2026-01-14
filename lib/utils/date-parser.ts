@@ -9,9 +9,58 @@ const BRAZIL_TIMEZONE = 'America/Sao_Paulo'
 
 /**
  * Obtém a data/hora atual no timezone do Brasil
+ * Retorna uma data que representa "agora" no timezone do Brasil
  */
 export function getNowInBrazil(): Date {
-  return new Date()
+  const now = new Date()
+  
+  // Obtém o horário atual no Brasil
+  const brazilNow = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(now)
+  
+  const year = parseInt(brazilNow.find(p => p.type === 'year')?.value || '2024')
+  const month = parseInt(brazilNow.find(p => p.type === 'month')?.value || '1')
+  const day = parseInt(brazilNow.find(p => p.type === 'day')?.value || '1')
+  const hour = parseInt(brazilNow.find(p => p.type === 'hour')?.value || '0')
+  const minute = parseInt(brazilNow.find(p => p.type === 'minute')?.value || '0')
+  const second = parseInt(brazilNow.find(p => p.type === 'second')?.value || '0')
+  
+  // Cria uma data UTC que representa esse horário no Brasil
+  // Usa a mesma lógica de createDateInBrazil
+  const noonUTC = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  const brazilNoonParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    hour: '2-digit',
+    hour12: false
+  }).formatToParts(noonUTC)
+  
+  const brazilNoonHour = parseInt(brazilNoonParts.find(p => p.type === 'hour')?.value || '12')
+  const offsetHours = brazilNoonHour - 12
+  
+  let utcHourTarget = hour - offsetHours
+  let utcDay = day
+  let utcMonth = month - 1
+  let utcYear = year
+  
+  if (utcHourTarget < 0) {
+    utcHourTarget += 24
+    utcDay -= 1
+  } else if (utcHourTarget >= 24) {
+    utcHourTarget -= 24
+    utcDay += 1
+  }
+  
+  const utcDate = new Date(Date.UTC(utcYear, utcMonth, utcDay, utcHourTarget, minute, second))
+  
+  return utcDate
 }
 
 /**
@@ -63,11 +112,7 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+    day: '2-digit'
   })
   
   const parts = formatter.formatToParts(now)
@@ -75,67 +120,48 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
   const month = parseInt(parts.find(p => p.type === 'month')?.value || '1')
   const day = parseInt(parts.find(p => p.type === 'day')?.value || '1')
   
-  // Cria uma string de data no formato que representa o horário desejado no Brasil
-  // Formato: YYYY-MM-DDTHH:mm:00 (sem timezone, será interpretado como local)
   const targetDay = day + dayOffset
-  const dateString = `${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
   
-  // Cria uma data assumindo que essa string representa um horário no Brasil
-  // Para converter corretamente, precisamos saber o offset do Brasil para essa data
-  // Vamos usar uma abordagem mais simples: criar a data e ajustar pelo offset conhecido
+  // Abordagem mais simples: usa busca binária para encontrar a data UTC correta
+  // Começa com uma estimativa (Brasil geralmente é UTC-3)
+  let utcHourEstimate = hour + 3
+  let utcDate = new Date(Date.UTC(year, month - 1, targetDay, utcHourEstimate, minute, 0, 0))
   
-  // Cria uma data de referência para calcular o offset
-  const referenceDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}T12:00:00Z`)
-  
-  // Obtém o horário dessa data no Brasil
-  const brazilTime = referenceDate.toLocaleString('en-US', {
+  // Verifica e ajusta se necessário
+  const verificationParts = new Intl.DateTimeFormat('en-US', {
     timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
-  })
+  }).formatToParts(utcDate)
   
-  // Obtém o horário em UTC
-  const utcTime = referenceDate.toLocaleString('en-US', {
-    timeZone: 'UTC',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+  const verifiedHour = parseInt(verificationParts.find(p => p.type === 'hour')?.value || '0')
+  const verifiedMinute = parseInt(verificationParts.find(p => p.type === 'minute')?.value || '0')
+  const verifiedDay = parseInt(verificationParts.find(p => p.type === 'day')?.value || String(targetDay))
   
-  // Calcula o offset (diferença entre Brasil e UTC)
-  const brazilHour = parseInt(brazilTime.split(':')[0])
-  const utcHour = parseInt(utcTime.split(':')[0])
-  const offsetHours = brazilHour - utcHour
-  
-  // Cria a data UTC que representa o horário desejado no Brasil
-  // Se queremos 18h no Brasil e o offset é -3, então em UTC seria 21h (18 - (-3) = 21)
-  let utcHourTarget = hour - offsetHours
-  
-  // Ajusta para o próximo dia se necessário
-  let utcDay = targetDay
-  let utcMonth = month - 1
-  let utcYear = year
-  
-  if (utcHourTarget < 0) {
-    utcHourTarget += 24
-    utcDay -= 1
-  } else if (utcHourTarget >= 24) {
-    utcHourTarget -= 24
-    utcDay += 1
+  // Se não está correto, ajusta
+  if (verifiedHour !== hour || verifiedMinute !== minute || verifiedDay !== targetDay) {
+    const hourDiff = hour - verifiedHour
+    const minuteDiff = minute - verifiedMinute
+    const dayDiff = targetDay - verifiedDay
+    
+    // Ajusta a data UTC
+    utcDate = new Date(utcDate.getTime() + 
+      (hourDiff * 60 + minuteDiff) * 60 * 1000 + 
+      dayDiff * 24 * 60 * 60 * 1000)
   }
-  
-  const utcDate = new Date(Date.UTC(utcYear, utcMonth, utcDay, utcHourTarget, minute, 0, 0))
   
   console.log('createDateInBrazil - Criando data:', {
     hour,
     minute,
     dayOffset,
-    targetDay,
-    offsetHours,
-    utcHourTarget,
+    targetDay: `${targetDay}/${month}/${year}`,
     utcDate: utcDate.toISOString(),
-    utcDateLocal: utcDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    utcDateLocal: utcDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    verified: `${verifiedDay}/${month}/${year} ${verifiedHour}:${verifiedMinute}`
   })
   
   return utcDate
@@ -144,30 +170,71 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
 /**
  * Compara duas datas considerando o timezone do Brasil
  * Retorna true se scheduledDate é no futuro ou presente (permite agendamentos no mesmo dia)
- * Permite uma margem de 10 minutos para agendamentos muito próximos e compensar diferenças de timezone
+ * Permite uma margem de 5 minutos para agendamentos muito próximos e compensar diferenças de timezone
  */
-export function isFutureInBrazil(scheduledDate: Date, now: Date = getNowInBrazil()): boolean {
-  // Obtém os timestamps em milissegundos
-  const scheduledTime = scheduledDate.getTime()
-  const nowTime = now.getTime()
+export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): boolean {
+  // Converte ambas as datas para o timezone do Brasil e compara diretamente
+  const scheduledBrazil = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(scheduledDate)
   
-  // Calcula a diferença em minutos
-  const diferencaMinutos = (scheduledTime - nowTime) / (1000 * 60)
+  const nowBrazil = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(now)
+  
+  // Extrai valores
+  const scheduledYear = parseInt(scheduledBrazil.find(p => p.type === 'year')?.value || '0')
+  const scheduledMonth = parseInt(scheduledBrazil.find(p => p.type === 'month')?.value || '0')
+  const scheduledDay = parseInt(scheduledBrazil.find(p => p.type === 'day')?.value || '0')
+  const scheduledHour = parseInt(scheduledBrazil.find(p => p.type === 'hour')?.value || '0')
+  const scheduledMinute = parseInt(scheduledBrazil.find(p => p.type === 'minute')?.value || '0')
+  
+  const nowYear = parseInt(nowBrazil.find(p => p.type === 'year')?.value || '0')
+  const nowMonth = parseInt(nowBrazil.find(p => p.type === 'month')?.value || '0')
+  const nowDay = parseInt(nowBrazil.find(p => p.type === 'day')?.value || '0')
+  const nowHour = parseInt(nowBrazil.find(p => p.type === 'hour')?.value || '0')
+  const nowMinute = parseInt(nowBrazil.find(p => p.type === 'minute')?.value || '0')
+  
+  // Compara ano, mês, dia, hora e minuto
+  // Permite margem de 5 minutos para compensar diferenças de processamento
+  if (scheduledYear > nowYear) return true
+  if (scheduledYear < nowYear) return false
+  
+  if (scheduledMonth > nowMonth) return true
+  if (scheduledMonth < nowMonth) return false
+  
+  if (scheduledDay > nowDay) return true
+  if (scheduledDay < nowDay) return false
+  
+  // Mesmo dia - compara hora e minuto
+  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
+  const nowTotalMinutes = nowHour * 60 + nowMinute
+  
+  // Permite margem de 5 minutos
+  const diferencaMinutos = scheduledTotalMinutes - nowTotalMinutes
   
   console.log('isFutureInBrazil - Comparação:', {
-    scheduledTime: scheduledDate.toISOString(),
-    scheduledLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-    nowTime: now.toISOString(),
-    nowLocal: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
-    isFuture: diferencaMinutos >= -10
+    scheduled: `${scheduledDay}/${scheduledMonth}/${scheduledYear} ${scheduledHour}:${scheduledMinute}`,
+    now: `${nowDay}/${nowMonth}/${nowYear} ${nowHour}:${nowMinute}`,
+    diferencaMinutos,
+    isFuture: diferencaMinutos >= -5
   })
   
-  // Permite agendamentos se:
-  // 1. A data/hora agendada é no futuro (pelo menos 10 minutos à frente, considerando margem)
-  // Isso permite agendamentos no mesmo dia, desde que o horário seja futuro
-  // A margem de 10 minutos compensa pequenas diferenças de timezone e processamento
-  return diferencaMinutos >= -10
+  return diferencaMinutos >= -5
 }
 
 /**
