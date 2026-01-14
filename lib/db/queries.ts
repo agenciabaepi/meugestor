@@ -14,7 +14,14 @@ import type {
 export async function getTenantByWhatsAppNumber(
   whatsappNumber: string
 ): Promise<Tenant | null> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('tenants')
     .select('*')
     .eq('whatsapp_number', whatsappNumber)
@@ -32,7 +39,14 @@ export async function createTenant(
   name: string,
   whatsappNumber: string
 ): Promise<Tenant | null> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('tenants')
     .insert({
       name,
@@ -105,7 +119,14 @@ export async function createFinanceiro(
   date: string,
   receiptImageUrl?: string | null
 ): Promise<Financeiro | null> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('financeiro')
     .insert({
       tenant_id: tenantId,
@@ -131,7 +152,14 @@ export async function getFinanceiroByTenant(
   startDate?: string,
   endDate?: string
 ): Promise<Financeiro[]> {
-  let query = supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+  
+  let query = client
     .from('financeiro')
     .select('*')
     .eq('tenant_id', tenantId)
@@ -196,7 +224,14 @@ export async function createCompromisso(
   scheduledAt: string,
   description?: string | null
 ): Promise<Compromisso | null> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('compromissos')
     .insert({
       tenant_id: tenantId,
@@ -220,7 +255,14 @@ export async function getCompromissosByTenant(
   startDate?: string,
   endDate?: string
 ): Promise<Compromisso[]> {
-  let query = supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+  
+  let query = client
     .from('compromissos')
     .select('*')
     .eq('tenant_id', tenantId)
@@ -256,7 +298,14 @@ export async function createConversation(
   message: string,
   role: 'user' | 'assistant'
 ): Promise<Conversation | null> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('conversations')
     .insert({
       tenant_id: tenantId,
@@ -278,7 +327,14 @@ export async function getRecentConversations(
   tenantId: string,
   limit: number = 10
 ): Promise<Conversation[]> {
-  const { data, error } = await supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+  
+  const { data, error } = await client
     .from('conversations')
     .select('*')
     .eq('tenant_id', tenantId)
