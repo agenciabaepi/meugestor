@@ -151,32 +151,35 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
 
   return (
     <>
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-full overflow-x-hidden">
       {/* Cabeçalho do calendário */}
-      <div className="p-4 sm:p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={goToPreviousMonth}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
+              className="p-2 hover:bg-gray-100 rounded-lg transition touch-manipulation"
               aria-label="Mês anterior"
+              style={{ minWidth: '44px', minHeight: '44px' }}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 capitalize">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 capitalize truncate">
               {monthName}
             </h2>
             <button
               onClick={goToNextMonth}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
+              className="p-2 hover:bg-gray-100 rounded-lg transition touch-manipulation"
               aria-label="Próximo mês"
+              style={{ minWidth: '44px', minHeight: '44px' }}
             >
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
           <button
             onClick={goToToday}
-            className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition"
+            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition touch-manipulation self-start sm:self-auto"
+            style={{ minHeight: '44px' }}
           >
             Hoje
           </button>
@@ -184,21 +187,22 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
       </div>
 
       {/* Grade do calendário */}
-      <div className="p-4 sm:p-6">
-        {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {weekDays.map((day) => (
-            <div
-              key={day}
-              className="text-center text-xs sm:text-sm font-semibold text-gray-500 py-2"
-            >
-              {day}
-            </div>
-          ))}
-        </div>
+      <div className="p-2 sm:p-4 lg:p-6 overflow-x-auto">
+        <div className="min-w-[280px]">
+          {/* Cabeçalho dos dias da semana */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+            {weekDays.map((day) => (
+              <div
+                key={day}
+                className="text-center text-xs font-semibold text-gray-500 py-2"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
 
-        {/* Dias do calendário */}
-        <div className="grid grid-cols-7 gap-2">
+          {/* Dias do calendário */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {calendarDays.map((date, index) => {
             if (!date) {
               return (
@@ -218,17 +222,18 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
               <button
                 key={dateKey}
                 onClick={() => handleDateClick(date)}
-                className={`aspect-square rounded-lg border-2 p-1 sm:p-2 transition text-left ${
+                className={`aspect-square rounded-lg border-2 p-1 transition text-left touch-manipulation ${
                   today
-                    ? 'bg-blue-50 border-blue-500 hover:bg-blue-100'
+                    ? 'bg-blue-50 border-blue-500 active:bg-blue-100'
                     : currentMonth
-                    ? 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'bg-white border-gray-200 active:border-gray-300 active:bg-gray-50'
                     : 'bg-gray-50 border-gray-100'
                 } ${dayCompromissos.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
+                style={{ minHeight: '60px' }}
               >
                 {/* Número do dia */}
                 <div
-                  className={`text-xs sm:text-sm font-semibold mb-1 ${
+                  className={`text-xs font-semibold mb-0.5 ${
                     today
                       ? 'text-blue-700'
                       : currentMonth
@@ -240,8 +245,8 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 </div>
 
                 {/* Compromissos do dia */}
-                <div className="space-y-1 overflow-hidden">
-                  {dayCompromissos.slice(0, 3).map((compromisso) => {
+                <div className="space-y-0.5 overflow-hidden">
+                  {dayCompromissos.slice(0, 2).map((compromisso) => {
                     const hora = new Date(compromisso.scheduled_at).toLocaleTimeString('pt-BR', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -250,25 +255,25 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                     return (
                       <div
                         key={compromisso.id}
-                        className={`text-xs px-1.5 py-0.5 rounded truncate ${
+                        className={`text-[10px] px-1 py-0.5 rounded truncate ${
                           today
                             ? 'bg-blue-200 text-blue-900'
                             : 'bg-indigo-100 text-indigo-900'
                         }`}
                         title={`${hora} - ${compromisso.title}`}
                       >
-                        <span className="font-medium">{hora}</span>{' '}
+                        <span className="font-medium hidden sm:inline">{hora} </span>
                         <span className="truncate">{compromisso.title}</span>
                       </div>
                     )
                   })}
-                  {dayCompromissos.length > 3 && (
+                  {dayCompromissos.length > 2 && (
                     <div
-                      className={`text-xs px-1.5 py-0.5 rounded ${
+                      className={`text-[10px] px-1 py-0.5 rounded ${
                         today ? 'text-blue-700' : 'text-gray-600'
                       }`}
                     >
-                      +{dayCompromissos.length - 3} mais
+                      +{dayCompromissos.length - 2}
                     </div>
                   )}
                 </div>
@@ -276,12 +281,13 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
             )
           })}
         </div>
+        </div>
       </div>
     </div>
 
       {/* Modal de Detalhes */}
       {isModalOpen && selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-black/10" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md bg-black/10" onClick={closeModal}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Cabeçalho do Modal */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">

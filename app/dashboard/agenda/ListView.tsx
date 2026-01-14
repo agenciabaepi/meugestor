@@ -54,15 +54,15 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-full overflow-x-hidden">
       <div className="divide-y divide-gray-200">
         {grouped.map(([dateKey, compromissos]) => {
           const isHoje = formatDateLabel(dateKey) === 'Hoje'
           
           return (
-            <div key={dateKey} className="p-4 sm:p-6">
-              <div className={`mb-3 ${isHoje ? 'bg-blue-50 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2' : ''}`}>
-                <h3 className={`font-semibold ${isHoje ? 'text-blue-900' : 'text-gray-900'}`}>
+            <div key={dateKey} className="p-3 sm:p-4 lg:p-6">
+              <div className={`mb-3 ${isHoje ? 'bg-blue-50 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 py-2' : ''}`}>
+                <h3 className={`text-sm sm:text-base font-semibold ${isHoje ? 'text-blue-900' : 'text-gray-900'}`}>
                   {formatDateLabel(dateKey)}
                 </h3>
               </div>
@@ -77,19 +77,19 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                   return (
                     <div
                       key={compromisso.id}
-                      className={`flex items-start gap-4 p-3 rounded-lg border ${
+                      className={`flex items-start gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg border ${
                         isHoje
                           ? 'bg-blue-50 border-blue-200'
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      <div className={`font-medium ${isHoje ? 'text-blue-700' : 'text-gray-700'}`}>
+                      <div className={`text-xs sm:text-sm font-medium flex-shrink-0 ${isHoje ? 'text-blue-700' : 'text-gray-700'}`}>
                         {hora}
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{compromisso.title}</h4>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{compromisso.title}</h4>
                         {compromisso.description && (
-                          <p className="text-sm text-gray-600 mt-1">{compromisso.description}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">{compromisso.description}</p>
                         )}
                       </div>
                     </div>

@@ -47,8 +47,9 @@ export function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-lg bg-white shadow-lg text-gray-700 hover:bg-gray-100 transition-all hover:scale-105"
+        className="lg:hidden fixed top-3 left-3 z-50 p-2.5 rounded-lg bg-white shadow-lg text-gray-700 hover:bg-gray-100 transition-all active:scale-95 touch-manipulation"
         aria-label="Toggle menu"
+        style={{ minWidth: '44px', minHeight: '44px' }}
       >
         {isMobileOpen ? (
           <X className="w-6 h-6" />
@@ -71,9 +72,14 @@ export function Sidebar() {
           fixed top-0 left-0 h-full bg-white border-r border-gray-200 z-40
           transform transition-transform duration-300 ease-in-out
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0
+          lg:translate-x-0 lg:static lg:h-auto
           w-64 shadow-lg lg:shadow-none
+          overflow-y-auto
         `}
+        style={{ 
+          maxHeight: '100vh',
+          WebkitOverflowScrolling: 'touch'
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}

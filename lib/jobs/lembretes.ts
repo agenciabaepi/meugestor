@@ -48,7 +48,21 @@ export async function buscarCompromissosParaLembrete(
     limiteSuperior.toISOString()
   )
 
-  console.log(`buscarCompromissosParaLembrete - Encontrados ${compromissos.length} compromissos no intervalo`)
+  console.log(`buscarCompromissosParaLembrete - Encontrados ${compromissos.length} compromissos no intervalo de 2 horas`)
+  
+  // Log detalhado de cada compromisso encontrado
+  if (compromissos.length > 0) {
+    console.log(`buscarCompromissosParaLembrete - Detalhes dos compromissos encontrados:`)
+    compromissos.forEach((comp) => {
+      const compDate = new Date(comp.scheduled_at)
+      const diffMin = Math.round((compDate.getTime() - agora.getTime()) / (1000 * 60))
+      console.log(`  - ${comp.title} (ID: ${comp.id}): ${compDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (${diffMin}min no futuro)`)
+      console.log(`    reminder_1h_sent: ${comp.reminder_1h_sent}, reminder_30min_sent: ${comp.reminder_30min_sent}, reminder_10min_sent: ${comp.reminder_10min_sent}`)
+    })
+  } else {
+    console.log(`buscarCompromissosParaLembrete - ⚠️ Nenhum compromisso encontrado nas próximas 2 horas para o tenant ${tenantId}`)
+    console.log(`buscarCompromissosParaLembrete - Verifique se há compromissos futuros no banco de dados`)
+  }
 
   if (!supabaseAdmin) {
     console.error('Supabase admin client não configurado')
@@ -123,6 +137,8 @@ export async function buscarCompromissosParaLembrete(
       console.log(`buscarCompromissosParaLembrete - ⏭️ Compromisso ${compromisso.id} já foi lembrado (${config.tipo})`)
     }
   }
+
+  console.log(`buscarCompromissosParaLembrete - Total de compromissos para lembrete ${config.tipo}: ${compromissosParaLembrar.length}`)
 
   return compromissosParaLembrar
 }
