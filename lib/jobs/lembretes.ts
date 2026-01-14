@@ -256,10 +256,12 @@ export async function processarLembretes(): Promise<{
   }
 }> {
   try {
+    console.log('\n=== PROCESSAR LEMBRETES INICIADO ===')
+    console.log('Validando configuração do Supabase...')
     validateSupabaseConfig()
     
     if (!supabaseAdmin) {
-      console.error('Supabase admin client não configurado')
+      console.error('❌ Supabase admin client não configurado')
       return {
         sucesso: 0,
         erros: 0,
@@ -272,13 +274,14 @@ export async function processarLembretes(): Promise<{
       }
     }
 
+    console.log('✅ Supabase configurado. Buscando tenants...')
     // Busca todos os tenants
     const { data: tenants, error } = await supabaseAdmin
       .from('tenants')
       .select('id, whatsapp_number')
 
     if (error || !tenants) {
-      console.error('Erro ao buscar tenants:', error)
+      console.error('❌ Erro ao buscar tenants:', error)
       return {
         sucesso: 0,
         erros: 0,
@@ -290,6 +293,8 @@ export async function processarLembretes(): Promise<{
         },
       }
     }
+
+    console.log(`✅ Encontrados ${tenants.length} tenant(s)`)
 
     let sucessoTotal = 0
     let errosTotal = 0

@@ -56,12 +56,37 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET - Health check do job
+ * GET - Health check e teste manual do job
+ * Permite testar o cron manualmente via browser ou curl
  */
 export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    service: 'lembretes-cron',
-    timestamp: new Date().toISOString(),
-  })
+  try {
+    console.log('\n=== TESTE MANUAL DO CRON LEMBRETES ===')
+    console.log('Timestamp:', new Date().toISOString())
+    console.log('Horário Brasil:', new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))
+    
+    // Processa lembretes (mesma lógica do POST)
+    console.log('Iniciando processamento de lembretes...')
+    const resultado = await processarLembretes()
+    
+    console.log('\n=== TESTE MANUAL FINALIZADO ===')
+    console.log('Resultado:', JSON.stringify(resultado, null, 2))
+
+    return NextResponse.json({
+      status: 'ok',
+      service: 'lembretes-cron',
+      timestamp: new Date().toISOString(),
+      timestampBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      resultado,
+    })
+  } catch (error) {
+    console.error('\n=== ERRO NO TESTE MANUAL ===')
+    console.error('Erro:', error)
+    return NextResponse.json({
+      status: 'error',
+      service: 'lembretes-cron',
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+      timestamp: new Date().toISOString(),
+    }, { status: 500 })
+  }
 }
