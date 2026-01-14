@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/db/client'
+import { createServerClient } from '@/lib/db/client'
 
 /**
  * POST - Login do usuário
@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
 
     // Faz login no Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({

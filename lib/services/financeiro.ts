@@ -17,6 +17,7 @@ export interface CreateFinanceiroInput {
   subcategory?: string | null
   metadata?: Record<string, any> | null
   tags?: string[] | null
+  transactionType?: 'expense' | 'revenue'
 }
 
 /**
@@ -36,7 +37,7 @@ export async function createFinanceiroRecord(
 
   if (!isValidCategory(input.category)) {
     throw new ValidationError(
-      'Categoria inválida. Use: Alimentação, Transporte, Moradia, Saúde, Educação, Lazer, Outros'
+      'Categoria inválida. Use: Alimentação, Moradia, Saúde, Transporte, Educação, Lazer e Entretenimento, Compras Pessoais, Assinaturas e Serviços, Financeiro e Obrigações, Impostos e Taxas, Pets, Doações e Presentes, Trabalho e Negócios, Outros'
     )
   }
 
@@ -54,7 +55,8 @@ export async function createFinanceiroRecord(
     input.receiptImageUrl,
     input.subcategory,
     input.metadata,
-    input.tags
+    input.tags,
+    input.transactionType || 'expense'
   )
 
   if (!record) {

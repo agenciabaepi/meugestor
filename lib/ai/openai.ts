@@ -2,9 +2,10 @@ import OpenAI from 'openai'
 
 /**
  * Cliente OpenAI configurado
- * Usa o modelo mais avançado disponível: gpt-4o
+ * Usa o modelo mais avançado disponível: gpt-5.2
  * 
- * gpt-4o é multimodal (texto, visão, áudio), mais rápido e mais barato que gpt-4
+ * GPT-5.2 é o modelo de última geração, otimizado para tarefas agênticas e programação
+ * Lançado em dezembro de 2025
  */
 export const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
@@ -14,7 +15,7 @@ export const openai = process.env.OPENAI_API_KEY
       apiKey: 'placeholder-key-for-build',
     })
 
-export const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o'
+export const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.2'
 
 /**
  * Valida se a API key do OpenAI está configurada
@@ -29,8 +30,10 @@ export function validateOpenAIConfig() {
 
 /**
  * Modelos disponíveis:
- * - gpt-4o: Mais avançado, multimodal, rápido (recomendado)
+ * - gpt-5.2: Modelo de última geração, otimizado para tarefas agênticas e programação (recomendado)
+ * - gpt-5.2-pro: Versão Pro para tarefas que exigem maior precisão e raciocínio complexo
+ * - gpt-5.2-chat-latest: Versão Instant, mais rápida para tarefas do dia a dia
+ * - gpt-4o: Modelo anterior, multimodal (texto, visão, áudio)
  * - gpt-4-turbo: Versão turbo do GPT-4
- * - gpt-4: GPT-4 padrão
  * - gpt-3.5-turbo: Mais rápido e barato, mas menos capaz
  */

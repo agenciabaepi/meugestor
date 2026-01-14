@@ -2,12 +2,13 @@
  * Utilitários de autenticação
  */
 
-import { supabase } from '../db/client'
+import { createServerClient } from '../db/client'
 
 /**
- * Verifica se o usuário está autenticado
+ * Verifica se o usuário está autenticado (para uso no servidor)
  */
 export async function getSession() {
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -15,7 +16,7 @@ export async function getSession() {
 }
 
 /**
- * Obtém o usuário atual
+ * Obtém o usuário atual (para uso no servidor)
  */
 export async function getCurrentUser() {
   const session = await getSession()
@@ -27,8 +28,9 @@ export async function getCurrentUser() {
 }
 
 /**
- * Faz logout
+ * Faz logout (para uso no servidor)
  */
 export async function logout() {
+  const supabase = await createServerClient()
   await supabase.auth.signOut()
 }

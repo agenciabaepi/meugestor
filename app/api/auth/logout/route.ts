@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/db/client'
+import { createServerClient } from '@/lib/db/client'
 
 /**
  * POST - Logout do usuário
  */
 export async function POST(request: NextRequest) {
   try {
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
+    
     const { error } = await supabase.auth.signOut()
 
     if (error) {

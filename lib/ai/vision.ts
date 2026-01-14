@@ -1,5 +1,5 @@
 /**
- * Módulo de processamento de imagens com GPT-4o Vision
+ * Módulo de processamento de imagens com GPT-5.2 Vision
  */
 
 import { openai, validateOpenAIConfig } from './openai'
@@ -51,9 +51,10 @@ export async function extractReceiptData(
     // Converte buffer para base64
     const base64Image = imageBuffer.toString('base64')
 
-    // Usa GPT-4o Vision para extrair dados
+    // Usa GPT-5.2 Vision para extrair dados (ou modelo configurado)
+    const model = process.env.OPENAI_MODEL || 'gpt-5.2'
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // GPT-4o tem suporte a visão
+      model, // GPT-5.2 tem suporte a visão
       messages: [
         {
           role: 'system',
@@ -63,7 +64,7 @@ Analise a imagem e extraia as seguintes informações:
 - Valor total (amount): número decimal
 - Data da transação (date): formato YYYY-MM-DD
 - Estabelecimento (establishment): nome do local
-- Categoria sugerida (category): uma das categorias válidas (Alimentação, Transporte, Moradia, Saúde, Educação, Lazer, Outros)
+- Categoria sugerida (category): uma das categorias válidas (Alimentação, Moradia, Saúde, Transporte, Educação, Lazer e Entretenimento, Compras Pessoais, Assinaturas e Serviços, Financeiro e Obrigações, Impostos e Taxas, Pets, Doações e Presentes, Trabalho e Negócios, Outros)
 - Descrição (description): breve descrição do que foi comprado
 
 Responda APENAS com JSON no formato:
@@ -270,6 +271,6 @@ export function validateImage(imageBuffer: Buffer, mimeType?: string): {
  * Estima o custo de processamento de imagem
  */
 export function estimateVisionCost(): number {
-  // GPT-4o Vision custa $0.01 por imagem (aproximado)
+  // GPT-5.2 Vision custa $0.01 por imagem (aproximado)
   return 0.01
 }

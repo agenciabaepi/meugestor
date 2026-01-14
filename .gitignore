@@ -36,4 +36,4 @@ yarn-error.log*
 next-env.d.ts
 
 # watchman
-.watchmanconfig
+.watchmanconfigVERCEL_ENV_COPY_PASTE.md

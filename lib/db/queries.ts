@@ -120,7 +120,8 @@ export async function createFinanceiro(
   receiptImageUrl?: string | null,
   subcategory?: string | null,
   metadata?: Record<string, any> | null,
-  tags?: string[] | null
+  tags?: string[] | null,
+  transactionType: 'expense' | 'revenue' = 'expense'
 ): Promise<Financeiro | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -129,24 +130,56 @@ export async function createFinanceiro(
   }
   const client = supabaseAdmin
   
-  const { data, error } = await client
+  // Prepara dados para inserção
+  const insertData: any = {
+    tenant_id: tenantId,
+    amount,
+    description,
+    category,
+    date,
+    receipt_image_url: receiptImageUrl || null,
+    subcategory: subcategory || null,
+    metadata: metadata || {},
+    tags: tags || [],
+    transaction_type: transactionType,
+  }
+  
+  console.log('createFinanceiro - Inserindo dados:', JSON.stringify(insertData, null, 2))
+  
+  let { data, error } = await client
     .from('financeiro')
-    .insert({
+    .insert(insertData)
+    .select()
+    .single()
+  
+  // Se o erro for sobre transaction_type não existir, tenta sem esse campo
+  if (error && (error.message?.includes('transaction_type') || error.message?.includes('column') || error.code === '42703')) {
+    console.warn('Campo transaction_type não existe, tentando inserir sem ele (migration não aplicada)')
+    console.warn('Erro original:', error.message)
+    const insertDataWithoutType = { ...insertData }
+    delete insertDataWithoutType.transaction_type
+    const retryResult = await client
+      .from('financeiro')
+      .insert(insertDataWithoutType)
+      .select()
+      .single()
+    data = retryResult.data
+    error = retryResult.error
+  }
+
+  if (error) {
+    console.error('Error creating financeiro:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
+    console.error('Data being inserted:', {
       tenant_id: tenantId,
       amount,
       description,
       category,
       date,
-      receipt_image_url: receiptImageUrl || null,
-      subcategory: subcategory || null,
-      metadata: metadata || {},
-      tags: tags || [],
+      receipt_image_url: receiptImageUrl,
+      subcategory,
+      transaction_type: transactionType,
     })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error creating financeiro:', error)
     return null
   }
 
@@ -195,7 +228,14 @@ export async function getFinanceiroByCategory(
   startDate?: string,
   endDate?: string
 ): Promise<Financeiro[]> {
-  let query = supabase
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+  
+  let query = client
     .from('financeiro')
     .select('*')
     .eq('tenant_id', tenantId)
@@ -237,6 +277,8 @@ export async function createCompromisso(
   }
   const client = supabaseAdmin
   
+  console.log('createCompromisso - Tentando inserir:', { tenantId, title, scheduledAt, description })
+  
   const { data, error } = await client
     .from('compromissos')
     .insert({
@@ -250,9 +292,11 @@ export async function createCompromisso(
 
   if (error) {
     console.error('Error creating compromisso:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
     return null
   }
 
+  console.log('createCompromisso - Sucesso! ID:', data?.id)
   return data
 }
 

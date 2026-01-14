@@ -28,6 +28,7 @@ export interface Financeiro {
   receipt_image_url: string | null
   metadata: Record<string, any> | null
   tags: string[] | null
+  transaction_type: 'expense' | 'revenue'
   created_at: string
 }
 

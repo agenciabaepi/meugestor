@@ -14,6 +14,7 @@ import { processAction } from '@/lib/ai/actions'
 import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
 import { createFinanceiroRecord } from '@/lib/services/financeiro'
+import { checkRateLimit } from '@/lib/utils/whatsapp-rate-limit'
 
 /**
  * GET - Verificação do webhook (chamado pelo WhatsApp na configuração inicial)
@@ -88,12 +89,38 @@ async function processWhatsAppMessage(
       return
     }
 
+    // SEGURANÇA: Verifica rate limiting
+    const rateLimit = checkRateLimit(from)
+    if (!rateLimit.allowed) {
+      console.warn(`Rate limit excedido para ${from}: ${rateLimit.error}`)
+      await sendTextMessage(
+        from,
+        `⚠️ *Limite de Mensagens Excedido*\n\n` +
+        `${rateLimit.error}\n\n` +
+        `Por favor, aguarde antes de enviar mais mensagens.`
+      )
+      return
+    }
+
     // Busca tenant e usuário vinculado ao número do WhatsApp
     // O número "from" é o número que enviou a mensagem
     const tenantInfo = await getTenantByWhatsApp(from)
 
-    if (!tenantInfo) {
-      console.error('Erro ao obter tenant/usuário')
+    // SEGURANÇA: Bloqueia uso do bot se o número não estiver vinculado a um usuário autenticado
+    if (!tenantInfo || !tenantInfo.user_id) {
+      console.warn(`Tentativa de uso não autorizado do bot pelo número: ${from}`)
+      
+      // Envia mensagem informando que é necessário cadastro
+      await sendTextMessage(
+        from,
+        `🔒 *Acesso Restrito*\n\n` +
+        `Para usar o *Meu Gestor*, você precisa:\n\n` +
+        `1️⃣ Criar uma conta em: https://seu-dominio.com/register\n` +
+        `2️⃣ Fazer login em: https://seu-dominio.com/login\n` +
+        `3️⃣ Vincular seu número de WhatsApp no seu perfil\n\n` +
+        `*Este número não está vinculado a nenhuma conta.*\n` +
+        `Por segurança, apenas usuários cadastrados podem usar o bot.`
+      )
       return
     }
 
@@ -108,16 +135,8 @@ async function processWhatsAppMessage(
         const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
         if (greetings.includes(userMessage)) {
           let presentation = `👋 Olá! Tudo bem?\n\n` +
-            `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n`
-          
-          // Se não está vinculado a um usuário, sugere vinculação
-          if (!userId) {
-            presentation += `⚠️ *Você ainda não vinculou seu WhatsApp à sua conta.*\n` +
-              `Para ter acesso completo, faça login em: https://seu-dominio.com/login\n` +
-              `E vincule seu número de WhatsApp no seu perfil.\n\n`
-          }
-          
-          presentation += `📋 *O que eu posso fazer por você:*\n` +
+            `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n` +
+            `📋 *O que eu posso fazer por você:*\n` +
             `• 💰 Registrar seus gastos e despesas\n` +
             `• 📅 Criar e gerenciar seus compromissos\n` +
             `• 📊 Consultar informações financeiras\n` +
@@ -190,12 +209,49 @@ async function processWhatsAppMessage(
         await createConversation(tenantId, message.text.body, 'user')
         
         // Processa ação (registro de gastos, compromissos, etc)
-        const actionResult = await processAction(message.text.body, tenantId)
+        let actionResult
+        try {
+          console.log('=== WEBHOOK PROCESSAMENTO ===')
+          console.log('Webhook - Mensagem recebida:', message.text.body)
+          console.log('Webhook - TenantId:', tenantId)
+          console.log('Webhook - From:', from)
+          
+          actionResult = await processAction(message.text.body, tenantId)
+          
+          console.log('Webhook - Resultado da ação:', {
+            success: actionResult.success,
+            message: actionResult.message?.substring(0, 100),
+            hasData: !!actionResult.data
+          })
+          console.log('Webhook - Resultado completo:', JSON.stringify(actionResult, null, 2))
+        } catch (error) {
+          console.error('=== ERRO NO WEBHOOK ===')
+          console.error('Webhook - Erro ao executar processAction:', error)
+          console.error('Webhook - Tipo do erro:', error?.constructor?.name)
+          console.error('Webhook - Mensagem do erro:', error instanceof Error ? error.message : String(error))
+          console.error('Webhook - Stack trace:', error instanceof Error ? error.stack : 'N/A')
+          console.error('Webhook - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+          
+          // Envia mensagem de erro mais específica
+          const errorMessage = error instanceof Error 
+            ? `Erro: ${error.message}` 
+            : 'Erro desconhecido ao processar'
+          
+          await sendTextMessage(
+            from, 
+            `Desculpe, ocorreu um erro ao processar sua mensagem.\n\n${errorMessage}\n\nTente novamente em alguns instantes.`
+          )
+          return
+        }
         
         // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant')
+        } else if (!actionResult.success) {
+          // Se a ação falhou, envia mensagem de erro
+          await sendTextMessage(from, actionResult.message || 'Desculpe, ocorreu um erro ao processar sua mensagem.')
+          await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant')
         } else {
           // Processa com IA para gerar resposta conversacional
           const recentMessages = await getRecentConversations(tenantId, 5)

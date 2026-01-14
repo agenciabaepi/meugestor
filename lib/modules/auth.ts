@@ -81,15 +81,15 @@ export async function getUserByWhatsApp(
 }
 
 /**
- * Obtém ou cria tenant baseado no número do WhatsApp (para webhook)
- * Se encontrar usuário vinculado, usa o tenant dele
- * Caso contrário, cria um tenant temporário
+ * Obtém tenant baseado no número do WhatsApp (para webhook)
+ * SEGURANÇA: Só retorna tenant se o número estiver vinculado a um usuário autenticado
+ * Não cria tenants temporários para prevenir uso não autorizado
  */
 export async function getOrCreateTenantByWhatsApp(
   whatsappNumber: string
 ): Promise<{ tenant_id: string; user_id: string | null } | null> {
   try {
-    // Primeiro, tenta encontrar usuário vinculado
+    // SEGURANÇA: Só permite uso se o número estiver vinculado a um usuário autenticado
     const user = await getUserByWhatsApp(whatsappNumber)
     
     if (user) {
@@ -99,47 +99,12 @@ export async function getOrCreateTenantByWhatsApp(
       }
     }
 
-    // Se não encontrou, busca tenant existente pelo número
-    if (!supabaseAdmin) {
-      return null
-    }
-
-    const normalized = whatsappNumber.replace(/\D/g, '')
-    
-    const { data: tenant } = await supabaseAdmin
-      .from('tenants')
-      .select('id')
-      .eq('whatsapp_number', normalized)
-      .single()
-
-    if (tenant) {
-      return {
-        tenant_id: tenant.id,
-        user_id: null,
-      }
-    }
-
-    // Cria novo tenant temporário (sem usuário vinculado)
-    const { data: newTenant, error } = await supabaseAdmin
-      .from('tenants')
-      .insert({
-        name: `Tenant ${normalized}`,
-        whatsapp_number: normalized,
-      })
-      .select()
-      .single()
-
-    if (error || !newTenant) {
-      console.error('Erro ao criar tenant:', error)
-      return null
-    }
-
-    return {
-      tenant_id: newTenant.id,
-      user_id: null,
-    }
+    // Se não encontrou usuário vinculado, retorna null
+    // NÃO cria tenant temporário para prevenir uso não autorizado
+    console.warn(`Tentativa de uso do bot por número não vinculado: ${whatsappNumber}`)
+    return null
   } catch (error) {
-    console.error('Erro ao obter/criar tenant:', error)
+    console.error('Erro ao obter tenant:', error)
     return null
   }
 }

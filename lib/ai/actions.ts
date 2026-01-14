@@ -9,7 +9,7 @@ import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relator
 import { getFinanceiroRecords } from '../services/financeiro'
 import { getCompromissosRecords, getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
-import { categorizeExpense, extractTags } from '../services/categorization'
+import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, extractAppointmentFromMessage } from '../utils/date-parser'
 
 export interface ActionResult {
@@ -21,19 +21,99 @@ export interface ActionResult {
 /**
  * Processa uma mensagem, identifica a intenção e executa a ação correspondente
  */
+/**
+ * Valida e corrige a intenção baseado em palavras-chave da mensagem original
+ * Isso serve como camada de segurança caso a IA não detecte corretamente
+ */
+function validateAndCorrectIntention(
+  message: string,
+  detectedIntention: string,
+  extractedData: any
+): string {
+  const lowerMessage = message.toLowerCase()
+  
+  // Palavras-chave que indicam RECEITA
+  const revenueKeywords = [
+    'recebi', 'recebido', 'receber', 'recebeu',
+    'ganhei', 'ganho', 'ganhar', 'ganhou',
+    'entrada', 'entrou',
+    'salário', 'salario',
+    'comissão', 'comissao', 'comissões', 'comissoes',
+    'dividendos', 'dividendo',
+    'rendimento', 'rendimentos',
+    'venda', 'vendas',
+    'freelance', 'freela',
+    'prolabore',
+    'bônus', 'bonus',
+    'reembolso', 'estorno', 'devolução', 'devolucao',
+    'aluguel recebido'
+  ]
+  
+  // Palavras-chave que indicam DESPESA
+  const expenseKeywords = [
+    'gastei', 'gasto', 'gastar', 'gastou',
+    'paguei', 'pago', 'pagar', 'pagou',
+    'despesa', 'despesas',
+    'comprei', 'compra', 'comprar', 'comprou',
+    'saída', 'saiu'
+  ]
+  
+  // Verifica se há palavras de receita na mensagem
+  const hasRevenueKeyword = revenueKeywords.some(keyword => lowerMessage.includes(keyword))
+  const hasExpenseKeyword = expenseKeywords.some(keyword => lowerMessage.includes(keyword))
+  
+  // Se detectou receita mas a IA disse que é despesa, corrige
+  if (hasRevenueKeyword && detectedIntention === 'register_expense') {
+    console.log('⚠️ Correção: Mensagem contém palavras de receita, corrigindo intenção para register_revenue')
+    return 'register_revenue'
+  }
+  
+  // Se detectou despesa mas a IA disse que é receita, corrige
+  if (hasExpenseKeyword && detectedIntention === 'register_revenue') {
+    console.log('⚠️ Correção: Mensagem contém palavras de despesa, corrigindo intenção para register_expense')
+    return 'register_expense'
+  }
+  
+  return detectedIntention
+}
+
 export async function processAction(
   message: string,
   tenantId: string
 ): Promise<ActionResult> {
   try {
+    console.log('=== PROCESS ACTION INICIADO ===')
+    console.log('processAction - Mensagem:', message)
+    console.log('processAction - TenantId:', tenantId)
+    
     // Analisa a intenção
+    console.log('processAction - Analisando intenção...')
     const { intention, extractedData } = await analyzeIntention(message)
 
-    console.log('Intenção detectada:', intention, 'Dados extraídos:', extractedData)
+    console.log('processAction - Intenção detectada:', intention)
+    console.log('processAction - Dados extraídos:', JSON.stringify(extractedData, null, 2))
 
-    switch (intention) {
+    // Valida e corrige a intenção baseado em palavras-chave
+    const correctedIntention = validateAndCorrectIntention(message, intention, extractedData)
+    
+    if (correctedIntention !== intention) {
+      console.log(`processAction - ✅ Intenção corrigida: ${intention} -> ${correctedIntention}`)
+    }
+
+    console.log('processAction - Intenção final:', correctedIntention)
+
+    switch (correctedIntention) {
       case 'register_expense':
-        return await handleRegisterExpense(extractedData, tenantId)
+        console.log('processAction - Chamando handleRegisterExpense')
+        const expenseResult = await handleRegisterExpense(extractedData, tenantId)
+        console.log('processAction - Resultado handleRegisterExpense:', expenseResult.success)
+        return expenseResult
+
+      case 'register_revenue':
+        console.log('processAction - Chamando handleRegisterRevenue')
+        const revenueResult = await handleRegisterRevenue(extractedData, tenantId)
+        console.log('processAction - Resultado handleRegisterRevenue:', revenueResult.success)
+        return revenueResult
 
       case 'create_appointment':
         return await handleCreateAppointment(extractedData, tenantId, message)
@@ -51,10 +131,18 @@ export async function processAction(
         }
     }
   } catch (error) {
-    console.error('Erro ao processar ação:', error)
+    console.error('=== ERRO EM PROCESS ACTION ===')
+    console.error('processAction - Erro capturado:', error)
+    console.error('processAction - Tipo:', error?.constructor?.name)
+    console.error('processAction - Mensagem:', error instanceof Error ? error.message : String(error))
+    console.error('processAction - Stack:', error instanceof Error ? error.stack : 'N/A')
+    console.error('processAction - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      message: error instanceof Error 
+        ? `Erro ao processar: ${error.message}` 
+        : 'Erro desconhecido ao processar ação',
     }
   }
 }
@@ -132,9 +220,111 @@ async function handleRegisterExpense(
       subcategory,
       metadata,
       tags,
+      transactionType: 'expense',
     })
 
     let responseMessage = `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
+    
+    if (subcategory) {
+      responseMessage += `\n📌 Subcategoria: ${subcategory}`
+    }
+    
+    responseMessage += `\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}`
+
+    return {
+      success: true,
+      message: responseMessage,
+      data: record,
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return {
+        success: false,
+        message: error.message,
+      }
+    }
+    throw error
+  }
+}
+
+/**
+ * Registra uma receita
+ * Mesma lógica de handleRegisterExpense, apenas muda transactionType e mensagens
+ */
+async function handleRegisterRevenue(
+  data: any,
+  tenantId: string
+): Promise<ActionResult> {
+  try {
+    // Valida dados mínimos
+    if (!data?.amount) {
+      return {
+        success: false,
+        message: 'Preciso saber o valor da receita. Quanto foi?',
+      }
+    }
+
+    if (!data?.description) {
+      return {
+        success: false,
+        message: 'Preciso saber de onde veio essa receita. Pode descrever?',
+      }
+    }
+
+    // Define valores padrão
+    const amount = parseFloat(data.amount) || 0
+    let description = data.description || 'Receita'
+    const date = data.date || new Date().toISOString().split('T')[0]
+
+    // Usa categorização inteligente se não foi fornecida categoria
+    let category = data.category
+    let subcategory: string | null = null
+    let tags: string[] = []
+
+    if (!category || category === 'Outros') {
+      // Aplica categorização inteligente baseada na descrição (para receitas)
+      const categorization = categorizeRevenue(description, amount)
+      category = categorization.category
+      subcategory = categorization.subcategory
+      tags = categorization.tags
+    } else {
+      // Se categoria foi fornecida, ainda tenta extrair subcategoria e tags
+      const categorization = categorizeRevenue(description, amount)
+      if (categorization.category === category) {
+        subcategory = categorization.subcategory
+        tags = categorization.tags
+      } else {
+        // Mesmo com categoria diferente, extrai tags da descrição
+        tags = extractTags(description, category, null)
+      }
+    }
+
+    // Extrai tags adicionais da descrição
+    const additionalTags = extractTags(description, category, subcategory)
+    tags = [...new Set([...tags, ...additionalTags])]
+
+    // Prepara metadados
+    const metadata: Record<string, any> = {
+      source: data.source || data.establishment || null,
+      paymentMethod: data.paymentMethod || null,
+      extractedAt: new Date().toISOString(),
+      confidence: data.confidence || 0.8,
+    }
+
+    // Cria o registro (única diferença: transactionType: 'revenue')
+    const record = await createFinanceiroRecord({
+      tenantId,
+      amount,
+      description: description.trim(),
+      category,
+      date,
+      subcategory,
+      metadata,
+      tags,
+      transactionType: 'revenue',
+    })
+
+    let responseMessage = `✅ Receita registrada com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
     
     if (subcategory) {
       responseMessage += `\n📌 Subcategoria: ${subcategory}`

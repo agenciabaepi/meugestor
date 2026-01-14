@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '@/lib/db/client'
+import { createServerClient, supabaseAdmin } from '@/lib/db/client'
 
 /**
  * GET - Retorna dados do usuário autenticado
  */
 export async function GET(request: NextRequest) {
   try {
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
+    
     // Obtém a sessão do cookie
     const {
       data: { session },

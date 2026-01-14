@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/db/client'
+import { createServerClient, supabaseAdmin } from '@/lib/db/client'
 
 /**
  * POST - Registro de novo usuário
@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
     const normalizedWhatsApp = whatsappNumber.replace(/\D/g, '')
 
     // Verifica se o WhatsApp já está vinculado a outro usuário
-    const { supabaseAdmin } = await import('@/lib/db/client')
     if (supabaseAdmin) {
       const { data: existingUser } = await supabaseAdmin
         .from('users')
@@ -50,6 +49,9 @@ export async function POST(request: NextRequest) {
         )
       }
     }
+
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
 
     // Registra no Supabase Auth
     const { data, error } = await supabase.auth.signUp({

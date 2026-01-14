@@ -15,6 +15,18 @@ export interface CostEntry {
 // Preços por serviço (em USD)
 const PRICING = {
   openai: {
+    'gpt-5.2': {
+      input: 1.75 / 1000, // $1.75 por 1K tokens de input ($1,750 / 1M tokens)
+      output: 14.0 / 1000, // $14.0 por 1K tokens de output ($14,000 / 1M tokens)
+    },
+    'gpt-5.2-pro': {
+      input: 1.75 / 1000, // Mesmo preço base (ajustar se necessário)
+      output: 14.0 / 1000,
+    },
+    'gpt-5.2-chat-latest': {
+      input: 1.75 / 1000, // Versão Instant (ajustar se necessário)
+      output: 14.0 / 1000,
+    },
     'gpt-4o': {
       input: 0.0025 / 1000, // $0.0025 por 1K tokens de input
       output: 0.01 / 1000, // $0.01 por 1K tokens de output
@@ -50,10 +62,10 @@ export function calculateOpenAICost(
   const modelPricing = PRICING.openai[model as keyof typeof PRICING.openai]
   
   if (!modelPricing) {
-    // Fallback para gpt-4o
+    // Fallback para gpt-5.2 (modelo padrão atual)
     return (
-      inputTokens * PRICING.openai['gpt-4o'].input +
-      outputTokens * PRICING.openai['gpt-4o'].output
+      inputTokens * PRICING.openai['gpt-5.2'].input +
+      outputTokens * PRICING.openai['gpt-5.2'].output
     )
   }
 

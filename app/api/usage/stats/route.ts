@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantCost, getTenantTokenUsage } from '@/lib/utils/cost-tracker'
-import { supabase, validateSupabaseConfig } from '@/lib/db/client'
+import { createServerClient, validateSupabaseConfig } from '@/lib/db/client'
 
 /**
  * GET - Obtém estatísticas de uso de um tenant
@@ -8,6 +8,10 @@ import { supabase, validateSupabaseConfig } from '@/lib/db/client'
 export async function GET(request: NextRequest) {
   try {
     validateSupabaseConfig()
+    
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
+    
     // TODO: Obter tenant_id da sessão autenticada
     // Por enquanto, busca o primeiro tenant
     const { data: tenant } = await supabase

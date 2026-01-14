@@ -17,7 +17,7 @@ export interface ConversationContext {
 }
 
 /**
- * Processa uma mensagem do usuário e gera uma resposta usando GPT-4o
+ * Processa uma mensagem do usuário e gera uma resposta usando GPT-5.2
  */
 export async function processMessage(
   message: string,
@@ -47,7 +47,7 @@ export async function processMessage(
     )
 
     // Chama a API do OpenAI
-    const model = process.env.OPENAI_MODEL || 'gpt-4o'
+    const model = process.env.OPENAI_MODEL || 'gpt-5.2'
     const completion = await openai.chat.completions.create({
       model,
       messages: [
@@ -165,13 +165,13 @@ async function getCompromissosSummary(tenantId: string): Promise<string | undefi
 export async function analyzeIntention(
   message: string
 ): Promise<{
-  intention: 'register_expense' | 'create_appointment' | 'query' | 'report' | 'chat'
+  intention: 'register_expense' | 'register_revenue' | 'create_appointment' | 'query' | 'report' | 'chat'
   confidence: number
   extractedData?: any
 }> {
   try {
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      model: process.env.OPENAI_MODEL || 'gpt-5.2',
       messages: [
         {
           role: 'system',
@@ -181,12 +181,12 @@ Analise a mensagem do usuário e identifique a intenção. Extraia TODAS as info
 
 Responda APENAS com JSON no formato:
 {
-  "intention": "register_expense" | "create_appointment" | "query" | "report" | "chat",
+  "intention": "register_expense" | "register_revenue" | "create_appointment" | "query" | "report" | "chat",
   "confidence": 0.0-1.0,
   "extractedData": {
     "amount": número se mencionado (extrair valor numérico),
     "category": categoria principal se mencionada ou inferida,
-    "description": descrição completa e detalhada do gasto,
+    "description": descrição completa e detalhada (do gasto ou receita),
     "date": data se mencionada (formato YYYY-MM-DD),
     "establishment": nome do estabelecimento se mencionado,
     "paymentMethod": método de pagamento se mencionado (cartão, dinheiro, pix, etc),
@@ -200,13 +200,64 @@ Responda APENAS com JSON no formato:
 }
 
 INTENÇÕES:
-- register_expense: usuário quer registrar um gasto (ex: "gastei 50 reais de gasolina", "coloquei 50 reais de gasolina")
+- register_expense: usuário quer registrar um gasto/despesa (ex: "gastei 50 reais de gasolina", "coloquei 50 reais de gasolina", "despesa de 100 reais", "paguei 30 no mercado")
+- register_revenue: usuário quer registrar uma receita/entrada de dinheiro (ex: "recebi 2000 de salário", "entrada de 500 reais", "ganhei 1000", "recebi 10 reais de comissão")
 - create_appointment: usuário quer criar um compromisso/agendamento (ex: "reunião 12h", "tenho reunião amanhã às 10h", "marcar consulta médica para segunda às 14h")
 - query: usuário quer consultar informações (ex: "quanto gastei de combustível?", "quanto gasto por mês de gasolina?")
 - report: usuário quer um relatório completo
 - chat: conversa geral sem ação específica
 
-CATEGORIAS VÁLIDAS: Alimentação, Transporte, Moradia, Saúde, Educação, Lazer, Outros
+DISTINÇÃO CRÍTICA ENTRE RECEITA E DESPESA:
+Para identificar se é RECEITA (register_revenue) ou DESPESA (register_expense), analise as palavras-chave na mensagem:
+
+PALAVRAS-CHAVE DE RECEITA (sempre use register_revenue):
+- "recebi", "recebido", "receber"
+- "ganhei", "ganho", "ganhar"
+- "entrada", "entrou"
+- "salário", "salario"
+- "comissão", "comissao", "comissões"
+- "dividendos", "dividendo"
+- "rendimento", "rendimentos"
+- "venda", "vendas"
+- "freelance", "freela"
+- "prolabore"
+- "bônus", "bonus"
+- "reembolso", "estorno", "devolução"
+- "aluguel recebido"
+- Qualquer verbo que indique RECEBER dinheiro
+
+PALAVRAS-CHAVE DE DESPESA (sempre use register_expense):
+- "gastei", "gasto", "gastar"
+- "paguei", "pago", "pagar"
+- "despesa", "despesas"
+- "comprei", "compra", "comprar"
+- "coloquei" (quando se refere a abastecer, pagar)
+- "saída", "saiu"
+- Qualquer verbo que indique PAGAR ou GASTAR dinheiro
+
+REGRAS IMPORTANTES:
+1. Se a mensagem contém palavras de RECEBER (recebi, ganhei, entrada), SEMPRE use register_revenue
+2. Se a mensagem contém palavras de PAGAR/GASTAR (gastei, paguei, despesa), SEMPRE use register_expense
+3. Quando houver dúvida, analise o contexto: se menciona "recebi", "ganhei" ou "entrada", é RECEITA
+4. Exemplos claros de RECEITA: "recebi X", "ganhei X", "entrada de X", "X de comissão", "X de salário"
+
+CATEGORIAS VÁLIDAS: Alimentação, Moradia, Saúde, Transporte, Educação, Lazer e Entretenimento, Compras Pessoais, Assinaturas e Serviços, Financeiro e Obrigações, Impostos e Taxas, Pets, Doações e Presentes, Trabalho e Negócios, Outros
+
+SUBCATEGORIAS POR CATEGORIA:
+- Alimentação: supermercado, feira, hortifruti, padaria, restaurante, lanchonete, delivery, café
+- Moradia: aluguel, condomínio, IPTU, água, energia elétrica, gás, internet, manutenção e reparos
+- Saúde: consulta médica, exames, medicamentos, farmácia, plano de saúde, dentista, psicólogo/terapia
+- Transporte: combustível, transporte público, aplicativos (Uber/99), estacionamento, manutenção veicular, seguro do veículo, IPVA, pedágio
+- Educação: mensalidade escolar, faculdade, cursos, livros, material escolar, plataformas online
+- Lazer e Entretenimento: cinema, streaming, viagens, passeios, bares, eventos, shows
+- Compras Pessoais: roupas, calçados, acessórios, cosméticos, higiene pessoal
+- Assinaturas e Serviços: streaming, softwares, aplicativos, clubes, associações
+- Financeiro e Obrigações: cartão de crédito, empréstimos, financiamentos, tarifas bancárias, juros, multas
+- Impostos e Taxas: imposto de renda, taxas municipais, taxas estaduais, licenças
+- Pets: ração, veterinário, medicamentos, banho e tosa
+- Doações e Presentes: doações, presentes, contribuições
+- Trabalho e Negócios: ferramentas de trabalho, serviços profissionais, marketing, contabilidade, hospedagem, sistemas
+- Outros: emergências, imprevistos, ajustes, correções
 
 IMPORTANTE PARA COMPROMISSOS:
 - Se o usuário mencionar horário sem data, assuma que é HOJE
@@ -216,10 +267,26 @@ IMPORTANTE PARA COMPROMISSOS:
 - Sempre extraia título (ex: "reunião", "consulta", "compromisso")
 - scheduled_at deve estar em formato ISO 8601 completo (YYYY-MM-DDTHH:mm:ss)
 
-EXEMPLOS:
+EXEMPLOS DE RECEITAS (register_revenue):
+- "recebi 2000 de salário" -> register_revenue, amount: 2000, description: "Salário", category: "Trabalho e Negócios"
+- "recebi 10 reais de comissão" -> register_revenue, amount: 10, description: "Comissão", category: "Trabalho e Negócios"
+- "recebi comissão de 50 reais" -> register_revenue, amount: 50, description: "Comissão", category: "Trabalho e Negócios"
+- "entrada de 500 reais" -> register_revenue, amount: 500, description: "Entrada"
+- "ganhei 1000" -> register_revenue, amount: 1000, description: "Ganho"
+- "recebi 500 de freelance" -> register_revenue, amount: 500, description: "Freelance", category: "Trabalho e Negócios"
+- "ganhei 200 de comissão" -> register_revenue, amount: 200, description: "Comissão", category: "Trabalho e Negócios"
+- "recebi dividendos de 150" -> register_revenue, amount: 150, description: "Dividendos", category: "Financeiro e Obrigações"
+- "entrada de 300 reais hoje" -> register_revenue, amount: 300, description: "Entrada"
+- "ganhei 20 reais de presente" -> register_revenue, amount: 20, description: "Presente", category: "Doações e Presentes"
+
+EXEMPLOS DE DESPESAS (register_expense):
 - "coloquei 50 reais de gasolina" -> register_expense, amount: 50, description: "Gasolina", category: "Transporte"
-- "quanto gasto por mês de combustível?" -> query, queryType: "categoria", queryCategory: "Transporte", queryPeriod: "mês"
 - "gastei 30 no posto" -> register_expense, amount: 30, description: "Posto", category: "Transporte", establishment: "Posto"
+- "paguei 100 no mercado" -> register_expense, amount: 100, description: "Mercado", category: "Alimentação"
+- "despesa de 200 reais" -> register_expense, amount: 200, description: "Despesa"
+
+EXEMPLOS DE OUTRAS INTENÇÕES:
+- "quanto gasto por mês de combustível?" -> query, queryType: "categoria", queryCategory: "Transporte", queryPeriod: "mês"
 - "reunião 12h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-15T12:00:00.000Z" (use data de HOJE)
 - "tenho reunião amanhã às 10h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-16T10:00:00.000Z"
 - "marcar consulta médica segunda às 14h" -> create_appointment, title: "Consulta médica", scheduled_at: "2024-01-20T14:00:00.000Z"

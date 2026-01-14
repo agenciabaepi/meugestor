@@ -1,14 +1,24 @@
 import { getFinanceiroRecords, calculateTotalSpent, calculateTotalByCategory } from '@/lib/services/financeiro'
 import { gerarRelatorioFinanceiro } from '@/lib/services/relatorios'
-import { supabase } from '@/lib/db/client'
+import { supabaseAdmin } from '@/lib/db/client'
 import { Charts } from './charts'
 
 async function getTenantId(): Promise<string | null> {
-  const { data } = await supabase
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado')
+    return null
+  }
+  
+  const { data, error } = await supabaseAdmin
     .from('tenants')
     .select('id')
     .limit(1)
     .single()
+  
+  if (error) {
+    console.error('Error fetching tenant:', error)
+    return null
+  }
   
   return data?.id || null
 }
@@ -48,7 +58,22 @@ async function getFinanceiroData() {
   )
 
   // Dados por categoria
-  const categorias = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 'Lazer', 'Outros']
+  const categorias = [
+    'Alimentação',
+    'Moradia',
+    'Saúde',
+    'Transporte',
+    'Educação',
+    'Lazer e Entretenimento',
+    'Compras Pessoais',
+    'Assinaturas e Serviços',
+    'Financeiro e Obrigações',
+    'Impostos e Taxas',
+    'Pets',
+    'Doações e Presentes',
+    'Trabalho e Negócios',
+    'Outros',
+  ]
   const dadosPorCategoria = await Promise.all(
     categorias.map(async (cat) => {
       const total = await calculateTotalByCategory(

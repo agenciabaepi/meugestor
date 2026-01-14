@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '@/lib/db/client'
-import { linkWhatsAppToUser } from '@/lib/modules/auth'
+import { createServerClient, supabaseAdmin } from '@/lib/db/client'
+import { sendOTPVerification, verifyOTPAndLink } from '@/lib/modules/whatsapp-verification'
 
 /**
- * POST - Vincula WhatsApp ao usuário autenticado
+ * POST - Inicia processo de vinculação de WhatsApp (envia OTP)
  */
 export async function POST(request: NextRequest) {
   try {
+    // Cria cliente Supabase com suporte a cookies
+    const supabase = await createServerClient()
+    
     // Verifica autenticação
     const {
       data: { session },
@@ -19,7 +22,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { whatsappNumber } = await request.json()
+    const { whatsappNumber, code } = await request.json()
 
     if (!whatsappNumber) {
       return NextResponse.json(
@@ -28,17 +31,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Vincula WhatsApp ao usuário
-    const success = await linkWhatsAppToUser(session.user.id, whatsappNumber)
+    // Se código foi fornecido, verifica e vincula
+    if (code) {
+      const result = await verifyOTPAndLink(
+        session.user.id,
+        whatsappNumber,
+        code
+      )
 
-    if (!success) {
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || 'Erro ao verificar código' },
+          { status: 400 }
+        )
+      }
+
+      return NextResponse.json({ success: true, message: 'WhatsApp vinculado com sucesso!' })
+    }
+
+    // Se não tem código, envia OTP
+    const result = await sendOTPVerification(session.user.id, whatsappNumber)
+
+    if (!result.success) {
       return NextResponse.json(
-        { error: 'Erro ao vincular WhatsApp. Verifique se o número não está vinculado a outra conta.' },
+        { error: result.error || 'Erro ao enviar código de verificação' },
         { status: 400 }
       )
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      message: 'Código de verificação enviado para seu WhatsApp',
+    })
   } catch (error) {
     console.error('Erro ao vincular WhatsApp:', error)
     return NextResponse.json(

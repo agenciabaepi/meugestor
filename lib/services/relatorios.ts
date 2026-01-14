@@ -30,11 +30,18 @@ export async function gerarRelatorioFinanceiro(
   const porCategoria: Record<string, number> = {}
   const categorias = [
     'Alimentação',
-    'Transporte',
     'Moradia',
     'Saúde',
+    'Transporte',
     'Educação',
-    'Lazer',
+    'Lazer e Entretenimento',
+    'Compras Pessoais',
+    'Assinaturas e Serviços',
+    'Financeiro e Obrigações',
+    'Impostos e Taxas',
+    'Pets',
+    'Doações e Presentes',
+    'Trabalho e Negócios',
     'Outros',
   ]
 

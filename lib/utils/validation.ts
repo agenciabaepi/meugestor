@@ -31,11 +31,18 @@ export function isValidDate(dateString: string): boolean {
 export function isValidCategory(category: string): boolean {
   const validCategories = [
     'Alimentação',
-    'Transporte',
     'Moradia',
     'Saúde',
+    'Transporte',
     'Educação',
-    'Lazer',
+    'Lazer e Entretenimento',
+    'Compras Pessoais',
+    'Assinaturas e Serviços',
+    'Financeiro e Obrigações',
+    'Impostos e Taxas',
+    'Pets',
+    'Doações e Presentes',
+    'Trabalho e Negócios',
     'Outros',
   ]
   return validCategories.includes(category)
