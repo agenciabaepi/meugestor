@@ -308,7 +308,8 @@ export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): b
 
 /**
  * Processa uma data/hora extraída pela IA e converte para ISO 8601
- * Se a data não tiver horário, assume horário atual ou padrão
+ * IMPORTANTE: A IA pode retornar horários em UTC, mas o usuário quer no horário do Brasil
+ * Se a IA retorna "20:00:00.000Z", ela provavelmente quis dizer 20h no Brasil, não 20h UTC
  */
 export function parseScheduledAt(scheduledAt: string | undefined, title?: string): string | null {
   if (!scheduledAt) {
@@ -316,19 +317,88 @@ export function parseScheduledAt(scheduledAt: string | undefined, title?: string
   }
 
   try {
-    // Se já está em formato ISO válido, retorna
+    // Tenta parsear a data
     const date = new Date(scheduledAt)
-    if (!isNaN(date.getTime())) {
-      return date.toISOString()
+    if (isNaN(date.getTime())) {
+      return null
     }
-
-    // Tenta parsear como string de data
-    const parsed = new Date(scheduledAt)
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toISOString()
+    
+    // Verifica se a data está em formato ISO com timezone UTC (termina com Z)
+    const isUTC = scheduledAt.endsWith('Z') || scheduledAt.includes('+00:00')
+    
+    if (isUTC) {
+      // Extrai componentes da data UTC
+      const utcHour = date.getUTCHours()
+      const utcMinute = date.getUTCMinutes()
+      const utcDay = date.getUTCDate()
+      const utcMonth = date.getUTCMonth()
+      const utcYear = date.getUTCFullYear()
+      
+      // Converte para o timezone do Brasil para ver o que a hora UTC representa no Brasil
+      const brazilParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: BRAZIL_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date)
+      
+      const brazilHour = parseInt(brazilParts.find(p => p.type === 'hour')?.value || '0')
+      const brazilDay = parseInt(brazilParts.find(p => p.type === 'day')?.value || '0')
+      const brazilMonth = parseInt(brazilParts.find(p => p.type === 'month')?.value || '0')
+      const brazilYear = parseInt(brazilParts.find(p => p.type === 'year')?.value || '0')
+      
+      // Se a hora no Brasil é diferente da hora UTC, a IA provavelmente quis dizer
+      // a hora UTC como se fosse a hora no Brasil
+      // Exemplo: IA retorna 20:00 UTC, mas no Brasil isso vira 17:00
+      // O usuário pediu 20h, então a IA quis dizer 20h no Brasil, não 20h UTC
+      if (brazilHour !== utcHour || brazilDay !== utcDay) {
+        console.log('parseScheduledAt - Detectada diferença de timezone:', {
+          original: scheduledAt,
+          utcHour,
+          utcMinute,
+          utcDate: `${utcDay}/${utcMonth + 1}/${utcYear}`,
+          brazilHour,
+          brazilDay,
+          brazilDate: `${brazilDay}/${brazilMonth}/${brazilYear}`,
+          interpretacao: `IA retornou ${utcHour}h UTC (que vira ${brazilHour}h no Brasil), mas usuário provavelmente queria ${utcHour}h no Brasil`
+        })
+        
+        // Cria uma data que representa utcHour:utcMinute no horário do Brasil
+        // Usa createDateInBrazil que já faz essa conversão corretamente
+        const dayOffset = brazilDay - utcDay
+        const adjustedDate = createDateInBrazil(utcHour, utcMinute, dayOffset)
+        
+        // Verifica se a data ajustada está correta
+        const adjustedBrazilParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: BRAZIL_TIMEZONE,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).formatToParts(adjustedDate)
+        
+        const adjustedBrazilHour = parseInt(adjustedBrazilParts.find(p => p.type === 'hour')?.value || '0')
+        const adjustedBrazilDay = parseInt(adjustedBrazilParts.find(p => p.type === 'day')?.value || '0')
+        
+        console.log('parseScheduledAt - Data ajustada:', {
+          original: scheduledAt,
+          originalBrazil: `${brazilDay}/${brazilMonth}/${brazilYear} ${brazilHour}:${brazilParts.find(p => p.type === 'minute')?.value}`,
+          adjusted: adjustedDate.toISOString(),
+          adjustedBrazil: `${adjustedBrazilDay}/${adjustedBrazilParts.find(p => p.type === 'month')?.value}/${adjustedBrazilParts.find(p => p.type === 'year')?.value} ${adjustedBrazilHour}:${adjustedBrazilParts.find(p => p.type === 'minute')?.value}`,
+          correto: adjustedBrazilHour === utcHour && adjustedBrazilDay === brazilDay
+        })
+        
+        return adjustedDate.toISOString()
+      }
     }
-
-    return null
+    
+    // Se não há diferença ou não é UTC, retorna como está
+    return date.toISOString()
   } catch (error) {
     console.error('Erro ao parsear data:', error)
     return null
