@@ -105,6 +105,32 @@ async function processWhatsAppMessage(
     if (message.type === 'text' && message.text?.body) {
       const userMessage = message.text.body.toLowerCase().trim()
       
+      // Verifica se é uma saudação inicial (oi, olá, etc)
+      const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
+      if (greetings.includes(userMessage)) {
+        const presentation = `👋 Olá! Tudo bem?\n\n` +
+          `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n` +
+          `📋 *O que eu posso fazer por você:*\n` +
+          `• 💰 Registrar seus gastos e despesas\n` +
+          `• 📅 Criar e gerenciar seus compromissos\n` +
+          `• 📊 Consultar informações financeiras\n` +
+          `• 📈 Gerar relatórios e estatísticas\n` +
+          `• 🖼️ Processar comprovantes de imagem\n` +
+          `• 🎤 Entender seus áudios\n\n` +
+          `*Exemplos de como usar:*\n` +
+          `• "Gastei 50 reais de gasolina"\n` +
+          `• "Tenho reunião amanhã às 10h"\n` +
+          `• "Quanto gastei este mês?"\n\n` +
+          `Pode me enviar uma mensagem e eu te ajudo! 😉`
+        
+        await sendTextMessage(from, presentation)
+        await createConversation(tenant.id, message.text.body, 'user')
+        await createConversation(tenant.id, presentation, 'assistant')
+        
+        console.log(`Apresentação enviada para ${from}`)
+        return
+      }
+      
       // Verifica se é confirmação de registro de comprovante
       if (userMessage === 'sim' || userMessage === 's' || userMessage === 'confirmar') {
         // Busca última conversa com dados extraídos
