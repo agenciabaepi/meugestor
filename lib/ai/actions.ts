@@ -423,12 +423,25 @@ async function handleCreateAppointment(
     // Valida se a data não é no passado (usando timezone do Brasil)
     const scheduledDate = new Date(scheduledAt)
     const now = getNowInBrazil()
+    
+    // Calcula diferença em minutos para log
+    const diferencaMinutos = (scheduledDate.getTime() - now.getTime()) / (1000 * 60)
+    console.log('handleCreateAppointment - Validação de data:', {
+      scheduledAt,
+      scheduledDateLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      nowLocal: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      diferencaMinutos: Math.round(diferencaMinutos),
+    })
+    
     if (!isFutureInBrazil(scheduledDate, now)) {
+      console.error('handleCreateAppointment - Data rejeitada como passado')
       return {
         success: false,
         message: 'Não é possível agendar compromissos no passado. Por favor, informe uma data/hora futura.',
       }
     }
+    
+    console.log('handleCreateAppointment - Data validada com sucesso')
 
     console.log('Criando compromisso:', { title, scheduledAt, tenantId })
 

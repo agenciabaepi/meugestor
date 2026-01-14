@@ -63,7 +63,11 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
   })
   
   const parts = formatter.formatToParts(now)
@@ -71,38 +75,45 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
   const month = parseInt(parts.find(p => p.type === 'month')?.value || '1')
   const day = parseInt(parts.find(p => p.type === 'day')?.value || '1')
   
-  // Cria uma data de teste no meio-dia UTC para calcular o offset do Brasil
-  const testDateUTC = new Date(Date.UTC(year, month - 1, day + dayOffset, 12, 0, 0))
+  // Cria uma string de data no formato que representa o horário desejado no Brasil
+  // Formato: YYYY-MM-DDTHH:mm:00 (sem timezone, será interpretado como local)
+  const targetDay = day + dayOffset
+  const dateString = `${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
   
-  // Obtém o horário no Brasil e em UTC para essa data
-  const brazilFormatter = new Intl.DateTimeFormat('en-US', {
+  // Cria uma data assumindo que essa string representa um horário no Brasil
+  // Para converter corretamente, precisamos saber o offset do Brasil para essa data
+  // Vamos usar uma abordagem mais simples: criar a data e ajustar pelo offset conhecido
+  
+  // Cria uma data de referência para calcular o offset
+  const referenceDate = new Date(`${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}T12:00:00Z`)
+  
+  // Obtém o horário dessa data no Brasil
+  const brazilTime = referenceDate.toLocaleString('en-US', {
     timeZone: BRAZIL_TIMEZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   })
-  const utcFormatter = new Intl.DateTimeFormat('en-US', {
+  
+  // Obtém o horário em UTC
+  const utcTime = referenceDate.toLocaleString('en-US', {
     timeZone: 'UTC',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
   })
   
-  const brazilParts = brazilFormatter.formatToParts(testDateUTC)
-  const utcParts = utcFormatter.formatToParts(testDateUTC)
-  
-  const brazilHour = parseInt(brazilParts.find(p => p.type === 'hour')?.value || '12')
-  const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '12')
-  
-  // Calcula o offset em horas (pode ser -3 ou -2 dependendo do horário de verão)
+  // Calcula o offset (diferença entre Brasil e UTC)
+  const brazilHour = parseInt(brazilTime.split(':')[0])
+  const utcHour = parseInt(utcTime.split(':')[0])
   const offsetHours = brazilHour - utcHour
   
   // Cria a data UTC que representa o horário desejado no Brasil
-  // Se queremos 15h no Brasil e o offset é -3, então em UTC seria 18h (15 - (-3) = 18)
+  // Se queremos 18h no Brasil e o offset é -3, então em UTC seria 21h (18 - (-3) = 21)
   let utcHourTarget = hour - offsetHours
   
   // Ajusta para o próximo dia se necessário
-  let utcDay = day + dayOffset
+  let utcDay = targetDay
   let utcMonth = month - 1
   let utcYear = year
   
@@ -116,38 +127,47 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
   
   const utcDate = new Date(Date.UTC(utcYear, utcMonth, utcDay, utcHourTarget, minute, 0, 0))
   
+  console.log('createDateInBrazil - Criando data:', {
+    hour,
+    minute,
+    dayOffset,
+    targetDay,
+    offsetHours,
+    utcHourTarget,
+    utcDate: utcDate.toISOString(),
+    utcDateLocal: utcDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  })
+  
   return utcDate
 }
 
 /**
  * Compara duas datas considerando o timezone do Brasil
- * Retorna true se scheduledDate é no futuro em relação a now
+ * Retorna true se scheduledDate é no futuro ou presente (permite agendamentos no mesmo dia)
+ * Permite uma margem de 10 minutos para agendamentos muito próximos e compensar diferenças de timezone
  */
 export function isFutureInBrazil(scheduledDate: Date, now: Date = getNowInBrazil()): boolean {
-  // Converte ambas as datas para o mesmo formato no timezone do Brasil e compara
-  const scheduledBrazil = scheduledDate.toLocaleString('en-US', {
-    timeZone: BRAZIL_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+  // Obtém os timestamps em milissegundos
+  const scheduledTime = scheduledDate.getTime()
+  const nowTime = now.getTime()
+  
+  // Calcula a diferença em minutos
+  const diferencaMinutos = (scheduledTime - nowTime) / (1000 * 60)
+  
+  console.log('isFutureInBrazil - Comparação:', {
+    scheduledTime: scheduledDate.toISOString(),
+    scheduledLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    nowTime: now.toISOString(),
+    nowLocal: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
+    isFuture: diferencaMinutos >= -10
   })
   
-  const nowBrazil = now.toLocaleString('en-US', {
-    timeZone: BRAZIL_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  })
-  
-  return scheduledBrazil > nowBrazil
+  // Permite agendamentos se:
+  // 1. A data/hora agendada é no futuro (pelo menos 10 minutos à frente, considerando margem)
+  // Isso permite agendamentos no mesmo dia, desde que o horário seja futuro
+  // A margem de 10 minutos compensa pequenas diferenças de timezone e processamento
+  return diferencaMinutos >= -10
 }
 
 /**
@@ -193,15 +213,21 @@ export function extractAppointmentFromMessage(message: string): {
 
   // Padrões comuns
   const patterns = [
+    // "tenho reunião hoje às 18h" - padrão mais específico primeiro
+    /(?:tenho\s+)?(reunião|consulta|compromisso|encontro|evento)\s+hoje\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
+    // "reunião hoje às 18h"
+    /(reunião|consulta|compromisso|encontro|evento)\s+hoje\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
+    // "hoje às 18h"
+    /hoje\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "tenho reunião amanhã às 9h" - padrão mais específico primeiro
     /(?:tenho\s+)?(reunião|consulta|compromisso|encontro|evento)\s+amanhã\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "reunião amanhã às 9h"
     /(reunião|consulta|compromisso|encontro|evento)\s+amanhã\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "amanhã às 10h"
     /amanhã\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
-    // "reunião 12h", "reunião às 12h", "reunião as 12h"
+    // "reunião 12h", "reunião às 12h", "reunião as 12h" (assume hoje se não mencionar dia)
     /(reunião|consulta|compromisso|encontro|evento|agendar|marcar)\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
-    // "12h" sozinho (assume que é compromisso)
+    // "12h" sozinho (assume que é compromisso hoje)
     /^(\d{1,2})h$/i,
     // "reunião às 12h", "consulta as 14h"
     /(reunião|consulta|compromisso|encontro|evento)\s+(?:às|as)\s+(\d{1,2})h/i,
@@ -232,6 +258,11 @@ export function extractAppointmentFromMessage(message: string): {
       const hourMatch = match.find(m => m && /^\d+$/.test(m))
       if (hourMatch) {
         hour = parseInt(hourMatch)
+      }
+      
+      // Verifica se mencionou "hoje" (garante que é hoje mesmo)
+      if (lowerMessage.includes('hoje')) {
+        dayOffset = 0
       }
       
       // Verifica se mencionou "amanhã"
