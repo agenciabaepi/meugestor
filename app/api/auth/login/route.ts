@@ -121,7 +121,21 @@ export async function POST(request: NextRequest) {
     console.log('Login bem-sucedido:', {
       userId: data.user.id,
       email: data.user.email,
+      sessionExpiresAt: data.session.expires_at,
     })
+
+    // IMPORTANTE: O Supabase deve salvar a sessão automaticamente via setItem no storage
+    // Mas vamos garantir que a sessão está configurada corretamente
+    await supabase.auth.setSession(data.session)
+
+    // Verifica se a sessão foi salva
+    const { data: { session: savedSession } } = await supabase.auth.getSession()
+    
+    if (!savedSession) {
+      console.error('AVISO: Sessão não foi salva após setSession')
+    } else {
+      console.log('Sessão confirmada como salva')
+    }
 
     // Retorna dados do usuário
     return NextResponse.json({

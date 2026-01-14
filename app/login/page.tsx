@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@/lib/db/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -50,6 +51,25 @@ export default function LoginPage() {
         setError(errorMessage)
         setLoading(false)
         return
+      }
+
+      // IMPORTANTE: Salva a sessão no cliente Supabase
+      // Isso garante que a sessão seja mantida entre requisições
+      if (data.session) {
+        const supabase = createBrowserClient()
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token || '',
+        })
+
+        if (sessionError) {
+          console.error('Erro ao salvar sessão no cliente:', sessionError)
+          setError('Erro ao salvar sessão. Tente novamente.')
+          setLoading(false)
+          return
+        }
+
+        console.log('Sessão salva com sucesso no cliente')
       }
 
       // Redireciona para o dashboard
