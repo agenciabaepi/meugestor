@@ -53,21 +53,23 @@ export async function POST(request: NextRequest) {
         message: error.message,
         status: error.status,
         name: error.name,
+        email: email ? `${email.substring(0, 3)}***` : 'não fornecido',
       })
 
       // Mensagens de erro mais amigáveis
-      let errorMessage = 'Erro ao fazer login'
+      let errorMessage = 'Email ou senha incorretos'
       
-      if (error.message.includes('Invalid login credentials') || 
-          error.message.includes('Email not confirmed') ||
-          error.status === 400) {
-        errorMessage = 'Email ou senha incorretos'
+      // Verifica tipos específicos de erro
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Email não confirmado. Verifique sua caixa de entrada.'
       } else if (error.message.includes('rate limit') || 
                  error.message.includes('too many requests')) {
-        // Mensagem genérica para rate limit (sem mencionar "muitas tentativas")
         errorMessage = 'Erro ao fazer login. Tente novamente em alguns instantes.'
-      } else {
-        errorMessage = error.message || 'Erro ao fazer login'
+      } else if (error.message) {
+        // Para outros erros, usa a mensagem do Supabase mas de forma genérica
+        errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
       }
 
       return NextResponse.json(
