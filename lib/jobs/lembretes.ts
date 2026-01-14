@@ -60,15 +60,56 @@ export async function buscarCompromissosParaLembrete(
       const dataCompromisso = new Date(compromisso.scheduled_at)
       const diferencaMinutos = (dataCompromisso.getTime() - agora.getTime()) / (1000 * 60)
 
+      // Log detalhado para debug
+      const dataCompromissoBrazil = dataCompromisso.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      const agoraBrazil = agora.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+
+      console.log(`buscarCompromissosParaLembrete - Verificando compromisso:`, {
+        id: compromisso.id,
+        title: compromisso.title,
+        tipoLembrete: config.tipo,
+        antecedenciaMinutos: config.antecedenciaMinutos,
+        dataCompromisso: dataCompromissoBrazil,
+        agora: agoraBrazil,
+        diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
+        jaLembrado,
+        janelaMin: config.antecedenciaMinutos - 5,
+        janelaMax: config.antecedenciaMinutos + 5,
+        dentroJanela: diferencaMinutos >= config.antecedenciaMinutos - 5 && diferencaMinutos <= config.antecedenciaMinutos + 5
+      })
+
       // Verifica se está dentro da janela de antecedência
       // Envia lembrete se o compromisso está entre (antecedência - 5min) e (antecedência + 5min)
       // Isso permite que o cron rode a cada 5 minutos e ainda capture os lembretes
+      // Para lembretes de 10min, ajustamos a janela para ser mais permissiva
+      const margem = config.antecedenciaMinutos <= 10 ? 3 : 5 // Margem menor para lembretes próximos
       if (
-        diferencaMinutos >= config.antecedenciaMinutos - 5 && // Margem de 5 minutos
-        diferencaMinutos <= config.antecedenciaMinutos + 5
+        diferencaMinutos >= config.antecedenciaMinutos - margem &&
+        diferencaMinutos <= config.antecedenciaMinutos + margem
       ) {
+        console.log(`buscarCompromissosParaLembrete - ✅ Compromisso ${compromisso.id} dentro da janela para lembrete ${config.tipo}`)
         compromissosParaLembrar.push(compromisso)
+      } else {
+        console.log(`buscarCompromissosParaLembrete - ❌ Compromisso ${compromisso.id} FORA da janela para lembrete ${config.tipo}`)
       }
+    } else {
+      console.log(`buscarCompromissosParaLembrete - ⏭️ Compromisso ${compromisso.id} já foi lembrado (${config.tipo})`)
     }
   }
 
@@ -262,14 +303,18 @@ export async function processarLembretes(): Promise<{
     // Processa cada tipo de lembrete
     for (const tipoLembrete of ['1h', '30min', '10min'] as LembreteType[]) {
       const config = LEMBRETES_CONFIG[tipoLembrete]
-      console.log(`Processando lembretes ${tipoLembrete}...`)
+      console.log(`\n=== Processando lembretes ${tipoLembrete} (${config.antecedenciaMinutos}min antes) ===`)
+      console.log(`Horário atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)
 
       // Processa lembretes para cada tenant
       for (const tenant of tenants) {
+        console.log(`\nProcessando tenant: ${tenant.id} (WhatsApp: ${tenant.whatsapp_number})`)
         const compromissos = await buscarCompromissosParaLembrete(tenant.id, config)
+        console.log(`Encontrados ${compromissos.length} compromissos para lembrete ${tipoLembrete}`)
 
         for (const compromisso of compromissos) {
           totalGeral++
+          console.log(`\nEnviando lembrete ${tipoLembrete} para compromisso: ${compromisso.title} (ID: ${compromisso.id})`)
           
           const enviado = await enviarLembrete(
             compromisso.id,
@@ -281,9 +326,11 @@ export async function processarLembretes(): Promise<{
           if (enviado) {
             sucessoTotal++
             detalhes[tipoLembrete].sucesso++
+            console.log(`✅ Lembrete ${tipoLembrete} enviado com sucesso`)
           } else {
             errosTotal++
             detalhes[tipoLembrete].erros++
+            console.error(`❌ Erro ao enviar lembrete ${tipoLembrete}`)
           }
         }
       }
