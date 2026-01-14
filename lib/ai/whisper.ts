@@ -2,7 +2,7 @@
  * Módulo de processamento de áudio com Whisper API
  */
 
-import { openai } from './openai'
+import { openai, validateOpenAIConfig } from './openai'
 import { downloadMedia } from '../modules/whatsapp'
 import { logUsage, calculateWhisperCost } from '../utils/cost-tracker'
 
@@ -14,6 +14,7 @@ export async function transcribeAudio(
   mimeType?: string
 ): Promise<string | null> {
   try {
+    validateOpenAIConfig()
     // Baixa o áudio do WhatsApp
     const audioBuffer = await downloadMedia(audioId)
     

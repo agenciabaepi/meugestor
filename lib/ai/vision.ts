@@ -2,7 +2,7 @@
  * Módulo de processamento de imagens com GPT-4o Vision
  */
 
-import { openai } from './openai'
+import { openai, validateOpenAIConfig } from './openai'
 import { downloadMedia } from '../modules/whatsapp'
 import { supabaseAdmin } from '../db/client'
 import { logUsage, calculateVisionCost } from '../utils/cost-tracker'
@@ -28,6 +28,7 @@ export async function extractReceiptData(
   error?: string
 }> {
   try {
+    validateOpenAIConfig()
     // Baixa a imagem do WhatsApp
     const imageBuffer = await downloadMedia(imageId)
     

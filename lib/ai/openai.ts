@@ -6,11 +6,26 @@ import OpenAI from 'openai'
  * 
  * gpt-4o é multimodal (texto, visão, áudio), mais rápido e mais barato que gpt-4
  */
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+export const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : new OpenAI({
+      apiKey: 'placeholder-key-for-build',
+    })
 
 export const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o'
+
+/**
+ * Valida se a API key do OpenAI está configurada
+ */
+export function validateOpenAIConfig() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error(
+      'Missing OpenAI API key. Please set OPENAI_API_KEY environment variable.'
+    )
+  }
+}
 
 /**
  * Modelos disponíveis:

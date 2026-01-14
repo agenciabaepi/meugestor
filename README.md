@@ -644,6 +644,7 @@ npm run dev
 - 📖 `CONTRIBUINDO.md` - Guia de contribuição
 - 📖 `TURBOPACK_FIX.md` - 🔧 Fix para erro do Turbopack
 - 📖 `WATCHPACK_NOTES.md` - 📝 Notas sobre avisos do Watchpack
+- 📖 `VERCEL_ENV_VARS.md` - 🔧 Lista completa de variáveis para Vercel
 
 ---
 

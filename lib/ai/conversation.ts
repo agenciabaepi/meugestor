@@ -1,4 +1,4 @@
-import { openai } from './openai'
+import { openai, validateOpenAIConfig } from './openai'
 import { SYSTEM_PROMPT, getContextPrompt } from './prompts'
 import { getRecentConversations } from '../db/queries'
 import {
@@ -24,6 +24,7 @@ export async function processMessage(
   context: ConversationContext
 ): Promise<string> {
   try {
+    validateOpenAIConfig()
     // Carrega contexto recente
     const recentConversations = context.recentMessages || 
       await getRecentConversations(context.tenantId, 5)
