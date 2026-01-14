@@ -220,57 +220,85 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
 /**
  * Compara duas datas considerando o timezone do Brasil
  * Retorna true se scheduledDate é no futuro ou presente (permite agendamentos no mesmo dia)
- * Permite uma margem de 15 minutos para compensar diferenças de timezone e processamento
+ * Permite uma margem generosa para compensar diferenças de timezone e processamento
  */
 export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): boolean {
-  // Obtém os timestamps em milissegundos
-  const scheduledTime = scheduledDate.getTime()
-  const nowTime = now.getTime()
-  
-  // Calcula a diferença em minutos
-  const diferencaMinutos = (scheduledTime - nowTime) / (1000 * 60)
-  
-  // Converte para o timezone do Brasil para logs
-  const scheduledBrazil = scheduledDate.toLocaleString('pt-BR', {
+  // Converte ambas as datas para o timezone do Brasil para comparação
+  const scheduledBrazil = new Intl.DateTimeFormat('en-US', {
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false
-  })
+  }).formatToParts(scheduledDate)
   
-  const nowBrazil = now.toLocaleString('pt-BR', {
+  const nowBrazil = new Intl.DateTimeFormat('en-US', {
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false
-  })
+  }).formatToParts(now)
   
-  console.log('isFutureInBrazil - Comparação:', {
-    scheduledISO: scheduledDate.toISOString(),
-    scheduledBrazil,
-    nowISO: now.toISOString(),
-    nowBrazil,
-    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
-    isFuture: diferencaMinutos >= -15
-  })
+  // Extrai componentes
+  const scheduledYear = parseInt(scheduledBrazil.find(p => p.type === 'year')?.value || '0')
+  const scheduledMonth = parseInt(scheduledBrazil.find(p => p.type === 'month')?.value || '0')
+  const scheduledDay = parseInt(scheduledBrazil.find(p => p.type === 'day')?.value || '0')
+  const scheduledHour = parseInt(scheduledBrazil.find(p => p.type === 'hour')?.value || '0')
+  const scheduledMinute = parseInt(scheduledBrazil.find(p => p.type === 'minute')?.value || '0')
   
-  // Permite agendamentos se a diferença for maior ou igual a -30 minutos
-  // Isso permite agendamentos no mesmo dia, desde que o horário seja futuro
-  // A margem de 30 minutos compensa diferenças de timezone, processamento e pequenos erros
-  // Se a diferença for negativa mas pequena (menos de 30 minutos), ainda permite
-  // porque pode ser apenas uma diferença de timezone ou processamento
-  const isFuture = diferencaMinutos >= -30
+  const nowYear = parseInt(nowBrazil.find(p => p.type === 'year')?.value || '0')
+  const nowMonth = parseInt(nowBrazil.find(p => p.type === 'month')?.value || '0')
+  const nowDay = parseInt(nowBrazil.find(p => p.type === 'day')?.value || '0')
+  const nowHour = parseInt(nowBrazil.find(p => p.type === 'hour')?.value || '0')
+  const nowMinute = parseInt(nowBrazil.find(p => p.type === 'minute')?.value || '0')
   
-  console.log('isFutureInBrazil - Resultado:', {
-    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
+  // Compara ano
+  if (scheduledYear > nowYear) {
+    console.log('isFutureInBrazil - Resultado: FUTURO (ano diferente)')
+    return true
+  }
+  if (scheduledYear < nowYear) {
+    console.log('isFutureInBrazil - Resultado: PASSADO (ano diferente)')
+    return false
+  }
+  
+  // Compara mês
+  if (scheduledMonth > nowMonth) {
+    console.log('isFutureInBrazil - Resultado: FUTURO (mês diferente)')
+    return true
+  }
+  if (scheduledMonth < nowMonth) {
+    console.log('isFutureInBrazil - Resultado: PASSADO (mês diferente)')
+    return false
+  }
+  
+  // Compara dia
+  if (scheduledDay > nowDay) {
+    console.log('isFutureInBrazil - Resultado: FUTURO (dia diferente)')
+    return true
+  }
+  if (scheduledDay < nowDay) {
+    console.log('isFutureInBrazil - Resultado: PASSADO (dia diferente)')
+    return false
+  }
+  
+  // Mesmo dia - compara hora e minuto
+  // Permite margem de 60 minutos para compensar diferenças de timezone e processamento
+  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
+  const nowTotalMinutes = nowHour * 60 + nowMinute
+  const diferencaMinutos = scheduledTotalMinutes - nowTotalMinutes
+  
+  const isFuture = diferencaMinutos >= -60 // Margem de 60 minutos
+  
+  console.log('isFutureInBrazil - Comparação (mesmo dia):', {
+    scheduled: `${scheduledDay}/${scheduledMonth}/${scheduledYear} ${scheduledHour}:${String(scheduledMinute).padStart(2, '0')}`,
+    now: `${nowDay}/${nowMonth}/${nowYear} ${nowHour}:${String(nowMinute).padStart(2, '0')}`,
+    diferencaMinutos,
     isFuture,
     permitido: isFuture ? 'SIM' : 'NÃO'
   })
@@ -321,6 +349,10 @@ export function extractAppointmentFromMessage(message: string): {
 
   // Padrões comuns
   const patterns = [
+    // "marca uma reunião pra mim às 20h de hoje" - padrão mais específico
+    /(?:marca|marcar|agenda|agendar)\s+(?:uma\s+)?(?:reunião|consulta|compromisso|encontro|evento)\s+(?:pra\s+)?(?:mim|eu)?\s+(?:às\s*|as\s*)?(\d{1,2})h\s+(?:de\s+)?hoje/i,
+    // "marca reunião às 20h de hoje"
+    /(?:marca|marcar|agenda|agendar)\s+(?:reunião|consulta|compromisso|encontro|evento)\s+(?:às\s*|as\s*)?(\d{1,2})h\s+(?:de\s+)?hoje/i,
     // "tenho reunião hoje às 18h" - padrão mais específico primeiro
     /(?:tenho\s+)?(reunião|consulta|compromisso|encontro|evento)\s+hoje\s+(?:às\s*|as\s*)?(\d{1,2})h/i,
     // "reunião hoje às 18h"
@@ -369,19 +401,18 @@ export function extractAppointmentFromMessage(message: string): {
       }
       
       // Verifica se mencionou "hoje" (garante que é hoje mesmo)
+      // IMPORTANTE: Verifica "hoje" ANTES de verificar "amanhã" para evitar conflitos
       if (lowerMessage.includes('hoje')) {
         dayOffset = 0
         console.log('extractAppointmentFromMessage - Detectado "hoje", dayOffset = 0')
       }
-      
-      // Verifica se mencionou "amanhã"
-      if (lowerMessage.includes('amanhã')) {
+      // Verifica se mencionou "amanhã" (só se não mencionou "hoje")
+      else if (lowerMessage.includes('amanhã')) {
         dayOffset = 1
         console.log('extractAppointmentFromMessage - Detectado "amanhã", dayOffset = 1')
       }
-      
       // Se não mencionou nem "hoje" nem "amanhã" nem dia da semana, assume hoje
-      if (dayOffset === 0 && !lowerMessage.includes('hoje') && !lowerMessage.includes('amanhã')) {
+      else {
         const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
         const hasDayOfWeek = daysOfWeek.some(day => lowerMessage.includes(day))
         if (!hasDayOfWeek) {
@@ -434,8 +465,45 @@ export function extractAppointmentFromMessage(message: string): {
       lowerMessage
     })
     // Cria a data no timezone do Brasil
+    console.log('extractAppointmentFromMessage - Criando data com:', { hour, minute: 0, dayOffset })
     const scheduledDate = createDateInBrazil(hour, 0, dayOffset)
-    const scheduledAtISO = scheduledDate.toISOString()
+    
+    // Verifica se a data criada está correta
+    const verifyParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: BRAZIL_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(scheduledDate)
+    
+    const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
+    const verifyDay = parseInt(verifyParts.find(p => p.type === 'day')?.value || '0')
+    
+    console.log('extractAppointmentFromMessage - Data criada e verificada:', {
+      input: { hour, dayOffset },
+      createdDateISO: scheduledDate.toISOString(),
+      createdDateLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      verified: { hour: verifyHour, day: verifyDay },
+      match: verifyHour === hour
+    })
+    
+    // Se a hora não está correta, tenta ajustar
+    let finalDate = scheduledDate
+    if (verifyHour !== hour) {
+      console.warn('extractAppointmentFromMessage - Hora não corresponde! Tentando ajustar...')
+      // Ajusta a diferença
+      const hourDiff = hour - verifyHour
+      finalDate = new Date(scheduledDate.getTime() + hourDiff * 60 * 60 * 1000)
+      console.log('extractAppointmentFromMessage - Data ajustada:', {
+        adjustedDateISO: finalDate.toISOString(),
+        adjustedDateLocal: finalDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      })
+    }
+    
+    const scheduledAtISO = finalDate.toISOString()
     
     console.log('extractAppointmentFromMessage - Data criada:', {
       scheduledAt: scheduledAtISO,
