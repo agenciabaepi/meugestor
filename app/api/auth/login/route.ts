@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Retorna dados do usuário
+    // IMPORTANTE: Inclui refresh_token para manter a sessão ativa
     return NextResponse.json({
       user: {
         id: data.user.id,
@@ -145,7 +146,9 @@ export async function POST(request: NextRequest) {
       },
       session: {
         access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
         expires_at: data.session.expires_at,
+        expires_in: data.session.expires_in,
       },
     })
   } catch (error) {
