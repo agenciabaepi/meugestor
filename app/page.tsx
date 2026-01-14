@@ -71,26 +71,9 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="text-center space-y-3">
-            <Link
-              href="/dashboard"
-              className="inline-block bg-blue-600 text-white px-6 sm:px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-sm sm:text-base w-full sm:w-auto"
-            >
-              Acessar Dashboard
-            </Link>
-            <div>
-              <Link
-                href="/webhook-config"
-                className="inline-block text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
-              >
-                Configurar Webhook WhatsApp →
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-gray-200">
-            <p className="text-center text-xs sm:text-sm text-gray-500">
-              Sistema completo e funcional • Todas as 14 etapas implementadas
+          <div className="text-center">
+            <p className="text-sm sm:text-base text-gray-600">
+              Entre em contato para mais informações
             </p>
           </div>
         </div>
