@@ -15,24 +15,36 @@ import { processarLembretes } from '@/lib/jobs/lembretes'
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('\n=== CRON LEMBRETES INICIADO ===')
+    console.log('Timestamp:', new Date().toISOString())
+    console.log('Horário Brasil:', new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))
+    
     // Validação de segurança (opcional)
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      console.error('❌ Autenticação falhou')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Processa lembretes
+    console.log('Iniciando processamento de lembretes...')
     const resultado = await processarLembretes()
+    
+    console.log('\n=== CRON LEMBRETES FINALIZADO ===')
+    console.log('Resultado:', JSON.stringify(resultado, null, 2))
 
     return NextResponse.json({
       success: true,
       ...resultado,
       timestamp: new Date().toISOString(),
+      timestampBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
     })
   } catch (error) {
+    console.error('\n=== ERRO NO CRON LEMBRETES ===')
     console.error('Erro ao executar job de lembretes:', error)
+    console.error('Stack:', error instanceof Error ? error.stack : 'N/A')
     return NextResponse.json(
       {
         success: false,
