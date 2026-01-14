@@ -277,6 +277,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
           })}
         </div>
       </div>
+    </div>
 
       {/* Modal de Detalhes */}
       {isModalOpen && selectedDate && (
@@ -346,7 +347,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
                                 <svg
                                   className="w-6 h-6 text-indigo-600"
                                   fill="none"

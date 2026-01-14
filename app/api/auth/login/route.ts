@@ -79,14 +79,6 @@ export async function POST(request: NextRequest) {
         email: emailNormalized,
         errorObject: JSON.stringify(error, Object.getOwnPropertyNames(error)),
       })
-      
-      // Tenta buscar informações adicionais
-      try {
-        const { data: userData } = await supabase.auth.admin.getUserByEmail(emailNormalized)
-        console.log('Informações do usuário (se encontrado):', userData ? 'Usuário existe' : 'Usuário não encontrado')
-      } catch (adminError) {
-        console.log('Não foi possível verificar usuário (normal se não for admin)')
-      }
 
       // Mensagens de erro mais amigáveis
       let errorMessage = 'Email ou senha incorretos'
