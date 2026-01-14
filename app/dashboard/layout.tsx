@@ -13,6 +13,11 @@ export default function DashboardLayout({
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center flex-1 min-w-0">
+              {/* Mobile Menu Button */}
+              <div className="lg:hidden flex items-center mr-2">
+                <MobileMenu />
+              </div>
+              
               <Link 
                 href="/dashboard" 
                 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600 truncate"
@@ -48,11 +53,6 @@ export default function DashboardLayout({
                 Relatórios
               </Link>
             </nav>
-
-            {/* Mobile Menu Button */}
-            <div className="lg:hidden flex items-center">
-              <MobileMenu />
-            </div>
 
             {/* Desktop Back Link */}
             <div className="hidden lg:flex items-center ml-4">

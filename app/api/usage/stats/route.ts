@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantCost, getTenantTokenUsage } from '@/lib/utils/cost-tracker'
-import { supabase } from '@/lib/db/client'
+import { supabase, validateSupabaseConfig } from '@/lib/db/client'
 
 /**
  * GET - Obtém estatísticas de uso de um tenant
  */
 export async function GET(request: NextRequest) {
   try {
+    validateSupabaseConfig()
     // TODO: Obter tenant_id da sessão autenticada
     // Por enquanto, busca o primeiro tenant
     const { data: tenant } = await supabase

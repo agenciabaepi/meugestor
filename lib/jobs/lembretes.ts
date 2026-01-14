@@ -5,7 +5,7 @@
 
 import { getCompromissosRecords } from '../services/compromissos'
 import { sendTextMessage } from '../modules/whatsapp'
-import { supabaseAdmin } from '../db/client'
+import { supabaseAdmin, validateSupabaseConfig } from '../db/client'
 import { getTenantByWhatsAppNumber } from '../db/queries'
 
 export interface LembreteConfig {
@@ -155,6 +155,8 @@ export async function processarLembretes(): Promise<{
   total: number
 }> {
   try {
+    validateSupabaseConfig()
+    
     if (!supabaseAdmin) {
       console.error('Supabase admin client não configurado')
       return { sucesso: 0, erros: 0, total: 0 }
