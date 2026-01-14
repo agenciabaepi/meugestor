@@ -432,8 +432,40 @@ async function handleCreateAppointment(
       nowLocal: now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
     })
     
-    if (!isFutureInBrazil(scheduledDate, now)) {
-      console.error('handleCreateAppointment - Data rejeitada como passado')
+    // Validação mais permissiva para agendamentos no mesmo dia
+    const isValid = isFutureInBrazil(scheduledDate, now)
+    
+    if (!isValid) {
+      // Log detalhado para debug
+      const scheduledBrazil = scheduledDate.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      
+      const nowBrazil = now.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      
+      console.error('handleCreateAppointment - Data rejeitada como passado:', {
+        scheduledBrazil,
+        nowBrazil,
+        scheduledISO: scheduledDate.toISOString(),
+        nowISO: now.toISOString(),
+        diferencaMs: scheduledDate.getTime() - now.getTime(),
+        diferencaMinutos: (scheduledDate.getTime() - now.getTime()) / (1000 * 60)
+      })
+      
       return {
         success: false,
         message: 'Não é possível agendar compromissos no passado. Por favor, informe uma data/hora futura.',

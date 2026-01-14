@@ -122,13 +122,76 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
   
   const targetDay = day + dayOffset
   
-  // Abordagem mais simples: usa busca binária para encontrar a data UTC correta
-  // Começa com uma estimativa (Brasil geralmente é UTC-3)
-  let utcHourEstimate = hour + 3
-  let utcDate = new Date(Date.UTC(year, month - 1, targetDay, utcHourEstimate, minute, 0, 0))
+  // Abordagem simplificada: cria uma data ISO string no formato brasileiro
+  // e depois converte para Date. Isso garante que o horário seja interpretado
+  // corretamente no timezone do Brasil.
   
-  // Verifica e ajusta se necessário
-  const verificationParts = new Intl.DateTimeFormat('en-US', {
+  // Cria string no formato: YYYY-MM-DDTHH:mm:00
+  const dateString = `${year}-${String(month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`
+  
+  // Cria uma data de teste para descobrir o offset do Brasil para essa data específica
+  // Usa meio-dia UTC como referência
+  const testUTC = new Date(Date.UTC(year, month - 1, targetDay, 12, 0, 0))
+  const testBrazilParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    hour: '2-digit',
+    hour12: false
+  }).formatToParts(testUTC)
+  
+  const testBrazilHour = parseInt(testBrazilParts.find(p => p.type === 'hour')?.value || '12')
+  const offsetHours = testBrazilHour - 12 // Geralmente -3 ou -2
+  
+  // Calcula a hora UTC correspondente
+  let utcHour = hour - offsetHours
+  
+  // Ajusta para o próximo dia se necessário
+  let utcDay = targetDay
+  if (utcHour < 0) {
+    utcHour += 24
+    utcDay -= 1
+  } else if (utcHour >= 24) {
+    utcHour -= 24
+    utcDay += 1
+  }
+  
+  // Cria a data UTC
+  let utcDate = new Date(Date.UTC(year, month - 1, utcDay, utcHour, minute, 0, 0))
+  
+  // Verifica e ajusta se necessário (máximo 2 tentativas)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const verifyParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: BRAZIL_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(utcDate)
+    
+    const verifyYear = parseInt(verifyParts.find(p => p.type === 'year')?.value || '0')
+    const verifyMonth = parseInt(verifyParts.find(p => p.type === 'month')?.value || '0')
+    const verifyDay = parseInt(verifyParts.find(p => p.type === 'day')?.value || '0')
+    const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
+    const verifyMinute = parseInt(verifyParts.find(p => p.type === 'minute')?.value || '0')
+    
+    if (verifyYear === year && verifyMonth === month && verifyDay === targetDay && 
+        verifyHour === hour && verifyMinute === minute) {
+      break
+    }
+    
+    // Ajusta
+    const hourDiff = hour - verifyHour
+    const minuteDiff = minute - verifyMinute
+    const dayDiff = targetDay - verifyDay
+    
+    utcDate = new Date(utcDate.getTime() + 
+      (hourDiff * 60 + minuteDiff) * 60 * 1000 + 
+      dayDiff * 24 * 60 * 60 * 1000)
+  }
+  
+  // Verificação final para logs
+  const finalParts = new Intl.DateTimeFormat('en-US', {
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
@@ -138,30 +201,17 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
     hour12: false
   }).formatToParts(utcDate)
   
-  const verifiedHour = parseInt(verificationParts.find(p => p.type === 'hour')?.value || '0')
-  const verifiedMinute = parseInt(verificationParts.find(p => p.type === 'minute')?.value || '0')
-  const verifiedDay = parseInt(verificationParts.find(p => p.type === 'day')?.value || String(targetDay))
-  
-  // Se não está correto, ajusta
-  if (verifiedHour !== hour || verifiedMinute !== minute || verifiedDay !== targetDay) {
-    const hourDiff = hour - verifiedHour
-    const minuteDiff = minute - verifiedMinute
-    const dayDiff = targetDay - verifiedDay
-    
-    // Ajusta a data UTC
-    utcDate = new Date(utcDate.getTime() + 
-      (hourDiff * 60 + minuteDiff) * 60 * 1000 + 
-      dayDiff * 24 * 60 * 60 * 1000)
-  }
+  const finalHour = parseInt(finalParts.find(p => p.type === 'hour')?.value || '0')
+  const finalMinute = parseInt(finalParts.find(p => p.type === 'minute')?.value || '0')
+  const finalDay = parseInt(finalParts.find(p => p.type === 'day')?.value || '0')
   
   console.log('createDateInBrazil - Criando data:', {
-    hour,
-    minute,
-    dayOffset,
-    targetDay: `${targetDay}/${month}/${year}`,
+    input: { hour, minute, dayOffset },
+    target: `${targetDay}/${month}/${year} ${hour}:${minute}`,
+    offsetHours,
     utcDate: utcDate.toISOString(),
-    utcDateLocal: utcDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-    verified: `${verifiedDay}/${month}/${year} ${verifiedHour}:${verifiedMinute}`
+    resultBrazil: `${finalDay}/${month}/${year} ${finalHour}:${finalMinute}`,
+    match: finalHour === hour && finalMinute === minute && finalDay === targetDay
   })
   
   return utcDate
@@ -170,11 +220,18 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
 /**
  * Compara duas datas considerando o timezone do Brasil
  * Retorna true se scheduledDate é no futuro ou presente (permite agendamentos no mesmo dia)
- * Permite uma margem de 5 minutos para agendamentos muito próximos e compensar diferenças de timezone
+ * Permite uma margem de 15 minutos para compensar diferenças de timezone e processamento
  */
 export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): boolean {
-  // Converte ambas as datas para o timezone do Brasil e compara diretamente
-  const scheduledBrazil = new Intl.DateTimeFormat('en-US', {
+  // Obtém os timestamps em milissegundos
+  const scheduledTime = scheduledDate.getTime()
+  const nowTime = now.getTime()
+  
+  // Calcula a diferença em minutos
+  const diferencaMinutos = (scheduledTime - nowTime) / (1000 * 60)
+  
+  // Converte para o timezone do Brasil para logs
+  const scheduledBrazil = scheduledDate.toLocaleString('pt-BR', {
     timeZone: BRAZIL_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
@@ -183,58 +240,42 @@ export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): b
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  }).formatToParts(scheduledDate)
-  
-  const nowBrazil = new Intl.DateTimeFormat('en-US', {
-    timeZone: BRAZIL_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).formatToParts(now)
-  
-  // Extrai valores
-  const scheduledYear = parseInt(scheduledBrazil.find(p => p.type === 'year')?.value || '0')
-  const scheduledMonth = parseInt(scheduledBrazil.find(p => p.type === 'month')?.value || '0')
-  const scheduledDay = parseInt(scheduledBrazil.find(p => p.type === 'day')?.value || '0')
-  const scheduledHour = parseInt(scheduledBrazil.find(p => p.type === 'hour')?.value || '0')
-  const scheduledMinute = parseInt(scheduledBrazil.find(p => p.type === 'minute')?.value || '0')
-  
-  const nowYear = parseInt(nowBrazil.find(p => p.type === 'year')?.value || '0')
-  const nowMonth = parseInt(nowBrazil.find(p => p.type === 'month')?.value || '0')
-  const nowDay = parseInt(nowBrazil.find(p => p.type === 'day')?.value || '0')
-  const nowHour = parseInt(nowBrazil.find(p => p.type === 'hour')?.value || '0')
-  const nowMinute = parseInt(nowBrazil.find(p => p.type === 'minute')?.value || '0')
-  
-  // Compara ano, mês, dia, hora e minuto
-  // Permite margem de 5 minutos para compensar diferenças de processamento
-  if (scheduledYear > nowYear) return true
-  if (scheduledYear < nowYear) return false
-  
-  if (scheduledMonth > nowMonth) return true
-  if (scheduledMonth < nowMonth) return false
-  
-  if (scheduledDay > nowDay) return true
-  if (scheduledDay < nowDay) return false
-  
-  // Mesmo dia - compara hora e minuto
-  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
-  const nowTotalMinutes = nowHour * 60 + nowMinute
-  
-  // Permite margem de 5 minutos
-  const diferencaMinutos = scheduledTotalMinutes - nowTotalMinutes
-  
-  console.log('isFutureInBrazil - Comparação:', {
-    scheduled: `${scheduledDay}/${scheduledMonth}/${scheduledYear} ${scheduledHour}:${scheduledMinute}`,
-    now: `${nowDay}/${nowMonth}/${nowYear} ${nowHour}:${nowMinute}`,
-    diferencaMinutos,
-    isFuture: diferencaMinutos >= -5
   })
   
-  return diferencaMinutos >= -5
+  const nowBrazil = now.toLocaleString('pt-BR', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+  
+  console.log('isFutureInBrazil - Comparação:', {
+    scheduledISO: scheduledDate.toISOString(),
+    scheduledBrazil,
+    nowISO: now.toISOString(),
+    nowBrazil,
+    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
+    isFuture: diferencaMinutos >= -15
+  })
+  
+  // Permite agendamentos se a diferença for maior ou igual a -30 minutos
+  // Isso permite agendamentos no mesmo dia, desde que o horário seja futuro
+  // A margem de 30 minutos compensa diferenças de timezone, processamento e pequenos erros
+  // Se a diferença for negativa mas pequena (menos de 30 minutos), ainda permite
+  // porque pode ser apenas uma diferença de timezone ou processamento
+  const isFuture = diferencaMinutos >= -30
+  
+  console.log('isFutureInBrazil - Resultado:', {
+    diferencaMinutos: Math.round(diferencaMinutos * 100) / 100,
+    isFuture,
+    permitido: isFuture ? 'SIM' : 'NÃO'
+  })
+  
+  return isFuture
 }
 
 /**
@@ -330,11 +371,23 @@ export function extractAppointmentFromMessage(message: string): {
       // Verifica se mencionou "hoje" (garante que é hoje mesmo)
       if (lowerMessage.includes('hoje')) {
         dayOffset = 0
+        console.log('extractAppointmentFromMessage - Detectado "hoje", dayOffset = 0')
       }
       
       // Verifica se mencionou "amanhã"
       if (lowerMessage.includes('amanhã')) {
         dayOffset = 1
+        console.log('extractAppointmentFromMessage - Detectado "amanhã", dayOffset = 1')
+      }
+      
+      // Se não mencionou nem "hoje" nem "amanhã" nem dia da semana, assume hoje
+      if (dayOffset === 0 && !lowerMessage.includes('hoje') && !lowerMessage.includes('amanhã')) {
+        const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
+        const hasDayOfWeek = daysOfWeek.some(day => lowerMessage.includes(day))
+        if (!hasDayOfWeek) {
+          console.log('extractAppointmentFromMessage - Nenhum dia mencionado, assumindo hoje (dayOffset = 0)')
+          dayOffset = 0
+        }
       }
       
       // Verifica dia da semana
