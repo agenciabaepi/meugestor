@@ -515,7 +515,7 @@ async function handleCreateAppointment(
 
     return {
       success: true,
-      message: `✅ Compromisso agendado!\n\n📅 ${title}\n🕐 ${new Date(scheduledAt).toLocaleString('pt-BR')}${data?.description ? `\n📝 ${data.description}` : ''}`,
+      message: `✅ Compromisso agendado!\n\n📅 ${title}\n🕐 ${new Date(scheduledAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}${data?.description ? `\n📝 ${data.description}` : ''}`,
       data: compromisso,
     }
   } catch (error) {
@@ -659,7 +659,7 @@ async function handleQuery(
 
       if (proximos.length > 0) {
         response += `Próximos:\n${proximos.slice(0, 5).map(c => 
-          `• ${c.title} - ${new Date(c.scheduled_at).toLocaleString('pt-BR')}`
+          `• ${c.title} - ${new Date(c.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
         ).join('\n')}`
       } else {
         response += 'Nenhum compromisso futuro agendado.'

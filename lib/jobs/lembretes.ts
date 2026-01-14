@@ -140,10 +140,12 @@ function formatarMensagemLembrete(
   tipoLembrete: LembreteType
 ): string {
   const hora = dataCompromisso.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
     hour: '2-digit',
     minute: '2-digit',
   })
   const data = dataCompromisso.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
