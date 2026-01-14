@@ -1,0 +1,41 @@
+{
+  "name": "meu-gestor",
+  "version": "1.0.0",
+  "description": "SaaS Multitenant - Assistente Inteligente via WhatsApp",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "dev:quiet": "node scripts/suppress-watchpack-warnings.js",
+    "dev:turbo": "next dev --turbo",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "check-env": "node scripts/check-env.js",
+    "diagnose": "node scripts/diagnose.js",
+    "setup": "npm install && npm run check-env"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@types/node": "^25.0.7",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "lucide-react": "^0.562.0",
+    "next": "^16.1.1",
+    "openai": "^6.16.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "recharts": "^2.12.7",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "autoprefixer": "^10.4.23",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.1",
+    "postcss": "^8.5.6",
+    "prettier": "^3.7.4",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tailwindcss": "^4.1.18"
+  }
+}
