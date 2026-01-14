@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processarLembretes } from '@/lib/jobs/lembretes'
 
+// Força execução dinâmica (sem cache) para garantir que o cron execute sempre
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * POST - Executa job de lembretes
  * 
