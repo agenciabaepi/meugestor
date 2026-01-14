@@ -373,11 +373,31 @@ async function handleCreateAppointment(
     let title = data?.title
     let scheduledAt = data?.scheduled_at ? parseScheduledAt(data.scheduled_at) : null
 
-    console.log('handleCreateAppointment - Após parseScheduledAt:', {
+    console.log('handleCreateAppointment - Dados da IA:', {
       title,
       scheduledAt,
-      scheduled_at_original: data?.scheduled_at
+      scheduled_at_original: data?.scheduled_at,
+      data_completo: JSON.stringify(data, null, 2)
     })
+    
+    // Se a IA retornou uma data, verifica se está no formato correto
+    if (scheduledAt) {
+      const testDate = new Date(scheduledAt)
+      const testBrazil = testDate.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      console.log('handleCreateAppointment - Data da IA verificada:', {
+        scheduledAt,
+        testBrazil,
+        isValid: !isNaN(testDate.getTime())
+      })
+    }
 
     // Se não tem dados suficientes, tenta extrair da mensagem original
     if ((!title || !scheduledAt) && originalMessage) {
