@@ -640,48 +640,78 @@ async function handleQuery(
     const lowerMessage = message.toLowerCase()
     
     // Detecta perguntas de continuação e reconstrói usando contexto
-    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes))[?]?$/i.test(lowerMessage) ||
-                                   /^(e\s+agora)[?]?$/i.test(lowerMessage)
+    // Padrões mais flexíveis para capturar variações
+    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes|agora))[?]?\.?$/i.test(lowerMessage.trim()) ||
+                                   /^(e\s+isso)[?]?\.?$/i.test(lowerMessage.trim()) ||
+                                   lowerMessage.trim() === 'e hoje' ||
+                                   lowerMessage.trim() === 'e ontem' ||
+                                   lowerMessage.trim() === 'e amanhã' ||
+                                   lowerMessage.trim() === 'e amanha'
     
     let effectiveMessage = message
+    let shouldForceExpenseQuery = false
+    let forcedPeriod: string | undefined = undefined
+    
     if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
-      // Busca a última pergunta do usuário sobre gastos
+      console.log('handleQuery - PERGUNTA DE CONTINUAÇÃO DETECTADA:', message)
+      
+      // Busca a última pergunta do usuário sobre gastos/compromissos
       const lastUserQuery = [...recentConversations].reverse().find(c => 
         c.role === 'user' && 
         (c.message.toLowerCase().includes('gastei') || 
          c.message.toLowerCase().includes('gasto') ||
+         c.message.toLowerCase().includes('gastos') ||
          c.message.toLowerCase().includes('compromisso') ||
-         c.message.toLowerCase().includes('agenda'))
+         c.message.toLowerCase().includes('agenda') ||
+         c.message.toLowerCase().includes('quantos') ||
+         c.message.toLowerCase().includes('quanto'))
       )
       
       if (lastUserQuery) {
         effectiveMessage = `${lastUserQuery.message} ${message}`
-        console.log('handleQuery - Pergunta de continuação detectada:', {
+        console.log('handleQuery - Contexto reconstruído:', {
           original: message,
           contexto: lastUserQuery.message,
           reconstruida: effectiveMessage
         })
-        // Atualiza lowerMessage para usar a mensagem reconstruída
+        
         const lowerEffectiveMessage = effectiveMessage.toLowerCase()
+        const lowerLastQuery = lastUserQuery.message.toLowerCase()
         
         // Se a última pergunta era sobre gastos, esta também é sobre gastos
-        if (lastUserQuery.message.toLowerCase().includes('gastei') || 
-            lastUserQuery.message.toLowerCase().includes('gasto')) {
+        if (lowerLastQuery.includes('gastei') || 
+            lowerLastQuery.includes('gasto') ||
+            lowerLastQuery.includes('gastos') ||
+            (lowerLastQuery.includes('quantos') && lowerLastQuery.includes('gastei')) ||
+            (lowerLastQuery.includes('quanto') && lowerLastQuery.includes('gastei'))) {
+          
           // Força queryType para gasto
           if (!extractedData) extractedData = {}
           extractedData.queryType = 'gasto'
+          shouldForceExpenseQuery = true
+          
           // Detecta período na continuação
-          if (lowerEffectiveMessage.includes('hoje')) {
+          if (lowerMessage.includes('hoje')) {
             extractedData.queryPeriod = 'hoje'
-          } else if (lowerEffectiveMessage.includes('ontem')) {
+            forcedPeriod = 'hoje'
+          } else if (lowerMessage.includes('ontem')) {
             extractedData.queryPeriod = 'ontem'
-          } else if (lowerEffectiveMessage.includes('amanhã') || lowerEffectiveMessage.includes('amanha')) {
+            forcedPeriod = 'ontem'
+          } else if (lowerMessage.includes('amanhã') || lowerMessage.includes('amanha')) {
             extractedData.queryPeriod = 'amanhã'
-          } else if (lowerEffectiveMessage.includes('semana')) {
+            forcedPeriod = 'amanhã'
+          } else if (lowerMessage.includes('semana')) {
             extractedData.queryPeriod = 'semana'
-          } else if (lowerEffectiveMessage.includes('mês') || lowerEffectiveMessage.includes('mes')) {
+            forcedPeriod = 'semana'
+          } else if (lowerMessage.includes('mês') || lowerMessage.includes('mes')) {
             extractedData.queryPeriod = 'mês'
+            forcedPeriod = 'mês'
           }
+          
+          console.log('handleQuery - QueryType forçado para gasto:', {
+            queryType: extractedData.queryType,
+            queryPeriod: extractedData.queryPeriod
+          })
         }
       }
     }
@@ -1025,17 +1055,28 @@ async function handleQuery(
 
     // Consulta geral de gastos/despesas
     // IMPORTANTE: Detecta período específico (hoje, ontem, semana, mês)
-    if (lowerMessage.includes('gasto') || lowerMessage.includes('gastei') || 
+    // Também verifica se foi forçado como query de gastos (pergunta de continuação)
+    if (shouldForceExpenseQuery || 
+        lowerMessage.includes('gasto') || lowerMessage.includes('gastei') || 
         (lowerMessage.includes('quanto') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')))) {
       
       // Detecta período específico na pergunta
       // IMPORTANTE: Verifica "só hoje", "apenas hoje", "hoje" para garantir detecção correta
-      const isHoje = lowerMessage.includes('hoje') || lowerMessage.includes('só hoje') || lowerMessage.includes('apenas hoje')
-      const isOntem = lowerMessage.includes('ontem') || lowerMessage.includes('só ontem') || lowerMessage.includes('apenas ontem')
-      const isSemana = lowerMessage.includes('semana') && !lowerMessage.includes('mês') && !lowerMessage.includes('mes')
-      const isMes = lowerMessage.includes('mês') || lowerMessage.includes('mes') || lowerMessage.includes('mensal')
+      // Se foi forçado um período (pergunta de continuação), usa esse período
+      const isHoje = forcedPeriod === 'hoje' || lowerMessage.includes('hoje') || lowerMessage.includes('só hoje') || lowerMessage.includes('apenas hoje')
+      const isOntem = forcedPeriod === 'ontem' || lowerMessage.includes('ontem') || lowerMessage.includes('só ontem') || lowerMessage.includes('apenas ontem')
+      const isSemana = forcedPeriod === 'semana' || (lowerMessage.includes('semana') && !lowerMessage.includes('mês') && !lowerMessage.includes('mes'))
+      const isMes = forcedPeriod === 'mês' || lowerMessage.includes('mês') || lowerMessage.includes('mes') || lowerMessage.includes('mensal')
       
-      console.log('handleQuery - Detecção de período:', { isHoje, isOntem, isSemana, isMes, lowerMessage })
+      console.log('handleQuery - Detecção de período:', { 
+        isHoje, 
+        isOntem, 
+        isSemana, 
+        isMes, 
+        lowerMessage,
+        forcedPeriod,
+        shouldForceExpenseQuery
+      })
       
       let startDate: string
       let endDate: string | undefined

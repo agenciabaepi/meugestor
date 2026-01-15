@@ -186,30 +186,45 @@ export async function analyzeIntention(
   try {
     // Detecta perguntas de continuação (ex: "e hoje?", "e ontem?", "e amanhã?")
     const lowerMessage = message.toLowerCase().trim()
-    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes))[?]?$/i.test(lowerMessage) ||
-                                   /^(e\s+agora)[?]?$/i.test(lowerMessage) ||
-                                   /^(e\s+isso)[?]?$/i.test(lowerMessage)
+    // Padrões mais flexíveis para capturar variações
+    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes|agora))[?]?\.?$/i.test(lowerMessage) ||
+                                   /^(e\s+isso)[?]?\.?$/i.test(lowerMessage) ||
+                                   lowerMessage === 'e hoje' ||
+                                   lowerMessage === 'e ontem' ||
+                                   lowerMessage === 'e amanhã' ||
+                                   lowerMessage === 'e amanha' ||
+                                   lowerMessage === 'e hoje?' ||
+                                   lowerMessage === 'e ontem?' ||
+                                   lowerMessage === 'e amanhã?' ||
+                                   lowerMessage === 'e amanha?'
     
     // Se é pergunta de continuação, usa contexto anterior
     let contextMessage = message
     if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
+      console.log('analyzeIntention - PERGUNTA DE CONTINUAÇÃO DETECTADA:', message)
+      
       // Busca a última pergunta do usuário sobre gastos/compromissos
       const lastUserQuery = [...recentConversations].reverse().find(c => 
         c.role === 'user' && 
         (c.message.toLowerCase().includes('gastei') || 
          c.message.toLowerCase().includes('gasto') ||
+         c.message.toLowerCase().includes('gastos') ||
          c.message.toLowerCase().includes('compromisso') ||
-         c.message.toLowerCase().includes('agenda'))
+         c.message.toLowerCase().includes('agenda') ||
+         c.message.toLowerCase().includes('quantos') ||
+         c.message.toLowerCase().includes('quanto'))
       )
       
       if (lastUserQuery) {
         // Reconstrói a pergunta completa usando contexto
         contextMessage = `${lastUserQuery.message} ${message}`
-        console.log('analyzeIntention - Pergunta de continuação detectada:', {
+        console.log('analyzeIntention - Contexto reconstruído:', {
           original: message,
           contexto: lastUserQuery.message,
           reconstruida: contextMessage
         })
+      } else {
+        console.log('analyzeIntention - Pergunta de continuação detectada, mas não encontrou contexto relevante')
       }
     }
     
