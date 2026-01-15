@@ -33,20 +33,38 @@ export default function LoginPage() {
         }),
       })
 
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        console.error('Erro ao parsear resposta:', parseError)
+        setError('Erro ao processar resposta do servidor. Tente novamente.')
+        setLoading(false)
+        return
+      }
 
       if (!response.ok) {
         // Mensagens de erro mais específicas
-        let errorMessage = data.error || 'Erro ao fazer login'
+        let errorMessage = data?.error || 'Erro ao fazer login'
         
         if (response.status === 401) {
           // Mensagem genérica para erros de autenticação
-          if (errorMessage.includes('incorretos')) {
-            errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.'
+          if (errorMessage.includes('incorretos') || errorMessage.includes('Invalid login')) {
+            errorMessage = 'Email ou senha incorretos. Verifique suas credenciais ou crie uma conta se ainda não tiver.'
+          } else if (errorMessage.includes('Email not confirmed')) {
+            errorMessage = 'Email não confirmado. Verifique sua caixa de entrada e confirme seu email antes de fazer login.'
           } else {
-            errorMessage = 'Erro ao fazer login. Verifique suas credenciais e tente novamente.'
+            errorMessage = 'Erro ao fazer login. Verifique suas credenciais e tente novamente. Se não tem conta, clique em "Registre-se".'
           }
+        } else if (response.status === 500) {
+          errorMessage = 'Erro no servidor. Verifique se as variáveis de ambiente estão configuradas corretamente.'
         }
+        
+        console.error('Erro no login:', {
+          status: response.status,
+          error: errorMessage,
+          data: data
+        })
         
         setError(errorMessage)
         setLoading(false)
