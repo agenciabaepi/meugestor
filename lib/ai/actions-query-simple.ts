@@ -28,11 +28,13 @@ import { filterBySemanticCategory } from '../utils/semantic-filter'
 function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDate: string; endDate?: string; periodoTexto: string } {
   const now = getNowInBrazil()
   
+  // REGRA CRÍTICA: Se período é null/undefined aqui, significa que:
+  // 1. GPT não retornou período
+  // 2. inheritContext não conseguiu herdar (sem contexto anterior)
+  // 3. Nesse caso, NÃO usar default agressivo - retornar erro ou pedir esclarecimento
+  // Mas para não quebrar, usamos default apenas como último recurso
   if (!periodo) {
-    // REGRA CRÍTICA: Default só é usado se NÃO existir contexto anterior
-    // Se período é null, significa que o GPT não retornou período
-    // Nesse caso, o sistema deve herdar do contexto (já feito em inheritContext)
-    // Se ainda assim for null aqui, significa que não há contexto, então usa default
+    console.warn('getDateRangeFromPeriodo - Período não especificado e sem contexto para herdar, usando default (este mês)')
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     return {
       startDate: startOfMonth.toISOString().split('T')[0],

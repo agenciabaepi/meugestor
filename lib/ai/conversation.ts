@@ -483,24 +483,30 @@ IMPORTANTE:
 
     const parsed = JSON.parse(response)
     
+    // Normaliza categoria/subcategoria antes de construir estado
+    const { resolveCategoria } = await import('../utils/category-normalizer')
+    const categoriaNormalizada = parsed.categoria ? resolveCategoria(parsed.categoria) : { category: null, subcategory: null }
+    
     // Constrói estado semântico completo
+    // IMPORTANTE: Usa null explicitamente (não undefined) para campos ausentes
+    // Isso permite que inheritContext distinga entre "não mencionado" (null) e "mencionado como null"
     const semanticState: SemanticState = {
       intent: parsed.intent || 'chat',
-      domain: parsed.domain || null,
-      periodo: parsed.periodo || null,
-      categoria: parsed.categoria || null,
-      subcategoria: parsed.subcategoria || null,
-      queryType: parsed.queryType || null,
-      amount: parsed.amount || null,
-      title: parsed.title || null,
-      scheduled_at: parsed.scheduled_at || null,
-      description: parsed.description || null,
-      confidence: parsed.confidence || 0.5,
-      needsClarification: parsed.needsClarification || false,
-      clarificationMessage: parsed.clarificationMessage || null
+      domain: parsed.domain ?? null,
+      periodo: parsed.periodo ?? null, // null se não mencionado, não undefined
+      categoria: categoriaNormalizada.category ?? parsed.categoria ?? null,
+      subcategoria: categoriaNormalizada.subcategory ?? parsed.subcategoria ?? null,
+      queryType: parsed.queryType ?? null,
+      amount: parsed.amount ?? null,
+      title: parsed.title ?? null,
+      scheduled_at: parsed.scheduled_at ?? null,
+      description: parsed.description ?? null,
+      confidence: parsed.confidence ?? 0.5,
+      needsClarification: parsed.needsClarification ?? false,
+      clarificationMessage: parsed.clarificationMessage ?? null
     }
     
-    // Aplica herança de contexto
+    // Aplica herança de contexto (apenas preenche null)
     const stateWithContext = inheritContext(semanticState)
     
     // Salva estado válido se confidence >= 0.7

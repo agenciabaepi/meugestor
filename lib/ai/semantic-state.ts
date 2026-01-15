@@ -42,11 +42,13 @@ export function saveLastValidState(state: SemanticState): void {
 }
 
 /**
- * Herda contexto do último estado válido para campos ausentes
- * Aplica regras de herança:
- * - Se usuário mencionar nova categoria → descartar a anterior
- * - Se não mencionar período → herdar o último
- * - Se não houver contexto → manter campos vazios
+ * Herda contexto do último estado válido APENAS para campos null/undefined
+ * 
+ * REGRAS OBRIGATÓRIAS:
+ * - APENAS preenche campos null/undefined
+ * - NUNCA sobrescreve valores existentes
+ * - NUNCA aplica default global
+ * - Se campo não existe no newState → herda do lastState
  */
 export function inheritContext(newState: SemanticState): SemanticState {
   if (!lastValidState) {
@@ -54,53 +56,49 @@ export function inheritContext(newState: SemanticState): SemanticState {
     return newState
   }
 
-  // Se a intenção mudou completamente, não herda
+  // Se a intenção mudou completamente (exceto query), não herda
   if (newState.intent !== lastValidState.intent && 
       newState.intent !== 'query' && 
       lastValidState.intent !== 'query') {
-    console.log('semantic-state - Intenção mudou, não herdando contexto')
+    console.log('semantic-state - Intenção mudou completamente, não herdando contexto')
     return newState
   }
 
   const inherited: SemanticState = { ...newState }
 
-  // Herda domínio se não foi especificado
+  // REGRA: Apenas preenche se for null/undefined
+  // NUNCA sobrescreve valores existentes
+  
   if (!inherited.domain && lastValidState.domain) {
     inherited.domain = lastValidState.domain
     console.log('semantic-state - Herdou domínio:', inherited.domain)
   }
 
-  // REGRA CRÍTICA: Herda período se não foi especificado (exceto para registros)
-  // Default só é usado se NÃO existir contexto anterior
-  // Mudança de categoria NÃO pode resetar período
-  if (!inherited.periodo && 
-      lastValidState.periodo && 
-      (inherited.intent === 'query' || inherited.intent === 'report')) {
-    inherited.periodo = lastValidState.periodo
-    console.log('semantic-state - Herdou período do contexto:', inherited.periodo)
+  // REGRA CRÍTICA: Período só é herdado se for null/undefined
+  // Se GPT retornou null, herda do contexto
+  // Se GPT retornou um valor, usa esse valor (não sobrescreve)
+  if (inherited.periodo === null || inherited.periodo === undefined) {
+    if (lastValidState.periodo && 
+        (inherited.intent === 'query' || inherited.intent === 'report')) {
+      inherited.periodo = lastValidState.periodo
+      console.log('semantic-state - Herdou período (era null):', inherited.periodo)
+    }
+  } else {
+    console.log('semantic-state - Período já definido pelo GPT, não herdando:', inherited.periodo)
   }
 
-  // Herda queryType se não foi especificado
   if (!inherited.queryType && lastValidState.queryType && inherited.intent === 'query') {
     inherited.queryType = lastValidState.queryType
     console.log('semantic-state - Herdou queryType:', inherited.queryType)
   }
 
-  // REGRA CRÍTICA: Mudança de categoria NÃO pode resetar período
-  // Se usuário mencionou nova categoria, mantém o período do contexto anterior
-  if (inherited.categoria && inherited.categoria !== lastValidState.categoria) {
-    // Nova categoria mencionada - descarta categoria anterior
-    // MAS mantém período se não foi mencionado novo período
-    if (!inherited.periodo && lastValidState.periodo) {
-      inherited.periodo = lastValidState.periodo
-      console.log('semantic-state - Nova categoria detectada, mantendo período do contexto:', inherited.periodo)
-    }
-  } else if (!inherited.categoria && lastValidState.categoria && inherited.intent === 'query') {
-    // Não mencionou categoria - herda do contexto
+  // Categoria: apenas herda se for null/undefined
+  // Mudança de categoria não reseta período (já garantido acima)
+  if (!inherited.categoria && lastValidState.categoria && inherited.intent === 'query') {
     inherited.categoria = lastValidState.categoria
     console.log('semantic-state - Herdou categoria:', inherited.categoria)
     
-    // Herda subcategoria se categoria foi herdada
+    // Herda subcategoria apenas se categoria foi herdada
     if (!inherited.subcategoria && lastValidState.subcategoria) {
       inherited.subcategoria = lastValidState.subcategoria
       console.log('semantic-state - Herdou subcategoria:', inherited.subcategoria)
