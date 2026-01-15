@@ -330,13 +330,23 @@ REGRAS IMPORTANTES:
     }
     
     // Registra menção para focus lock (para updates de compromissos)
-    if (semanticState.intent === 'update_appointment' && semanticState.targetId) {
-      registerMention(tenantId, 'appointment', {
-        targetId: semanticState.targetId,
-        title: semanticState.title || undefined,
-        location: semanticState.description || undefined,
-        date: semanticState.scheduled_at || undefined
-      })
+    if (semanticState.intent === 'update_appointment') {
+      if (semanticState.targetId) {
+        // Tem targetId, registra com ele
+        registerMention(tenantId, 'appointment', {
+          targetId: semanticState.targetId,
+          title: semanticState.title || undefined,
+          location: semanticState.description || undefined,
+          date: semanticState.scheduled_at || undefined
+        })
+      } else if (semanticState.title || semanticState.description || semanticState.scheduled_at) {
+        // Não tem targetId ainda, mas tem dados do compromisso - registra para busca futura
+        registerMention(tenantId, 'appointment', {
+          title: semanticState.title || undefined,
+          location: semanticState.description || undefined,
+          date: semanticState.scheduled_at || undefined
+        })
+      }
     }
     
     // Se há foco travado e dados estão completos, força readyToSave
