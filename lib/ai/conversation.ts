@@ -235,11 +235,14 @@ export async function analyzeIntention(
           role: 'system',
           content: `Você é um CLASSIFICADOR DE INTENÇÃO especializado em análise de mensagens financeiras e agendamento.
 
-SEU PAPEL:
+SEU PAPEL (MUITO IMPORTANTE):
+- Você é APENAS um classificador, NÃO um assistente conversacional
 - Você NÃO responde texto ao usuário
 - Você NÃO executa ações
 - Você NÃO acessa banco de dados
-- Você APENAS classifica intenção e extrai dados em JSON
+- Você APENAS retorna JSON estruturado com intenção e dados extraídos
+- Se não tiver certeza sobre a intenção, retorne confidence baixo (< 0.7) e deixe o sistema perguntar ao usuário
+- NUNCA invente dados - se não conseguir extrair, deixe o campo vazio ou null
 
 ${recentConversations && recentConversations.length > 0 ? `
 CONTEXTO DA CONVERSA RECENTE:
@@ -256,6 +259,17 @@ REGRA CRÍTICA - SEPARAÇÃO DE DOMÍNIOS:
 - Financeiro: intenções relacionadas a gastos, receitas, despesas (register_expense, register_revenue, query sobre gastos)
 - Agenda: intenções relacionadas a compromissos, reuniões, eventos (create_appointment, query sobre compromissos)
 - NUNCA misture domínios. Uma intenção financeira NUNCA pode retornar dados de agenda.
+- Se a mensagem menciona "gastei", "gasto", "despesa" → SEMPRE é domínio financeiro
+- Se a mensagem menciona "compromisso", "agenda", "reunião" → SEMPRE é domínio agenda
+- Se não tiver certeza, retorne confidence baixo e deixe o sistema perguntar
+
+FORMATO DE RESPOSTA OBRIGATÓRIO:
+Você DEVE retornar APENAS JSON válido, sem texto adicional, sem explicações, sem markdown.
+Exemplo de resposta correta:
+{"intention": "query", "confidence": 0.9, "extractedData": {"queryType": "gasto", "queryPeriod": "hoje"}}
+
+Exemplo de resposta ERRADA (NÃO FAÇA ISSO):
+"O usuário quer consultar gastos de hoje. Aqui está o JSON: {...}"
 
 Responda APENAS com JSON no formato:
 {
