@@ -15,7 +15,6 @@ import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
 import { createFinanceiroRecord } from '@/lib/services/financeiro'
 import { checkRateLimit } from '@/lib/utils/whatsapp-rate-limit'
-import { processarLembretesParaTenant } from '@/lib/jobs/lembretes'
 
 /**
  * GET - Verificação do webhook (chamado pelo WhatsApp na configuração inicial)
@@ -107,22 +106,6 @@ async function processWhatsAppMessage(
     // O número "from" é o número que enviou a mensagem
     console.log('=== WHATSAPP WEBHOOK ===')
     console.log('Número recebido (from):', message.from)
-    
-    // NOVA FUNCIONALIDADE: Verifica lembretes pendentes antes de processar a mensagem
-    // Isso elimina a necessidade de cron - lembretes são enviados quando o usuário interage
-    try {
-      const tenant = await getTenantByWhatsApp(from)
-      if (tenant) {
-        console.log('Verificando lembretes pendentes para o tenant...')
-        // Processa lembretes em background (não bloqueia a resposta)
-        processarLembretesParaTenant(tenant.id, from).catch(err => {
-          console.error('Erro ao processar lembretes (não crítico):', err)
-        })
-      }
-    } catch (lembreteError) {
-      // Erro não crítico - não bloqueia o processamento da mensagem
-      console.error('Erro ao verificar lembretes (não crítico):', lembreteError)
-    }
     console.log('Número normalizado:', from)
     const tenantInfo = await getTenantByWhatsApp(from)
     console.log('Resultado da busca:', tenantInfo ? { tenant_id: tenantInfo.tenant_id, user_id: tenantInfo.user_id } : 'null')
