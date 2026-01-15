@@ -236,16 +236,31 @@ async function processWhatsAppMessage(
           console.error('Webhook - Stack trace:', error instanceof Error ? error.stack : 'N/A')
           console.error('Webhook - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
           
-          // Envia mensagem de erro mais específica
-          const errorMessage = error instanceof Error 
-            ? `Erro: ${error.message}` 
-            : 'Erro desconhecido ao processar'
-          
-          await sendTextMessage(
-            from, 
-            `Desculpe, ocorreu um erro ao processar sua mensagem.\n\n${errorMessage}\n\nTente novamente em alguns instantes.`
-          )
-          return
+          // Tenta usar fallback conversacional antes de enviar erro genérico
+          try {
+            console.log('Webhook - Tentando fallback conversacional após erro...')
+            const recentMessages = await getRecentConversations(tenantId, 5)
+            const aiResponse = await processMessage(message.text.body, {
+              tenantId: tenantId,
+              recentMessages,
+            })
+            
+            await sendTextMessage(from, aiResponse)
+            await createConversation(tenantId, aiResponse, 'assistant')
+            return
+          } catch (aiError) {
+            console.error('Webhook - Erro também no fallback conversacional:', aiError)
+            // Se o fallback também falhar, envia mensagem de erro
+            const errorMessage = error instanceof Error 
+              ? `Erro: ${error.message}` 
+              : 'Erro desconhecido ao processar'
+            
+            await sendTextMessage(
+              from, 
+              `Desculpe, ocorreu um erro ao processar sua mensagem.\n\n${errorMessage}\n\nTente novamente em alguns instantes.`
+            )
+            return
+          }
         }
         
         // Se a ação foi executada com sucesso e tem mensagem, responde diretamente

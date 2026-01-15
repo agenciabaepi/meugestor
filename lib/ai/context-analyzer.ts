@@ -267,10 +267,47 @@ export function analyzeConversationalIntent(message: string): ContextAnalysis {
   const casualPhrases = [
     'obrigado', 'obrigada', 'valeu', 'vlw', 'ok', 'okay', 'tudo bem',
     'beleza', 'show', 'legal', 'bacana', 'top', 'perfeito', 'ótimo',
-    'entendi', 'entendido', 'ok entendi', 'beleza entendi'
+    'entendi', 'entendido', 'ok entendi', 'beleza entendi',
+    'fala', 'eae', 'e aí', 'e ai', 'opa', 'hey', 'hi', 'hello',
+    'tudo certo', 'tudo ok', 'tudo tranquilo', 'tranquilo',
+    'blz', 'suave', 'de boa', 'de boas'
   ]
   
-  if (casualPhrases.some(phrase => lowerMessage === phrase || lowerMessage.startsWith(phrase + ' '))) {
+  // Saudações informais brasileiras
+  const informalGreetings = [
+    'fala zé', 'fala ze', 'fala ai', 'fala aí', 'fala mano', 'fala brother',
+    'eae zé', 'eae ze', 'e aí zé', 'e ai ze', 'e aí mano', 'e ai mano',
+    'opa zé', 'opa ze', 'oi zé', 'oi ze', 'olá zé', 'ola ze'
+  ]
+  
+  // Verifica saudações informais completas
+  if (informalGreetings.some(greeting => lowerMessage.includes(greeting))) {
+    return {
+      shouldProceed: false,
+      message: '😊 E aí! Tudo certo? Como posso te ajudar hoje?',
+      reason: 'informal_greeting',
+      suggestedAction: 'friendly_response'
+    }
+  }
+  
+  // Verifica frases casuais exatas ou que começam com elas
+  if (casualPhrases.some(phrase => {
+    const exactMatch = lowerMessage === phrase
+    const startsWith = lowerMessage.startsWith(phrase + ' ')
+    const endsWith = lowerMessage.endsWith(' ' + phrase)
+    const includes = lowerMessage.includes(' ' + phrase + ' ')
+    return exactMatch || startsWith || endsWith || includes
+  })) {
+    // Se for "tudo bem?" como pergunta, responde de forma amigável
+    if (lowerMessage.includes('tudo bem') && (lowerMessage.includes('?') || lowerMessage.endsWith('bem'))) {
+      return {
+        shouldProceed: false,
+        message: '😊 Tudo certo! E você? Como posso te ajudar?',
+        reason: 'casual_greeting_question',
+        suggestedAction: 'friendly_response'
+      }
+    }
+    
     return {
       shouldProceed: false,
       message: '😊 De nada! Estou aqui sempre que precisar!',
