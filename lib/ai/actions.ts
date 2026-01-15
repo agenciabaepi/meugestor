@@ -513,8 +513,8 @@ async function handleCreateAppointment(
     console.log('handleCreateAppointment - Dados da IA:', {
       title,
       scheduledAt,
-      scheduled_at_original: data?.scheduled_at,
-      data_completo: JSON.stringify(data, null, 2)
+      scheduled_at_original: state.scheduled_at,
+      state_completo: JSON.stringify(state, null, 2)
     })
     
     // Se a IA retornou uma data, verifica se está no formato correto
@@ -638,7 +638,7 @@ async function handleCreateAppointment(
       tenantId,
       title: title.trim(),
       scheduledAt: scheduledAt,
-      description: data?.description || null,
+      description: state.description || null,
     })
 
     if (!compromisso) {
