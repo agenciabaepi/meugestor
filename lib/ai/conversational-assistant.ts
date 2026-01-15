@@ -14,6 +14,7 @@ import {
   clearFocus, 
   findMatchingAppointments 
 } from './focus-lock'
+import type { ActiveTask } from './session-focus'
 
 /**
  * Valida se os dados essenciais estão completos para salvar
@@ -53,7 +54,8 @@ function validateDataCompleteness(state: SemanticState): boolean {
 export async function analyzeConversationalIntention(
   message: string,
   recentConversations: Array<{ role: string; message: string }>,
-  tenantId: string
+  tenantId: string,
+  activeTask?: ActiveTask | null
 ): Promise<SemanticState> {
   try {
     const conversationContext = recentConversations.length > 0
@@ -96,6 +98,21 @@ FOCO TRAVADO (usuário repetiu o mesmo compromisso ${focusLock.mentions} vezes):
 - confidence: ${focusLock.confidence}
 
 Se o usuário está corrigindo este compromisso, use targetId: "${focusLock.targetId}" e NÃO pergunte novamente qual compromisso é.
+` : ''
+
+    const activeTaskContext = activeTask ? `
+AÇÃO ATIVA (SESSION FOCUS):
+- type: ${activeTask.type}
+- targetId: ${activeTask.state.targetId || 'null'}
+- title: ${activeTask.state.title || 'null'}
+- scheduled_at: ${activeTask.state.scheduled_at || 'null'}
+- description: ${activeTask.state.description || 'null'}
+
+REGRAS DE SESSION FOCUS:
+- Enquanto houver ação ativa, NÃO troque de assunto automaticamente.
+- Interprete a mensagem atual como: continuação/correção/confirm/cancel.
+- Se o usuário fizer uma pergunta diferente (ex: consulta), NÃO ignore a ação ativa:
+  peça para concluir ou cancelar (uma única vez) e mantenha o foco.
 ` : ''
     
     const completion = await openai.chat.completions.create({
@@ -164,6 +181,7 @@ ${conversationContext}
 ${lastStateContext}
 ${lastActionContext}
 ${focusLockContext}
+${activeTaskContext}
 ` : ''}
 
 Responda APENAS com JSON no formato:

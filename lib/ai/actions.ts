@@ -6,6 +6,7 @@ import { analyzeIntention } from './conversation'
 import { analyzeConversationalIntention } from './conversational-assistant'
 import { getPendingConfirmation, savePendingConfirmation, clearPendingConfirmation } from './confirmation-manager'
 import { saveRecentAction } from './action-history'
+import { getActiveTask, setActiveTask, clearActiveTask, queueMessageForTask, consumeQueuedMessage } from './session-focus'
 import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
 import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
 import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relatorios'
@@ -78,6 +79,9 @@ export async function processAction(
     // Verifica se há confirmação pendente
     const pendingConfirmation = getPendingConfirmation(tenantId)
     const lowerMessage = message.toLowerCase().trim()
+
+    // Session focus: ação ativa (create/update compromisso)
+    const activeTask = getActiveTask(tenantId)
     
     // Se há confirmação pendente e usuário confirmou/cancelou
     if (pendingConfirmation) {
@@ -87,10 +91,27 @@ export async function processAction(
         // Usa o estado da confirmação pendente
         const semanticState = pendingConfirmation.state
         semanticState.intent = semanticState.intent.replace('confirm', '') as any // Remove 'confirm' do intent
-        return await executeAction(semanticState, tenantId, message)
+        const actionResult = await executeAction(semanticState, tenantId, message)
+
+        // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
+        const queued = consumeQueuedMessage(tenantId)
+        clearActiveTask(tenantId)
+        if (queued) {
+          const followUp = await processAction(queued, tenantId)
+          if (followUp?.message) {
+            return {
+              success: true,
+              message: `${actionResult.message}\n\n${followUp.message}`,
+              data: { action: actionResult.data, followUp: followUp.data }
+            }
+          }
+        }
+
+        return actionResult
       } else if (lowerMessage === 'não' || lowerMessage === 'nao' || lowerMessage === 'cancelar') {
         console.log('processAction - Cancelamento recebido')
         clearPendingConfirmation(tenantId)
+        clearActiveTask(tenantId)
         return {
           success: true,
           message: 'Entendido, cancelado. Como posso ajudar?'
@@ -100,7 +121,7 @@ export async function processAction(
     
     // Usa assistente conversacional (novo modelo)
     console.log('processAction - Analisando intenção conversacional...')
-    const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId)
+    const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId, activeTask)
     
     console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
@@ -122,6 +143,10 @@ export async function processAction(
     
     // Se precisa confirmação (ambiguidade real), salva e retorna mensagem
     if (semanticState.needsConfirmation && semanticState.confirmationMessage) {
+      // Marca ação ativa se for compromisso (não deixa perder o foco)
+      if (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment') {
+        setActiveTask(tenantId, semanticState.intent, semanticState)
+      }
       savePendingConfirmation(tenantId, semanticState)
       return {
         success: true,
@@ -131,6 +156,14 @@ export async function processAction(
     
     // Se é conversa casual, usa fallback conversacional
     if (semanticState.intent === 'chat') {
+      // Se existe ação ativa, não deixa cair em chat fora de contexto
+      if (activeTask) {
+        queueMessageForTask(tenantId, message)
+        return {
+          success: true,
+          message: buildKeepFocusMessage(activeTask),
+        }
+      }
       return {
         success: false, // Indica para usar processMessage
         message: 'Mensagem conversacional',
@@ -189,7 +222,28 @@ export async function processAction(
     }
 
     // Delega execução para função separada
-    return await executeAction(semanticState, tenantId, message)
+    // Session focus: se há ação ativa e a mensagem mudou de assunto (query/report),
+    // não ignora a ação ativa — guarda pergunta e pede para concluir/cancelar.
+    if (activeTask && (semanticState.intent === 'query' || semanticState.intent === 'report')) {
+      queueMessageForTask(tenantId, message)
+      return {
+        success: true,
+        message: buildKeepFocusMessage(activeTask),
+      }
+    }
+
+    // Se esta mensagem inicia/continua uma ação de compromisso mas ainda não está pronta, mantém foco.
+    if ((semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment') &&
+        (!semanticState.readyToSave || (semanticState.intent === 'update_appointment' && !semanticState.targetId))) {
+      setActiveTask(tenantId, semanticState.intent, semanticState)
+    }
+
+    const result = await executeAction(semanticState, tenantId, message)
+    // Se concluiu uma ação de compromisso com sucesso, limpa foco
+    if (result.success && (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment')) {
+      clearActiveTask(tenantId)
+    }
+    return result
   } catch (error) {
     console.error('=== ERRO EM PROCESS ACTION ===')
     console.error('processAction - Erro capturado:', error)
@@ -205,6 +259,22 @@ export async function processAction(
         : 'Erro desconhecido ao processar ação',
     }
   }
+}
+
+function buildKeepFocusMessage(activeTask: any): string {
+  const title = activeTask?.state?.title || 'compromisso'
+  const when = activeTask?.state?.scheduled_at
+    ? new Date(activeTask.state.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    : null
+  const desc = activeTask?.state?.description || null
+
+  const resumo = [
+    title ? `📌 ${title}` : null,
+    when ? `🕐 ${when}` : null,
+    desc ? `📍 ${desc}` : null,
+  ].filter(Boolean).join(' • ')
+
+  return `Posso te responder isso, mas antes preciso concluir a ação pendente.\n\nVou salvar/atualizar: ${resumo || 'esse compromisso'}.\nPosso salvar assim? (sim / cancelar)`
 }
 
 /**

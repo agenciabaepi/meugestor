@@ -49,6 +49,18 @@ function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDat
         endDate: getTodayEndInBrazil(),
         periodoTexto: 'hoje'
       }
+    case 'amanhã': {
+      const amanhaInicio = new Date(now)
+      amanhaInicio.setDate(amanhaInicio.getDate() + 1)
+      amanhaInicio.setHours(0, 0, 0, 0)
+      const amanhaFim = new Date(amanhaInicio)
+      amanhaFim.setHours(23, 59, 59, 999)
+      return {
+        startDate: amanhaInicio.toISOString(),
+        endDate: amanhaFim.toISOString(),
+        periodoTexto: 'amanhã'
+      }
+    }
     case 'ontem':
       return {
         startDate: getYesterdayStartInBrazil(),
