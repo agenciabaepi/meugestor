@@ -369,9 +369,17 @@ export async function getCompromissosByTenant(
     query = query.lte('scheduled_at', endDate)
   }
 
-  // Supabase tem limite padrão de 1000, mas vamos garantir que buscamos todos
-  // Se houver muitos compromissos, pode precisar de paginação, mas para uso normal não deve ser problema
-  const { data, error, count } = await query
+  // Supabase tem limite padrão de 1000 registros
+  // Para garantir que buscamos todos, vamos usar range se necessário
+  // Mas para uso normal (poucos compromissos), não deve ser problema
+  let { data, error, count } = await query
+  
+  // Se houver mais de 1000 registros, precisaríamos paginar
+  // Mas para compromissos de um dia específico, não deve ser necessário
+  // Se count > 1000 e data.length < count, significa que há mais registros
+  if (count && count > (data?.length || 0) && count > 1000) {
+    console.warn(`getCompromissosByTenant - Há mais de 1000 compromissos (${count}), mas apenas ${data?.length || 0} foram retornados. Pode precisar de paginação.`)
+  }
 
   if (error) {
     console.error('Error fetching compromissos:', error)

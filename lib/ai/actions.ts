@@ -742,7 +742,16 @@ async function handleQuery(
       }
       
       // Log para debug
-      console.log(`handleQuery - Compromissos encontrados para período "${periodoTexto}":`, compromissos.length)
+      console.log(`handleQuery - Compromissos encontrados para período "${periodoTexto}": ${compromissos.length}`)
+      
+      // Log adicional: lista todos os IDs e títulos para verificar
+      if (compromissos.length > 0) {
+        console.log(`handleQuery - Lista completa de compromissos encontrados:`, compromissos.map(c => ({
+          id: c.id,
+          title: c.title,
+          scheduled_at: c.scheduled_at
+        })))
+      }
       
       // Ordena por data
       compromissos.sort((a, b) => 
