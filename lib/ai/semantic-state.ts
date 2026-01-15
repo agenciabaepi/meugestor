@@ -24,6 +24,7 @@ export interface SemanticState {
   needsConfirmation?: boolean
   confirmationMessage?: string | null
   targetId?: string | null // ID do registro a ser atualizado (para updates)
+  readyToSave?: boolean // Indica se todos os dados essenciais estão completos
 }
 
 /**

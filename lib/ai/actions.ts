@@ -112,7 +112,15 @@ export async function processAction(
       }
     }
     
-    // Se precisa confirmação, salva e retorna mensagem
+    // CONFIRMAÇÃO INTELIGENTE: só pede confirmação se realmente necessário
+    // Se dados estão completos (readyToSave), executa diretamente
+    if (semanticState.readyToSave && !semanticState.needsConfirmation) {
+      // Dados completos, executa diretamente sem confirmação
+      console.log('processAction - Dados completos, executando diretamente sem confirmação')
+      return await executeAction(semanticState, tenantId, message)
+    }
+    
+    // Se precisa confirmação (ambiguidade real), salva e retorna mensagem
     if (semanticState.needsConfirmation && semanticState.confirmationMessage) {
       savePendingConfirmation(tenantId, semanticState)
       return {
