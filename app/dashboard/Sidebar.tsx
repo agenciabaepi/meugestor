@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-react'
 import { useState } from 'react'
 import LogoutButton from './LogoutButton'
@@ -134,6 +135,35 @@ export function Sidebar() {
               })}
             </div>
           </nav>
+
+          {/* Upgrade Card */}
+          <div className="px-4 pb-4">
+            <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-2xl p-6 overflow-hidden">
+              {/* Ícone circular no topo */}
+              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                <div className="relative">
+                  <div className="w-12 h-12 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white/20">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-inner">
+                      <Sparkles className="w-5 h-5 text-[#7A5AF8]" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Conteúdo */}
+              <div className="pt-6 text-center">
+                <h3 className="text-lg font-bold text-white mb-2">
+                  Upgrade to PRO
+                </h3>
+                <p className="text-sm text-white/90 mb-4 leading-relaxed">
+                  Melhore seu processo de gestão e faça mais com Meu Gestor PRO!
+                </p>
+                <button className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/30">
+                  Upgrade to PRO
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="p-4 border-t border-gray-200 space-y-2">
