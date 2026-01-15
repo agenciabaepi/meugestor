@@ -442,11 +442,16 @@ async function handleUpdateAppointment(
     const { removeAction } = await import('./action-history')
     removeAction(tenantId, state.targetId)
     
+    // Usa os dados do compromisso atualizado do banco (já está correto)
     let responseMessage = `✅ Compromisso atualizado com sucesso!\n\n`
-    if (updates.title) responseMessage += `📋 Título: ${updates.title}\n`
-    if (updates.scheduledAt) {
-      const date = new Date(updates.scheduledAt)
-      responseMessage += `📅 Data/Hora: ${date.toLocaleString('pt-BR')}\n`
+    if (compromisso.title) responseMessage += `📋 Título: ${compromisso.title}\n`
+    if (compromisso.scheduled_at) {
+      // Usa o scheduled_at do banco e formata com timezone correto
+      const date = new Date(compromisso.scheduled_at)
+      responseMessage += `📅 Data/Hora: ${date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n`
+    }
+    if (compromisso.description) {
+      responseMessage += `📝 ${compromisso.description}\n`
     }
     
     return {
