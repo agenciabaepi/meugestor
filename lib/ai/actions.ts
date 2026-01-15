@@ -650,13 +650,32 @@ async function handleQuery(
           amanhaFimLocal: amanhaFim.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
         })
         
-        compromissos = await getCompromissosRecords(
+        // Busca compromissos no intervalo de amanhã
+        const todosCompromissos = await getCompromissosRecords(
           tenantId,
           amanha.toISOString(),
           amanhaFim.toISOString()
         )
         
-        console.log(`handleQuery - Compromissos encontrados para amanhã: ${compromissos.length}`, {
+        // Filtra novamente no cliente para garantir que está no dia correto (timezone)
+        compromissos = todosCompromissos.filter(c => {
+          const dataCompromisso = new Date(c.scheduled_at)
+          const dataCompromissoBrazil = dataCompromisso.toLocaleDateString('en-CA', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })
+          const amanhaKey = amanha.toLocaleDateString('en-CA', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          })
+          return dataCompromissoBrazil === amanhaKey
+        })
+        
+        console.log(`handleQuery - Compromissos encontrados para amanhã: ${compromissos.length} (de ${todosCompromissos.length} no intervalo)`, {
           amanhaInicio: amanha.toISOString(),
           amanhaFim: amanhaFim.toISOString(),
           amanhaInicioLocal: amanha.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
