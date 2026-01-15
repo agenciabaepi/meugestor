@@ -486,8 +486,30 @@ IMPORTANTE:
     const parsed = JSON.parse(response)
     
     // Normaliza categoria/subcategoria antes de construir estado
+    // Isso garante que termos como "mercado" sejam normalizados para "Alimentação" / "supermercado"
     const { resolveCategoria } = await import('../utils/category-normalizer')
-    const categoriaNormalizada = parsed.categoria ? resolveCategoria(parsed.categoria) : { category: null, subcategory: null }
+    
+    // Normaliza categoria se fornecida
+    let categoriaFinal: string | null = null
+    let subcategoriaFinal: string | null = null
+    
+    if (parsed.categoria) {
+      const normalizada = resolveCategoria(parsed.categoria)
+      categoriaFinal = normalizada.category
+      subcategoriaFinal = normalizada.subcategory
+    }
+    
+    // Se subcategoria foi fornecida diretamente, normaliza também
+    if (parsed.subcategoria && !subcategoriaFinal) {
+      const normalizadaSub = resolveCategoria(parsed.subcategoria)
+      if (normalizadaSub.subcategory) {
+        subcategoriaFinal = normalizadaSub.subcategory
+        // Se não tinha categoria mas normalizou subcategoria, pega categoria também
+        if (!categoriaFinal && normalizadaSub.category) {
+          categoriaFinal = normalizadaSub.category
+        }
+      }
+    }
     
     // Constrói estado semântico completo
     // IMPORTANTE: Usa null explicitamente (não undefined) para campos ausentes
@@ -496,8 +518,8 @@ IMPORTANTE:
       intent: parsed.intent || 'chat',
       domain: parsed.domain ?? null,
       periodo: parsed.periodo ?? null, // null se não mencionado, não undefined
-      categoria: categoriaNormalizada.category ?? parsed.categoria ?? null,
-      subcategoria: categoriaNormalizada.subcategory ?? parsed.subcategoria ?? null,
+      categoria: categoriaFinal,
+      subcategoria: subcategoriaFinal,
       queryType: parsed.queryType ?? null,
       amount: parsed.amount ?? null,
       title: parsed.title ?? null,
@@ -507,6 +529,13 @@ IMPORTANTE:
       needsClarification: parsed.needsClarification ?? false,
       clarificationMessage: parsed.clarificationMessage ?? null
     }
+    
+    console.log('analyzeIntention - Categoria normalizada:', {
+      original: parsed.categoria,
+      normalizada: categoriaFinal,
+      subcategoriaOriginal: parsed.subcategoria,
+      subcategoriaNormalizada: subcategoriaFinal
+    })
     
     // Aplica herança de contexto (apenas preenche null)
     const stateWithContext = inheritContext(semanticState)
