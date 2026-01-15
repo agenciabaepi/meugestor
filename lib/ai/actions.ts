@@ -824,23 +824,10 @@ async function handleCreateAppointment(
     console.log('handleCreateAppointment - Mensagem original:', originalMessage)
     console.log('handleCreateAppointment - TenantId:', tenantId)
     
-    // Validação rígida: verifica dados obrigatórios
-    if (!state.title) {
-      return {
-        success: false,
-        message: 'Preciso saber o título do compromisso. Pode informar?',
-      }
-    }
-    
-    if (!state.scheduled_at) {
-      return {
-        success: false,
-        message: 'Preciso saber quando será o compromisso. Pode informar data e horário?',
-      }
-    }
-    
-    let title = state.title
-    let scheduledAt = parseScheduledAt(state.scheduled_at, state.title, originalMessage)
+    // NÃO pergunte antes de tentar extrair da mensagem original.
+    // Isso evita perguntas como "qual a data de amanhã" quando o usuário já disse "amanhã às 15h".
+    let title = state.title || null
+    let scheduledAt = state.scheduled_at ? parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage) : null
 
     console.log('handleCreateAppointment - Dados da IA:', {
       title,
@@ -890,9 +877,9 @@ async function handleCreateAppointment(
       title = state.title || 'Compromisso'
     }
 
-    // Se ainda não tem data/hora, tenta processar o scheduled_at original
+    // Se ainda não tem data/hora, tenta processar o scheduled_at original (se existir)
     if (!scheduledAt && state.scheduled_at) {
-      scheduledAt = parseScheduledAt(state.scheduled_at, state.title, originalMessage)
+      scheduledAt = parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage)
     }
 
     // Se ainda não tem data/hora, retorna erro
@@ -906,7 +893,7 @@ async function handleCreateAppointment(
       })
       return {
         success: false,
-        message: 'Preciso saber quando será o compromisso. Qual data e horário? (ex: "reunião 12h", "amanhã às 10h")',
+        message: 'Não consegui entender a data/horário. Pode me dizer assim: "amanhã às 15h" ou "16/01 às 15h"?',
       }
     }
 
