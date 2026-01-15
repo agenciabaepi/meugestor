@@ -25,78 +25,30 @@ export interface ActionResult {
  * Agora com análise de contexto inteligente para evitar ações desnecessárias
  */
 /**
- * Valida e corrige a intenção baseado em palavras-chave da mensagem original
- * Isso serve como camada de segurança caso a IA não detecte corretamente
+ * Validação mínima de segurança (apenas para casos extremos)
+ * A maioria da análise deve vir do GPT
+ * Esta função serve apenas como última camada de segurança
  */
 function validateAndCorrectIntention(
   message: string,
   detectedIntention: string,
-  extractedData: any
+  state: SemanticState
 ): string {
   const lowerMessage = message.toLowerCase()
   
-  // Palavras-chave que indicam RECEITA
-  const revenueKeywords = [
-    'recebi', 'recebido', 'receber', 'recebeu',
-    'ganhei', 'ganho', 'ganhar', 'ganhou',
-    'entrada', 'entrou',
-    'salário', 'salario',
-    'comissão', 'comissao', 'comissões', 'comissoes',
-    'dividendos', 'dividendo',
-    'rendimento', 'rendimentos',
-    'venda', 'vendas',
-    'freelance', 'freela',
-    'prolabore',
-    'bônus', 'bonus',
-    'reembolso', 'estorno', 'devolução', 'devolucao',
-    'aluguel recebido'
-  ]
+  // Apenas validações críticas de segurança
+  // Se GPT detectou receita mas mensagem claramente é despesa (ou vice-versa)
+  const hasRevenueKeyword = ['recebi', 'ganhei', 'entrada', 'salário'].some(k => lowerMessage.includes(k))
+  const hasExpenseKeyword = ['gastei', 'paguei', 'despesa'].some(k => lowerMessage.includes(k))
   
-  // Palavras-chave que indicam DESPESA
-  const expenseKeywords = [
-    'gastei', 'gasto', 'gastar', 'gastou',
-    'paguei', 'pago', 'pagar', 'pagou',
-    'despesa', 'despesas',
-    'comprei', 'compra', 'comprar', 'comprou',
-    'saída', 'saiu'
-  ]
-  
-  // Verifica se há palavras de receita na mensagem
-  const hasRevenueKeyword = revenueKeywords.some(keyword => lowerMessage.includes(keyword))
-  const hasExpenseKeyword = expenseKeywords.some(keyword => lowerMessage.includes(keyword))
-  
-  // Palavras-chave que indicam CONSULTA DE GASTOS (não compromissos)
-  const expenseQueryKeywords = [
-    'quanto gastei', 'quantos gastei', 'quanto gasto', 'quantos gasto',
-    'quanto paguei', 'quantos paguei', 'quanto pago', 'quantos pago',
-    'quanto despesa', 'quantos despesa'
-  ]
-  
-  // Verifica se é consulta de gastos (deve ser query, não compromissos)
-  const isExpenseQuery = expenseQueryKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-                         (hasExpenseKeyword && (lowerMessage.includes('quanto') || lowerMessage.includes('quantos')))
-  
-  // Se detectou compromissos mas a mensagem é sobre gastos, corrige para query de gastos
-  if (detectedIntention === 'query' && extractedData?.queryType === 'compromissos' && isExpenseQuery) {
-    console.log('⚠️ Correção: Era "compromissos", mas é sobre gastos. Corrigindo queryType.')
-    if (extractedData) {
-      extractedData.queryType = 'gasto'
-      extractedData.queryPeriod = lowerMessage.includes('ontem') ? 'ontem' :
-                                  lowerMessage.includes('hoje') ? 'hoje' :
-                                  lowerMessage.includes('semana') ? 'semana' :
-                                  lowerMessage.includes('mês') || lowerMessage.includes('mes') ? 'mês' : undefined
-    }
-  }
-  
-  // Se detectou receita mas a IA disse que é despesa, corrige
+  // Correção apenas em casos extremos
   if (hasRevenueKeyword && detectedIntention === 'register_expense') {
-    console.log('⚠️ Correção: Mensagem contém palavras de receita, corrigindo intenção para register_revenue')
+    console.log('⚠️ Correção de segurança: Mensagem contém palavras de receita')
     return 'register_revenue'
   }
   
-  // Se detectou despesa mas a IA disse que é receita, corrige
   if (hasExpenseKeyword && detectedIntention === 'register_revenue') {
-    console.log('⚠️ Correção: Mensagem contém palavras de despesa, corrigindo intenção para register_expense')
+    console.log('⚠️ Correção de segurança: Mensagem contém palavras de despesa')
     return 'register_expense'
   }
   
@@ -140,6 +92,13 @@ export async function processAction(
         success: false,
         message: 'Não entendi completamente. Pode reformular sua pergunta?',
       }
+    }
+    
+    // Validação mínima de segurança (apenas casos extremos)
+    const validatedIntent = validateAndCorrectIntention(message, semanticState.intent, semanticState)
+    if (validatedIntent !== semanticState.intent) {
+      console.log(`processAction - Correção de segurança aplicada: ${semanticState.intent} -> ${validatedIntent}`)
+      semanticState.intent = validatedIntent as any
     }
 
     // Análise de contexto inteligente ANTES de executar ações
