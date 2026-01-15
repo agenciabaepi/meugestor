@@ -299,16 +299,17 @@ REGRAS IMPORTANTES:
                 date: matches[0].scheduled_at
               })
             } else if (matches.length > 1) {
-              // Múltiplos matches, usa o mais recente
-              semanticState.targetId = matches[0].id
-              console.log('conversational-assistant - TargetId definido por busca (mais recente):', semanticState.targetId)
+              // Múltiplos matches, usa o com maior score (mais relevante)
+              const bestMatch = matches[0]
+              semanticState.targetId = bestMatch.id
+              console.log('conversational-assistant - TargetId definido por busca (melhor match, score:', bestMatch.score, '):', semanticState.targetId)
               
               // Registra menção para focus lock
               registerMention(tenantId, 'appointment', {
-                targetId: matches[0].id,
-                title: matches[0].title,
-                location: matches[0].description || undefined,
-                date: matches[0].scheduled_at
+                targetId: bestMatch.id,
+                title: bestMatch.title,
+                location: bestMatch.description || undefined,
+                date: bestMatch.scheduled_at
               })
             }
           }

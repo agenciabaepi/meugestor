@@ -133,6 +133,17 @@ export function clearFocus(tenantId: string, type: 'appointment' | 'expense' | '
 }
 
 /**
+ * Normaliza string para comparação (remove acentos, lowercase)
+ */
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+/**
  * Busca compromissos que correspondem aos critérios de foco
  */
 export async function findMatchingAppointments(
@@ -142,42 +153,57 @@ export async function findMatchingAppointments(
     location?: string
     date?: string
   }
-): Promise<Array<{ id: string; title: string; scheduled_at: string; description?: string | null }>> {
+): Promise<Array<{ id: string; title: string; scheduled_at: string; description?: string | null; score: number }>> {
   const { getCompromissosRecords } = await import('../services/compromissos')
   
   // Busca compromissos futuros
   const now = new Date().toISOString()
   const compromissos = await getCompromissosRecords(tenantId, now)
   
-  const matches: Array<{ id: string; title: string; scheduled_at: string; description?: string | null }> = []
+  const matches: Array<{ id: string; title: string; scheduled_at: string; description?: string | null; score: number }> = []
   
   for (const comp of compromissos) {
     let score = 0
     
-    // Verifica título
+    // Verifica título (match exato vale mais)
     if (criteria.title) {
-      const titleLower = comp.title.toLowerCase()
-      const criteriaTitleLower = criteria.title.toLowerCase()
-      if (titleLower.includes(criteriaTitleLower) || criteriaTitleLower.includes(titleLower)) {
-        score += 2
+      const titleLower = normalizeString(comp.title)
+      const criteriaTitleLower = normalizeString(criteria.title)
+      
+      if (titleLower === criteriaTitleLower) {
+        score += 5 // Match exato
+      } else if (titleLower.includes(criteriaTitleLower) || criteriaTitleLower.includes(titleLower)) {
+        score += 2 // Match parcial
       }
     }
     
-    // Verifica local (na descrição)
-    if (criteria.location && comp.description) {
-      const descLower = comp.description.toLowerCase()
-      const locationLower = criteria.location.toLowerCase()
+    // Verifica local (na descrição ou título)
+    if (criteria.location) {
+      const locationLower = normalizeString(criteria.location)
+      const descLower = comp.description ? normalizeString(comp.description) : ''
+      const titleLower = normalizeString(comp.title)
+      
       if (descLower.includes(locationLower) || locationLower.includes(descLower)) {
-        score += 2
+        score += 3 // Match na descrição
+      } else if (titleLower.includes(locationLower) || locationLower.includes(titleLower)) {
+        score += 2 // Match no título
       }
     }
     
-    // Verifica data
+    // Verifica data (match exato vale muito)
     if (criteria.date) {
       const compDate = new Date(comp.scheduled_at).toISOString().split('T')[0]
       const criteriaDate = new Date(criteria.date).toISOString().split('T')[0]
       if (compDate === criteriaDate) {
-        score += 3
+        score += 5 // Match exato de data
+      } else {
+        // Verifica se está no mesmo dia (considerando timezone)
+        const compDateObj = new Date(comp.scheduled_at)
+        const criteriaDateObj = new Date(criteria.date)
+        const diffDays = Math.abs((compDateObj.getTime() - criteriaDateObj.getTime()) / (1000 * 60 * 60 * 24))
+        if (diffDays <= 1) {
+          score += 2 // Mesmo dia ou próximo
+        }
       }
     }
     
@@ -187,15 +213,19 @@ export async function findMatchingAppointments(
         id: comp.id,
         title: comp.title,
         scheduled_at: comp.scheduled_at,
-        description: comp.description
+        description: comp.description,
+        score
       })
     }
   }
   
-  // Ordena por recência (mais recente primeiro)
-  matches.sort((a, b) => 
-    new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
-  )
+  // Ordena por score (maior primeiro) e depois por recência
+  matches.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score
+    }
+    return new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+  })
   
   return matches
 }
