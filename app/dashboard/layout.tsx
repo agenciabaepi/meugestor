@@ -16,12 +16,12 @@ export default async function DashboardLayout({
   // }
   
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Sidebar - Fixo */}
       <Sidebar />
 
-      {/* Main Content */}
-      <main className="flex-1 w-full lg:ml-64 min-h-screen pt-16 lg:pt-0">
+      {/* Main Content - Sem gap, com margin para o sidebar fixo */}
+      <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
           <div className="w-full">
             {children}

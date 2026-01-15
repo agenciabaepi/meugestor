@@ -69,19 +69,14 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 h-full bg-white border-r border-gray-200 z-40
+          fixed top-0 left-0 h-screen bg-white border-r border-gray-200 z-40
           transform transition-transform duration-300 ease-in-out
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:h-auto
+          lg:translate-x-0
           w-64 shadow-lg lg:shadow-none
-          overflow-y-auto
         `}
-        style={{ 
-          maxHeight: '100vh',
-          WebkitOverflowScrolling: 'touch'
-        }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <Link
@@ -107,7 +102,7 @@ export function Sidebar() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4">
+          <nav className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             <div className="space-y-1">
               {menuItems.map((item) => {
                 const Icon = item.icon
