@@ -36,18 +36,31 @@ export async function POST(request: NextRequest) {
     console.log('Configuração Supabase:', {
       url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'NÃO CONFIGURADO',
       anonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 10)}...` : 'NÃO CONFIGURADO',
+      urlLength: supabaseUrl?.length || 0,
+      anonKeyLength: supabaseAnonKey?.length || 0,
     })
 
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error('Erro: Variáveis de ambiente do Supabase não configuradas')
+      console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'configurado' : 'FALTANDO')
+      console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'configurado' : 'FALTANDO')
       return NextResponse.json(
-        { error: 'Erro de configuração do servidor' },
+        { error: 'Erro de configuração do servidor. Verifique as variáveis de ambiente.' },
         { status: 500 }
       )
     }
 
     // Cria cliente Supabase com suporte a cookies
-    const supabase = await createServerClient()
+    let supabase
+    try {
+      supabase = await createServerClient()
+    } catch (clientError: any) {
+      console.error('Erro ao criar cliente Supabase:', clientError?.message || clientError)
+      return NextResponse.json(
+        { error: 'Erro de configuração do servidor' },
+        { status: 500 }
+      )
+    }
 
     if (!supabase) {
       console.error('Erro: Cliente Supabase não foi criado')
@@ -62,13 +75,25 @@ export async function POST(request: NextRequest) {
       email: emailNormalized,
       emailLength: emailNormalized.length,
       passwordLength: password.length,
+      supabaseUrl: supabaseUrl ? 'configurado' : 'não configurado',
     })
 
     // Faz login no Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: emailNormalized,
-      password,
-    })
+    let data, error
+    try {
+      const result = await supabase.auth.signInWithPassword({
+        email: emailNormalized,
+        password,
+      })
+      data = result.data
+      error = result.error
+    } catch (authError: any) {
+      console.error('Erro ao chamar signInWithPassword:', authError?.message || authError)
+      return NextResponse.json(
+        { error: 'Erro ao fazer login. Tente novamente.' },
+        { status: 500 }
+      )
+    }
 
     if (error) {
       console.error('=== ERRO NO SUPABASE AUTH ===')

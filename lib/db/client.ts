@@ -12,9 +12,9 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 export async function createServerClient() {
   // Valida configuração antes de criar cliente
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase não configurado. Verifique as variáveis de ambiente.')
-    // Retorna cliente placeholder para não quebrar o build
-    return createClient('https://placeholder.supabase.co', 'placeholder-key')
+    const errorMsg = 'Supabase não configurado. Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    console.error(errorMsg)
+    throw new Error(errorMsg)
   }
 
   try {
@@ -63,13 +63,19 @@ export async function createServerClient() {
     })
   } catch (error: any) {
     console.error('Error creating Supabase server client:', error?.message || error)
-    // Retorna um cliente básico sem cookies em caso de erro
-    return createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    // Em Route Handlers, podemos criar cliente sem cookies se necessário
+    // Mas preferimos lançar erro para que seja tratado adequadamente
+    if (error?.message?.includes('cookies') || error?.message?.includes('dynamic')) {
+      // Se o erro for relacionado a cookies em contexto dinâmico, cria cliente básico
+      console.warn('Criando cliente Supabase sem cookies (contexto dinâmico)')
+      return createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+    }
+    throw error
   }
 }
 
