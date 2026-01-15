@@ -10,54 +10,68 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
  * Usa cookies para manter a sessão entre requisições
  */
 export async function createServerClient() {
-  const cookieStore = await cookies()
-  
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      storage: {
-        getItem: (key: string) => {
-          return cookieStore.get(key)?.value ?? null
+  try {
+    // Valida configuração antes de criar cliente
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Supabase não configurado. Verifique as variáveis de ambiente.')
+      throw new Error('Missing Supabase environment variables')
+    }
+
+    const cookieStore = await cookies()
+    
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: {
+          getItem: (key: string) => {
+            try {
+              return cookieStore.get(key)?.value ?? null
+            } catch (error) {
+              console.error('Error getting cookie:', error)
+              return null
+            }
+          },
+          setItem: (key: string, value: string) => {
+            // Cookies só podem ser modificados em Server Actions ou Route Handlers
+            // Em Server Components, apenas lemos os cookies
+            // A escrita será feita pelo cliente ou em Route Handlers
+            try {
+              cookieStore.set(key, value, {
+                httpOnly: false,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 60 * 60 * 24 * 7, // 7 dias
+              })
+            } catch (error) {
+              // Em Server Components, não podemos modificar cookies
+              // Isso é esperado e não é um erro - silenciosamente ignora
+            }
+          },
+          removeItem: (key: string) => {
+            // Cookies só podem ser modificados em Server Actions ou Route Handlers
+            // Em Server Components, apenas lemos os cookies
+            // A remoção será feita pelo cliente ou em Route Handlers
+            try {
+              cookieStore.delete(key)
+            } catch (error) {
+              // Em Server Components, não podemos modificar cookies
+              // Isso é esperado e não é um erro - silenciosamente ignora
+            }
+          },
         },
-        setItem: (key: string, value: string) => {
-          // Cookies só podem ser modificados em Server Actions ou Route Handlers
-          // Em Server Components, apenas lemos os cookies
-          // A escrita será feita pelo cliente ou em Route Handlers
-          try {
-            cookieStore.set(key, value, {
-              httpOnly: false,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
-              path: '/',
-              maxAge: 60 * 60 * 24 * 7, // 7 dias
-            })
-          } catch (error) {
-            // Em Server Components, não podemos modificar cookies
-            // Isso é esperado e não é um erro - silenciosamente ignora
-            // O Supabase tentará atualizar a sessão, mas em Server Components
-            // isso não é permitido pelo Next.js 16. A sessão será atualizada
-            // quando necessário em Server Actions ou Route Handlers.
-          }
-        },
-        removeItem: (key: string) => {
-          // Cookies só podem ser modificados em Server Actions ou Route Handlers
-          // Em Server Components, apenas lemos os cookies
-          // A remoção será feita pelo cliente ou em Route Handlers
-          try {
-            cookieStore.delete(key)
-          } catch (error) {
-            // Em Server Components, não podemos modificar cookies
-            // Isso é esperado e não é um erro - silenciosamente ignora
-            // O Supabase tentará limpar a sessão, mas em Server Components
-            // isso não é permitido pelo Next.js 16. A limpeza será feita
-            // quando necessário em Server Actions ou Route Handlers.
-          }
-        },
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
       },
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    },
-  })
+    })
+  } catch (error) {
+    console.error('Error creating Supabase server client:', error)
+    // Retorna um cliente placeholder para evitar crash
+    return createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'placeholder-key'
+    )
+  }
 }
 
 
