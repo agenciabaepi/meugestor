@@ -111,9 +111,17 @@ export async function processAction(
     console.log('processAction - Mensagem:', message)
     console.log('processAction - TenantId:', tenantId)
     
-    // Analisa a intenção
-    console.log('processAction - Analisando intenção...')
-    const { intention, extractedData } = await analyzeIntention(message)
+    // Busca contexto recente para entender perguntas de continuação
+    const { getRecentConversations } = await import('../db/queries')
+    const recentConversations = await getRecentConversations(tenantId, 5)
+    const recentContext = recentConversations.map(c => ({
+      role: c.role,
+      message: c.message
+    }))
+    
+    // Analisa a intenção com contexto
+    console.log('processAction - Analisando intenção com contexto...')
+    const { intention, extractedData } = await analyzeIntention(message, recentContext)
 
     console.log('processAction - Intenção detectada:', intention)
     console.log('processAction - Dados extraídos:', JSON.stringify(extractedData, null, 2))
@@ -213,7 +221,7 @@ export async function processAction(
         return await handleCreateAppointment(extractedData, tenantId, message)
 
       case 'query':
-        return await handleQuery(message, tenantId, extractedData)
+        return await handleQuery(message, tenantId, extractedData, recentContext)
 
       case 'report':
         return await handleReport(tenantId)
@@ -625,10 +633,59 @@ async function handleCreateAppointment(
 async function handleQuery(
   message: string,
   tenantId: string,
-  extractedData?: any
+  extractedData?: any,
+  recentConversations?: Array<{ role: string; message: string }>
 ): Promise<ActionResult> {
   try {
     const lowerMessage = message.toLowerCase()
+    
+    // Detecta perguntas de continuação e reconstrói usando contexto
+    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes))[?]?$/i.test(lowerMessage) ||
+                                   /^(e\s+agora)[?]?$/i.test(lowerMessage)
+    
+    let effectiveMessage = message
+    if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
+      // Busca a última pergunta do usuário sobre gastos
+      const lastUserQuery = [...recentConversations].reverse().find(c => 
+        c.role === 'user' && 
+        (c.message.toLowerCase().includes('gastei') || 
+         c.message.toLowerCase().includes('gasto') ||
+         c.message.toLowerCase().includes('compromisso') ||
+         c.message.toLowerCase().includes('agenda'))
+      )
+      
+      if (lastUserQuery) {
+        effectiveMessage = `${lastUserQuery.message} ${message}`
+        console.log('handleQuery - Pergunta de continuação detectada:', {
+          original: message,
+          contexto: lastUserQuery.message,
+          reconstruida: effectiveMessage
+        })
+        // Atualiza lowerMessage para usar a mensagem reconstruída
+        const lowerEffectiveMessage = effectiveMessage.toLowerCase()
+        
+        // Se a última pergunta era sobre gastos, esta também é sobre gastos
+        if (lastUserQuery.message.toLowerCase().includes('gastei') || 
+            lastUserQuery.message.toLowerCase().includes('gasto')) {
+          // Força queryType para gasto
+          if (!extractedData) extractedData = {}
+          extractedData.queryType = 'gasto'
+          // Detecta período na continuação
+          if (lowerEffectiveMessage.includes('hoje')) {
+            extractedData.queryPeriod = 'hoje'
+          } else if (lowerEffectiveMessage.includes('ontem')) {
+            extractedData.queryPeriod = 'ontem'
+          } else if (lowerEffectiveMessage.includes('amanhã') || lowerEffectiveMessage.includes('amanha')) {
+            extractedData.queryPeriod = 'amanhã'
+          } else if (lowerEffectiveMessage.includes('semana')) {
+            extractedData.queryPeriod = 'semana'
+          } else if (lowerEffectiveMessage.includes('mês') || lowerEffectiveMessage.includes('mes')) {
+            extractedData.queryPeriod = 'mês'
+          }
+        }
+      }
+    }
+    
     const now = getNowInBrazil() // Usa timezone do Brasil
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0]

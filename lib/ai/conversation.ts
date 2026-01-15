@@ -173,21 +173,61 @@ async function getCompromissosSummary(tenantId: string): Promise<string | undefi
 
 /**
  * Analisa a intenção do usuário na mensagem
+ * Agora com suporte a contexto conversacional para entender perguntas de continuação
  */
 export async function analyzeIntention(
-  message: string
+  message: string,
+  recentConversations?: Array<{ role: string; message: string }>
 ): Promise<{
   intention: 'register_expense' | 'register_revenue' | 'create_appointment' | 'query' | 'report' | 'chat'
   confidence: number
   extractedData?: any
 }> {
   try {
+    // Detecta perguntas de continuação (ex: "e hoje?", "e ontem?", "e amanhã?")
+    const lowerMessage = message.toLowerCase().trim()
+    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes))[?]?$/i.test(lowerMessage) ||
+                                   /^(e\s+agora)[?]?$/i.test(lowerMessage) ||
+                                   /^(e\s+isso)[?]?$/i.test(lowerMessage)
+    
+    // Se é pergunta de continuação, usa contexto anterior
+    let contextMessage = message
+    if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
+      // Busca a última pergunta do usuário sobre gastos/compromissos
+      const lastUserQuery = [...recentConversations].reverse().find(c => 
+        c.role === 'user' && 
+        (c.message.toLowerCase().includes('gastei') || 
+         c.message.toLowerCase().includes('gasto') ||
+         c.message.toLowerCase().includes('compromisso') ||
+         c.message.toLowerCase().includes('agenda'))
+      )
+      
+      if (lastUserQuery) {
+        // Reconstrói a pergunta completa usando contexto
+        contextMessage = `${lastUserQuery.message} ${message}`
+        console.log('analyzeIntention - Pergunta de continuação detectada:', {
+          original: message,
+          contexto: lastUserQuery.message,
+          reconstruida: contextMessage
+        })
+      }
+    }
+    
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-5.2',
       messages: [
         {
           role: 'system',
           content: `Você é um assistente especializado em análise de mensagens financeiras e agendamento.
+
+${recentConversations && recentConversations.length > 0 ? `
+CONTEXTO DA CONVERSA RECENTE:
+${recentConversations.slice(-5).map(c => `${c.role === 'user' ? 'Usuário' : 'Assistente'}: ${c.message}`).join('\n')}
+
+IMPORTANTE - PERGUNTAS DE CONTINUAÇÃO:
+Se a mensagem atual é curta e parece uma continuação (ex: "e hoje?", "e ontem?", "e amanhã?"), use o contexto da conversa anterior para entender a intenção completa.
+Exemplo: Se o usuário perguntou "quantos gastei ontem?" e depois pergunta "e hoje?", interprete como "quantos gastei hoje?".
+` : ''}
 
 Analise a mensagem do usuário e identifique a intenção. Extraia TODAS as informações relevantes.
 
@@ -335,6 +375,12 @@ EXEMPLOS DE OUTRAS INTENÇÕES:
 - "quanto gastei hoje?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "hoje" (NÃO "compromissos")
 - "quantos eu gastei ontem?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "ontem" (NÃO "compromissos")
 - "quanto gastei esta semana?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "semana" (NÃO "compromissos")
+
+EXEMPLOS DE PERGUNTAS DE CONTINUAÇÃO (usar contexto anterior):
+- Contexto: "quantos gastei ontem?" → Nova mensagem: "e hoje?" → query, queryType: "gasto", queryPeriod: "hoje"
+- Contexto: "quanto gastei hoje?" → Nova mensagem: "e ontem?" → query, queryType: "gasto", queryPeriod: "ontem"
+- Contexto: "quantos compromissos tenho amanhã?" → Nova mensagem: "e hoje?" → query, queryType: "compromissos", queryPeriod: "hoje"
+- IMPORTANTE: Quando a mensagem é curta e parece continuação (ex: "e hoje?", "e ontem?"), SEMPRE use o contexto da conversa anterior para entender a intenção completa
 - "quantos compromissos tenho amanhã?" -> query, queryType: "compromissos", queryPeriod: "amanhã"
 - "quais são meus compromissos hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
 - "tenho algum compromisso hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
