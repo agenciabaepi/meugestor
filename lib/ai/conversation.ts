@@ -51,8 +51,6 @@ export async function processMessage(
     // Adiciona instruções específicas sobre lembretes automáticos
     const reminderInfo = `\n\nINFORMAÇÃO IMPORTANTE SOBRE LEMBRETES:
 O sistema já envia lembretes automáticos para TODOS os compromissos:
-- ⏰ 1 hora antes
-- ⏰ 30 minutos antes  
 - ⏰ 10 minutos antes
 
 Se o usuário pedir para lembrar de um compromisso, EXPLIQUE que o sistema já faz isso automaticamente.

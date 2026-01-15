@@ -1,7 +1,7 @@
 /**
  * Sistema de Lembretes Automáticos
  * Envia lembretes de compromissos via WhatsApp
- * Suporta múltiplos lembretes: 1h, 30min e 10min antes
+ * Suporta lembrete único: 10min antes
  */
 
 import { getCompromissosRecords } from '../services/compromissos'
@@ -18,8 +18,9 @@ export interface LembreteConfig {
 
 // Configurações de lembretes
 const LEMBRETES_CONFIG: Record<LembreteType, LembreteConfig> = {
-  '1h': { antecedenciaMinutos: 60, tipo: '1h' },
-  '30min': { antecedenciaMinutos: 30, tipo: '30min' },
+  // Desativados por decisão de produto (evitar excesso de mensagens)
+  // '1h': { antecedenciaMinutos: 60, tipo: '1h' },
+  // '30min': { antecedenciaMinutos: 30, tipo: '30min' },
   '10min': { antecedenciaMinutos: 10, tipo: '10min' },
 }
 
@@ -280,8 +281,9 @@ export async function processarLembretesParaTenant(
     console.log(`\n=== VERIFICANDO LEMBRETES PARA TENANT ${tenantId} ===`)
     
     // Processa cada tipo de lembrete
-    for (const tipoLembrete of ['1h', '30min', '10min'] as LembreteType[]) {
+    for (const tipoLembrete of ['10min'] as LembreteType[]) {
       const config = LEMBRETES_CONFIG[tipoLembrete]
+      if (!config) continue
       const compromissos = await buscarCompromissosParaLembrete(tenantId, config)
       
       if (compromissos.length > 0) {
@@ -305,7 +307,7 @@ export async function processarLembretesParaTenant(
 
 /**
  * Processa lembretes para todos os tenants
- * Processa os 3 tipos de lembrete: 1h, 30min e 10min antes
+ * Processa apenas o lembrete de 10min antes
  */
 export async function processarLembretes(): Promise<{
   sucesso: number
@@ -367,9 +369,10 @@ export async function processarLembretes(): Promise<{
       '10min': { sucesso: 0, erros: 0 },
     }
 
-    // Processa cada tipo de lembrete
-    for (const tipoLembrete of ['1h', '30min', '10min'] as LembreteType[]) {
+    // Processa apenas o lembrete de 10min (1h e 30min desativados)
+    for (const tipoLembrete of ['10min'] as LembreteType[]) {
       const config = LEMBRETES_CONFIG[tipoLembrete]
+      if (!config) continue
       console.log(`\n=== Processando lembretes ${tipoLembrete} (${config.antecedenciaMinutos}min antes) ===`)
       console.log(`Horário atual: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)
 
