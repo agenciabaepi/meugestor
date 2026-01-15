@@ -655,6 +655,20 @@ async function handleQuery(
           amanha.toISOString(),
           amanhaFim.toISOString()
         )
+        
+        console.log(`handleQuery - Compromissos encontrados para amanhã: ${compromissos.length}`, {
+          amanhaInicio: amanha.toISOString(),
+          amanhaFim: amanhaFim.toISOString(),
+          amanhaInicioLocal: amanha.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          amanhaFimLocal: amanhaFim.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          compromissos: compromissos.map(c => ({
+            id: c.id,
+            title: c.title,
+            scheduled_at: c.scheduled_at,
+            scheduled_at_brazil: new Date(c.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+          }))
+        })
+        
         periodoTexto = 'amanhã'
       } else if (isHoje) {
         // Compromissos de hoje
