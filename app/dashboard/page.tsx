@@ -5,11 +5,81 @@ import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
 
 async function getDashboardData() {
-  // Obtém tenant_id do usuário autenticado
-  const tenantId = await getAuthenticatedTenantId()
-  
-  if (!tenantId) {
-    // Retorna dados vazios se não houver tenant
+  try {
+    // Obtém tenant_id do usuário autenticado
+    const tenantId = await getAuthenticatedTenantId()
+    
+    if (!tenantId) {
+      // Retorna dados vazios se não houver tenant
+      return {
+        totalMes: 0,
+        gastosRecentes: [],
+        gastosMes: 0,
+        hoje: 0,
+        proximos: [],
+        resumo: {
+          total: 0,
+          porCategoria: {},
+          totalRegistros: 0,
+          periodo: { inicio: '', fim: '' },
+        },
+      }
+    }
+    
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    
+    // Busca dados financeiros com tratamento de erro
+    let totalMes = 0
+    let gastosRecentes: any[] = []
+    let gastosMes: any[] = []
+    
+    try {
+      totalMes = await calculateTotalSpent(
+        tenantId,
+        startOfMonth.toISOString().split('T')[0]
+      )
+      gastosRecentes = await getFinanceiroRecords(tenantId)
+      gastosMes = await getFinanceiroRecords(
+        tenantId,
+        startOfMonth.toISOString().split('T')[0]
+      )
+    } catch (error) {
+      console.error('Error fetching financeiro data:', error)
+    }
+    
+    // Busca compromissos com tratamento de erro
+    let hoje: any[] = []
+    let proximos: any[] = []
+    let resumo = {
+      total: 0,
+      porCategoria: {},
+      totalRegistros: 0,
+      periodo: { inicio: '', fim: '' },
+    }
+    
+    try {
+      hoje = await getTodayCompromissos(tenantId)
+      proximos = await getCompromissosRecords(
+        tenantId,
+        new Date().toISOString()
+      )
+      resumo = await gerarResumoMensal(tenantId)
+    } catch (error) {
+      console.error('Error fetching compromissos data:', error)
+    }
+    
+    return {
+      totalMes,
+      gastosRecentes: gastosRecentes.slice(0, 5),
+      gastosMes: gastosMes.length,
+      hoje: hoje.length,
+      proximos: proximos.slice(0, 5),
+      resumo,
+    }
+  } catch (error) {
+    console.error('Error in getDashboardData:', error)
+    // Retorna dados vazios em caso de erro para não quebrar a página
     return {
       totalMes: 0,
       gastosRecentes: [],
@@ -23,40 +93,6 @@ async function getDashboardData() {
         periodo: { inicio: '', fim: '' },
       },
     }
-  }
-  
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  
-  // Busca dados financeiros
-  const totalMes = await calculateTotalSpent(
-    tenantId,
-    startOfMonth.toISOString().split('T')[0]
-  )
-  
-  const gastosRecentes = await getFinanceiroRecords(tenantId)
-  const gastosMes = await getFinanceiroRecords(
-    tenantId,
-    startOfMonth.toISOString().split('T')[0]
-  )
-  
-  // Busca compromissos
-  const hoje = await getTodayCompromissos(tenantId)
-  const proximos = await getCompromissosRecords(
-    tenantId,
-    new Date().toISOString()
-  )
-  
-  // Gera resumo
-  const resumo = await gerarResumoMensal(tenantId)
-  
-  return {
-    totalMes,
-    gastosRecentes: gastosRecentes.slice(0, 5),
-    gastosMes: gastosMes.length,
-    hoje: hoje.length,
-    proximos: proximos.slice(0, 5),
-    resumo,
   }
 }
 

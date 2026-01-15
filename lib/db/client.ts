@@ -10,13 +10,14 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
  * Usa cookies para manter a sessão entre requisições
  */
 export async function createServerClient() {
-  try {
-    // Valida configuração antes de criar cliente
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Supabase não configurado. Verifique as variáveis de ambiente.')
-      throw new Error('Missing Supabase environment variables')
-    }
+  // Valida configuração antes de criar cliente
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase não configurado. Verifique as variáveis de ambiente.')
+    // Retorna cliente placeholder para não quebrar o build
+    return createClient('https://placeholder.supabase.co', 'placeholder-key')
+  }
 
+  try {
     const cookieStore = await cookies()
     
     return createClient(supabaseUrl, supabaseAnonKey, {
@@ -26,14 +27,13 @@ export async function createServerClient() {
             try {
               return cookieStore.get(key)?.value ?? null
             } catch (error) {
-              console.error('Error getting cookie:', error)
+              // Em alguns contextos, cookies() pode não estar disponível
               return null
             }
           },
           setItem: (key: string, value: string) => {
             // Cookies só podem ser modificados em Server Actions ou Route Handlers
             // Em Server Components, apenas lemos os cookies
-            // A escrita será feita pelo cliente ou em Route Handlers
             try {
               cookieStore.set(key, value, {
                 httpOnly: false,
@@ -44,18 +44,15 @@ export async function createServerClient() {
               })
             } catch (error) {
               // Em Server Components, não podemos modificar cookies
-              // Isso é esperado e não é um erro - silenciosamente ignora
+              // Isso é esperado e não é um erro
             }
           },
           removeItem: (key: string) => {
-            // Cookies só podem ser modificados em Server Actions ou Route Handlers
-            // Em Server Components, apenas lemos os cookies
-            // A remoção será feita pelo cliente ou em Route Handlers
             try {
               cookieStore.delete(key)
             } catch (error) {
               // Em Server Components, não podemos modificar cookies
-              // Isso é esperado e não é um erro - silenciosamente ignora
+              // Isso é esperado e não é um erro
             }
           },
         },
@@ -64,13 +61,15 @@ export async function createServerClient() {
         detectSessionInUrl: false,
       },
     })
-  } catch (error) {
-    console.error('Error creating Supabase server client:', error)
-    // Retorna um cliente placeholder para evitar crash
-    return createClient(
-      supabaseUrl || 'https://placeholder.supabase.co',
-      supabaseAnonKey || 'placeholder-key'
-    )
+  } catch (error: any) {
+    console.error('Error creating Supabase server client:', error?.message || error)
+    // Retorna um cliente básico sem cookies em caso de erro
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   }
 }
 
