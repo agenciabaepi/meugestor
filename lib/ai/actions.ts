@@ -4,7 +4,14 @@
 
 import { analyzeIntention } from './conversation'
 import { analyzeConversationalIntention } from './conversational-assistant'
-import { getPendingConfirmation, savePendingConfirmation, clearPendingConfirmation } from './confirmation-manager'
+import { 
+  getPendingConfirmation, 
+  savePendingConfirmation, 
+  clearPendingConfirmation,
+  loadLatestPendingConfirmation,
+  persistPendingConfirmation,
+  persistResolvedConfirmation,
+} from './confirmation-manager'
 import { saveRecentAction } from './action-history'
 import { getActiveTask, setActiveTask, clearActiveTask, queueMessageForTask, consumeQueuedMessage } from './session-focus'
 import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
@@ -76,21 +83,31 @@ export async function processAction(
       message: c.message
     }))
     
-    // Verifica se há confirmação pendente
-    const pendingConfirmation = getPendingConfirmation(tenantId)
+    // Verifica se há confirmação pendente (memória) ou persistida (DB via conversations)
     const lowerMessage = message.toLowerCase().trim()
+    const isPositiveConfirm = ['sim', 's', 'confirmar', 'ok', 'isso', 'isso mesmo', 'pode', 'pode sim', 'pode salvar', 'confirmo'].includes(lowerMessage)
+    const isNegativeConfirm = ['não', 'nao', 'cancelar', 'cancela'].includes(lowerMessage)
+
+    let pendingConfirmation = getPendingConfirmation(tenantId)
+    if (!pendingConfirmation) {
+      pendingConfirmation = await loadLatestPendingConfirmation(tenantId)
+    }
 
     // Session focus: ação ativa (create/update compromisso)
     const activeTask = getActiveTask(tenantId)
     
-    // Se há confirmação pendente e usuário confirmou/cancelou
+    // COMMIT POINT: Se há confirmação pendente e usuário confirmou/cancelou, executa imediatamente.
     if (pendingConfirmation) {
-      if (lowerMessage === 'sim' || lowerMessage === 's' || lowerMessage === 'confirmar' || lowerMessage === 'ok') {
+      if (isPositiveConfirm) {
         console.log('processAction - Confirmação recebida, executando ação pendente')
         clearPendingConfirmation(tenantId)
         // Usa o estado da confirmação pendente
-        const semanticState = pendingConfirmation.state
-        semanticState.intent = semanticState.intent.replace('confirm', '') as any // Remove 'confirm' do intent
+        const semanticState = { ...pendingConfirmation.state }
+
+        // Nunca confirmar duas vezes: marca resolvido imediatamente (idempotência)
+        await persistResolvedConfirmation(tenantId)
+
+        // Executa imediatamente (gatilho de execução)
         const actionResult = await executeAction(semanticState, tenantId, message)
 
         // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
@@ -107,11 +124,26 @@ export async function processAction(
           }
         }
 
-        return actionResult
-      } else if (lowerMessage === 'não' || lowerMessage === 'nao' || lowerMessage === 'cancelar') {
+        // Resposta final curta e conclusiva (não re-pergunta)
+        if (actionResult.success) {
+          return {
+            success: true,
+            message: buildCommitFinalMessage(semanticState, actionResult),
+            data: actionResult.data,
+          }
+        }
+
+        // Se falhou, retorna erro claro (não repete confirmação)
+        return {
+          success: false,
+          message: actionResult.message || 'Não consegui executar a ação. Tente novamente.',
+          data: actionResult.data,
+        }
+      } else if (isNegativeConfirm) {
         console.log('processAction - Cancelamento recebido')
         clearPendingConfirmation(tenantId)
         clearActiveTask(tenantId)
+        await persistResolvedConfirmation(tenantId)
         return {
           success: true,
           message: 'Entendido, cancelado. Como posso ajudar?'
@@ -148,6 +180,7 @@ export async function processAction(
         setActiveTask(tenantId, semanticState.intent, semanticState)
       }
       savePendingConfirmation(tenantId, semanticState)
+      await persistPendingConfirmation(tenantId, semanticState)
       return {
         success: true,
         message: semanticState.confirmationMessage,
@@ -275,6 +308,28 @@ function buildKeepFocusMessage(activeTask: any): string {
   ].filter(Boolean).join(' • ')
 
   return `Posso te responder isso, mas antes preciso concluir a ação pendente.\n\nVou salvar/atualizar: ${resumo || 'esse compromisso'}.\nPosso salvar assim? (sim / cancelar)`
+}
+
+function buildCommitFinalMessage(state: SemanticState, actionResult: ActionResult): string {
+  // Resposta curta e conclusiva
+  if (state.intent === 'update_appointment') {
+    const title = (actionResult.data?.title || state.title || 'compromisso').toString()
+    const whenIso = actionResult.data?.scheduled_at || state.scheduled_at
+    const when = whenIso ? new Date(whenIso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : null
+    return `Pronto! Atualizei ${title}${when ? ` para ${when}` : ''}.`
+  }
+  if (state.intent === 'create_appointment') {
+    const title = (actionResult.data?.title || state.title || 'compromisso').toString()
+    const whenIso = actionResult.data?.scheduled_at || state.scheduled_at
+    const when = whenIso ? new Date(whenIso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : null
+    return `Pronto! Agendei ${title}${when ? ` para ${when}` : ''}.`
+  }
+  if (state.intent === 'update_expense' || state.intent === 'update_revenue') {
+    return 'Pronto! Atualizei o registro.'
+  }
+  if (state.intent === 'register_expense') return 'Pronto! Registrei o gasto.'
+  if (state.intent === 'register_revenue') return 'Pronto! Registrei a receita.'
+  return actionResult.message || 'Pronto!'
 }
 
 /**
