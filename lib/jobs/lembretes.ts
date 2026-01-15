@@ -269,6 +269,41 @@ function formatarMensagemLembrete(
 }
 
 /**
+ * Processa lembretes para um tenant específico
+ * Útil para verificar lembretes quando o usuário interage
+ */
+export async function processarLembretesParaTenant(
+  tenantId: string,
+  whatsappNumber: string
+): Promise<void> {
+  try {
+    console.log(`\n=== VERIFICANDO LEMBRETES PARA TENANT ${tenantId} ===`)
+    
+    // Processa cada tipo de lembrete
+    for (const tipoLembrete of ['1h', '30min', '10min'] as LembreteType[]) {
+      const config = LEMBRETES_CONFIG[tipoLembrete]
+      const compromissos = await buscarCompromissosParaLembrete(tenantId, config)
+      
+      if (compromissos.length > 0) {
+        console.log(`Encontrados ${compromissos.length} lembretes ${tipoLembrete} para enviar`)
+        
+        for (const compromisso of compromissos) {
+          await enviarLembrete(
+            compromisso.id,
+            tenantId,
+            whatsappNumber,
+            config.tipo
+          )
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao processar lembretes para tenant:', error)
+    // Não bloqueia o processamento da mensagem se houver erro
+  }
+}
+
+/**
  * Processa lembretes para todos os tenants
  * Processa os 3 tipos de lembrete: 1h, 30min e 10min antes
  */
