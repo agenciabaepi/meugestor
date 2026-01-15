@@ -486,18 +486,33 @@ async function handleRegisterRevenue(
  * Cria um compromisso
  */
 async function handleCreateAppointment(
-  data: any,
+  state: SemanticState,
   tenantId: string,
   originalMessage?: string
 ): Promise<ActionResult> {
   try {
     console.log('=== handleCreateAppointment INICIADO ===')
-    console.log('handleCreateAppointment - Dados recebidos:', JSON.stringify(data, null, 2))
+    console.log('handleCreateAppointment - Estado semântico:', JSON.stringify(state, null, 2))
     console.log('handleCreateAppointment - Mensagem original:', originalMessage)
     console.log('handleCreateAppointment - TenantId:', tenantId)
     
-    let title = data?.title
-    let scheduledAt = data?.scheduled_at ? parseScheduledAt(data.scheduled_at, data?.title, originalMessage) : null
+    // Validação rígida: verifica dados obrigatórios
+    if (!state.title) {
+      return {
+        success: false,
+        message: 'Preciso saber o título do compromisso. Pode informar?',
+      }
+    }
+    
+    if (!state.scheduled_at) {
+      return {
+        success: false,
+        message: 'Preciso saber quando será o compromisso. Pode informar data e horário?',
+      }
+    }
+    
+    let title = state.title
+    let scheduledAt = parseScheduledAt(state.scheduled_at, state.title, originalMessage)
 
     console.log('handleCreateAppointment - Dados da IA:', {
       title,
@@ -1219,12 +1234,11 @@ async function handleQuery(
       }
     }
 
-    // Nota: Consultas de compromissos já são tratadas no bloco anterior (linhas 608-710)
-    // Este código não será alcançado devido à verificação anterior, mas mantido como fallback
-
+    // Esta função foi substituída por handleQuerySimple
+    // Mantida apenas para compatibilidade, mas não deve ser chamada
     return {
-      success: true,
-      message: 'Não entendi o que você quer consultar. Pode ser mais específico?',
+      success: false,
+      message: 'Erro interno. Tente novamente.',
     }
   } catch (error) {
     throw error
