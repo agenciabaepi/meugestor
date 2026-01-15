@@ -22,8 +22,9 @@ import type { ActiveTask } from './session-focus'
 function validateDataCompleteness(state: SemanticState): boolean {
   switch (state.intent) {
     case 'create_appointment':
-      // Precisa: title + scheduled_at (data/hora)
-      return !!(state.title && state.scheduled_at)
+      // Para UX natural: se o usuário deu "amanhã/hoje/segunda + horário" na mensagem,
+      // o backend consegue inferir a data absoluta. Então basta ter título aqui.
+      return !!state.title
     
     case 'register_expense':
     case 'register_revenue':
@@ -151,6 +152,18 @@ REGRAS CRÍTICAS DE CONFIRMAÇÃO (OBRIGATÓRIAS):
 6. Quando todos os dados essenciais estiverem claros → readyToSave: true
 7. Fazer NO MÁXIMO uma confirmação final resumida antes de salvar
 
+PROIBIDO:
+- Perguntar "qual a data exata" / "dd/mm/aaaa"
+- Mencionar ISO 8601
+- Perguntar sobre fuso horário/timezone
+- Pedir cidade/UF como requisito
+
+REGRA CRÍTICA DE TEMPO RELATIVO:
+- "amanhã", "hoje", "segunda", etc. + horário explícito = DADO COMPLETO.
+- Nesses casos: needsConfirmation=false e readyToSave=true.
+- Se precisar confirmar, a única frase permitida é:
+  "Vou marcar [título] amanhã às 15h. Posso salvar assim?"
+
 REGRA CRÍTICA - FOCUS LOCK (TRAVA DE FOCO):
 - Se o usuário mencionar o mesmo compromisso 2-3 vezes seguidas (mesmo título/local/data), NÃO perguntar novamente qual compromisso é
 - Use o targetId do foco travado se disponível
@@ -162,7 +175,7 @@ FORMATO DE CONFIRMAÇÃO (quando realmente necessário):
 "Vou salvar: [título], [data/hora], [cidade opcional]. Posso salvar assim?"
 
 DADOS ESSENCIAIS POR INTENÇÃO:
-- create_appointment: title + scheduled_at (data/hora explícita) → readyToSave: true
+- create_appointment: título + (tempo relativo + horário) → readyToSave: true (scheduled_at pode ser null; backend converte)
 - register_expense: amount + description → readyToSave: true
 - register_revenue: amount + description → readyToSave: true
 
