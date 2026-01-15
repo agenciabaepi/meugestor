@@ -114,15 +114,21 @@ async function processWhatsAppMessage(
     if (!tenantInfo || !tenantInfo.user_id) {
       console.warn(`Tentativa de uso não autorizado do bot pelo número: ${from}`)
       
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.APP_URL ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        'https://seu-dominio.com'
+
       // Envia mensagem informando que é necessário cadastro
       await sendTextMessage(
         from,
         `🔒 *Acesso Restrito*\n\n` +
         `Para usar o *Meu Gestor*, você precisa:\n\n` +
-        `1️⃣ Criar uma conta em: https://seu-dominio.com/register\n` +
-        `2️⃣ Fazer login em: https://seu-dominio.com/login\n` +
+        `1️⃣ Criar uma conta em: ${appUrl}/register\n` +
+        `2️⃣ Fazer login em: ${appUrl}/login\n` +
         `3️⃣ Vincular seu número de WhatsApp no seu perfil\n\n` +
-        `*Este número não está vinculado a nenhuma conta.*\n` +
+        `*Este número (${from}) não está vinculado a nenhuma conta.*\n` +
         `Por segurança, apenas usuários cadastrados podem usar o bot.`
       )
       return
