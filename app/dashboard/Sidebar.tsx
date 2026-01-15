@@ -146,13 +146,13 @@ export function Sidebar() {
                   <div className="w-14 h-14 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white">
                     {/* Círculo interno branco com meia lua crescente */}
                     <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-inner">
-                      {/* Meia lua crescente branca - SVG de crescente */}
+                      {/* Meia lua crescente branca */}
                       <svg 
                         className="w-5 h-5" 
                         viewBox="0 0 24 24" 
-                        fill="none"
+                        fill="white"
                       >
-                        {/* Meia lua crescente - círculo branco com parte cortada */}
+                        {/* Meia lua crescente - círculo com parte interna cortada */}
                         <path 
                           d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.54 0 3-.37 4.29-1.02C15.37 20.5 13.5 20 12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.5 0 2.87.37 4.29 1.02C15.37 2.37 13.54 2 12 2z" 
                           fill="white"
