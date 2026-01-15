@@ -64,10 +64,10 @@ export default async function DashboardPage() {
   const data = await getDashboardData()
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+    <div className="space-y-6 lg:space-y-8">
+      <div className="mb-8 lg:mb-10">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Dashboard</h1>
+        <p className="text-base sm:text-lg text-gray-600">
           Visão geral das suas finanças e compromissos
         </p>
       </div>
