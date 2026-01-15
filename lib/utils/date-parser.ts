@@ -103,6 +103,32 @@ export function getTodayEndInBrazil(): string {
 }
 
 /**
+ * Obtém a data (YYYY-MM-DD) no timezone do Brasil, com offset de dias.
+ * Útil para construir ranges de "amanhã" de forma determinística.
+ */
+export function getBrazilDateString(dayOffset: number = 0, baseDate: Date = new Date()): string {
+  const brazilToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(baseDate)
+
+  const [year, month, day] = brazilToday.split('-').map(Number)
+
+  // Usa meio-dia UTC para evitar problemas de DST/offset em mudanças de dia
+  const anchor = new Date(Date.UTC(year, (month - 1), day, 12, 0, 0))
+  const shifted = new Date(anchor.getTime() + dayOffset * 24 * 60 * 60 * 1000)
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(shifted)
+}
+
+/**
  * Obtém o início do dia de ontem no timezone do Brasil
  * Retorna uma string no formato YYYY-MM-DD para uso em queries
  */
@@ -166,8 +192,8 @@ export function getCurrentDayInBrazil(): number {
  * @param minute Minuto (0-59), padrão 0
  * @param dayOffset Offset de dias a partir de hoje, padrão 0
  */
-export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: number = 0): Date {
-  const now = new Date()
+export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: number = 0, baseDate: Date = new Date()): Date {
+  const now = baseDate
   
   // Obtém a data atual no timezone do Brasil
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -277,6 +303,30 @@ export function createDateInBrazil(hour: number, minute: number = 0, dayOffset: 
   })
   
   return utcDate
+}
+
+/**
+ * Início do dia (00:00:00.000) no Brasil em ISO (UTC instant)
+ */
+export function getBrazilDayStartISO(dayOffset: number = 0, baseDate: Date = new Date()): string {
+  return createDateInBrazil(0, 0, dayOffset, baseDate).toISOString()
+}
+
+/**
+ * Fim do dia (23:59:59.999) no Brasil em ISO (UTC instant)
+ */
+export function getBrazilDayEndISO(dayOffset: number = 0, baseDate: Date = new Date()): string {
+  const endMinute = createDateInBrazil(23, 59, dayOffset, baseDate)
+  const end = new Date(endMinute.getTime() + 59 * 1000 + 999)
+  return end.toISOString()
+}
+
+export function getTomorrowStartISOInBrazil(baseDate: Date = new Date()): string {
+  return getBrazilDayStartISO(1, baseDate)
+}
+
+export function getTomorrowEndISOInBrazil(baseDate: Date = new Date()): string {
+  return getBrazilDayEndISO(1, baseDate)
 }
 
 /**

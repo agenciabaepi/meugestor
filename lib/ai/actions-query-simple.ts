@@ -18,7 +18,9 @@ import {
   getTodayEndInBrazil,
   getYesterdayStartInBrazil,
   getYesterdayEndInBrazil,
-  getNowInBrazil
+  getNowInBrazil,
+  getTomorrowStartISOInBrazil,
+  getTomorrowEndISOInBrazil
 } from '../utils/date-parser'
 import { filterBySemanticCategory } from '../utils/semantic-filter'
 
@@ -50,14 +52,10 @@ function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDat
         periodoTexto: 'hoje'
       }
     case 'amanhã': {
-      const amanhaInicio = new Date(now)
-      amanhaInicio.setDate(amanhaInicio.getDate() + 1)
-      amanhaInicio.setHours(0, 0, 0, 0)
-      const amanhaFim = new Date(amanhaInicio)
-      amanhaFim.setHours(23, 59, 59, 999)
       return {
-        startDate: amanhaInicio.toISOString(),
-        endDate: amanhaFim.toISOString(),
+        // Range do dia de amanhã no Brasil (instantes ISO UTC)
+        startDate: getTomorrowStartISOInBrazil(),
+        endDate: getTomorrowEndISOInBrazil(),
         periodoTexto: 'amanhã'
       }
     }
@@ -107,42 +105,16 @@ async function queryCompromissos(
   if (state.periodo === 'hoje') {
     compromissos = await getTodayCompromissos(tenantId)
   } else if (state.periodo === 'amanhã') {
-    const nowBrazil = getNowInBrazil()
-    const amanha = new Date(nowBrazil)
-    amanha.setDate(amanha.getDate() + 1)
-    amanha.setHours(0, 0, 0, 0)
-    const amanhaFim = new Date(amanha)
-    amanhaFim.setHours(23, 59, 59, 999)
-    
-    const todos = await getCompromissosRecords(
-      tenantId,
-      amanha.toISOString(),
-      amanhaFim.toISOString()
-    )
-    
-    // Filtra no cliente para garantir timezone correto
-    compromissos = todos.filter(c => {
-      const dataComp = new Date(c.scheduled_at)
-      const dataCompBR = dataComp.toLocaleDateString('en-CA', {
-        timeZone: 'America/Sao_Paulo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      })
-      const amanhaBR = amanha.toLocaleDateString('en-CA', {
-        timeZone: 'America/Sao_Paulo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      })
-      return dataCompBR === amanhaBR
-    })
+    // Range correto: amanhã no Brasil (00:00 -> 23:59:59.999)
+    const start = getTomorrowStartISOInBrazil()
+    const end = getTomorrowEndISOInBrazil()
+    compromissos = await getCompromissosRecords(tenantId, start, end)
   } else {
     const { startDate, endDate } = getDateRangeFromPeriodo(state.periodo || null)
     compromissos = await getCompromissosRecords(
       tenantId,
-      new Date(startDate).toISOString(),
-      endDate ? new Date(endDate).toISOString() : undefined
+      startDate,
+      endDate || undefined
     )
   }
   
