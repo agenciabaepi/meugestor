@@ -214,22 +214,28 @@ Quando a mensagem é curta (ex: "e hoje?", "e mercado?", "e combustível?", "e c
 1. Herdar TODOS os campos do contexto anterior que não foram mencionados na mensagem atual
 2. Aplicar APENAS as mudanças mencionadas na mensagem curta
 3. NUNCA resetar campos que não foram mencionados
+4. SEMPRE retornar período se houver no contexto anterior (mesmo que não mencionado na mensagem curta)
 
 EXEMPLOS CORRETOS:
 - Contexto: "quanto gastei ontem?" (periodo: "ontem", queryType: "gasto")
   → Nova: "e mercado?" 
-  → Resultado: { periodo: "ontem", queryType: "gasto", categoria: "Alimentação" }
-  → NÃO resetar período para "mês"!
+  → Resultado: { intent: "query", periodo: "ontem", queryType: "gasto", categoria: "Alimentação", domain: "financeiro" }
+  → IMPORTANTE: Retornou período "ontem" mesmo não mencionado! NÃO resetar para "mês"!
 
 - Contexto: "quanto gastei no mercado ontem?" (periodo: "ontem", categoria: "Alimentação")
   → Nova: "e combustível?"
-  → Resultado: { periodo: "ontem", queryType: "gasto", categoria: "Transporte" }
-  → Mudou categoria, MAS manteve período "ontem"!
+  → Resultado: { intent: "query", periodo: "ontem", queryType: "gasto", categoria: "Transporte", domain: "financeiro" }
+  → Mudou categoria, MAS retornou período "ontem" explicitamente!
 
 - Contexto: "quanto gastei ontem?" (periodo: "ontem")
   → Nova: "e hoje?"
-  → Resultado: { periodo: "hoje", queryType: "gasto" }
+  → Resultado: { intent: "query", periodo: "hoje", queryType: "gasto", domain: "financeiro" }
   → Mencionou novo período, então usa "hoje"
+
+REGRA DE OURO PARA FOLLOW-UPS:
+- Se a mensagem curta NÃO menciona período → SEMPRE retorne o período do contexto anterior
+- Se a mensagem curta menciona novo período → use o novo período
+- Mudança de categoria/subcategoria NUNCA deve resetar período
 
 REGRA DE OURO: Se não mencionar período na mensagem curta, SEMPRE herde do contexto anterior.
 ` : ''}

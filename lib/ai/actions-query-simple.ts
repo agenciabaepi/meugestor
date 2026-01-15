@@ -29,7 +29,10 @@ function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDat
   const now = getNowInBrazil()
   
   if (!periodo) {
-    // Default: este mês
+    // REGRA CRÍTICA: Default só é usado se NÃO existir contexto anterior
+    // Se período é null, significa que o GPT não retornou período
+    // Nesse caso, o sistema deve herdar do contexto (já feito em inheritContext)
+    // Se ainda assim for null aqui, significa que não há contexto, então usa default
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     return {
       startDate: startOfMonth.toISOString().split('T')[0],
