@@ -347,6 +347,12 @@ REGRAS IMPORTANTES:
 
 CATEGORIAS VÁLIDAS: Alimentação, Moradia, Saúde, Transporte, Educação, Lazer e Entretenimento, Compras Pessoais, Assinaturas e Serviços, Financeiro e Obrigações, Impostos e Taxas, Pets, Doações e Presentes, Trabalho e Negócios, Outros
 
+MAPEAMENTO SEMÂNTICO DE TERMOS COMUNS:
+- "mercado", "supermercado" → categoria: "Alimentação", subcategoria: "supermercado"
+- "combustível", "combustivel", "gasolina" → categoria: "Transporte", subcategoria: "combustível"
+- "cartão", "cartao" → categoria: "Financeiro e Obrigações", subcategoria: "cartão de crédito"
+- "restaurante" → categoria: "Alimentação", subcategoria: "restaurante"
+
 SUBCATEGORIAS POR CATEGORIA:
 - Alimentação: supermercado, feira, hortifruti, padaria, restaurante, lanchonete, delivery, café
 - Moradia: aluguel, condomínio, IPTU, água, energia elétrica, gás, internet, manutenção e reparos

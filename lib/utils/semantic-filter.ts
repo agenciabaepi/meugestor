@@ -26,47 +26,57 @@ const SEMANTIC_MAPPINGS: Record<string, {
   'mercado': {
     categories: ['Alimentação'],
     subcategories: ['supermercado', 'feira', 'hortifruti'],
-    keywords: ['mercado', 'supermercado', 'atacadão', 'atacado', 'hipermercado']
+    keywords: ['mercado', 'supermercado', 'atacadão', 'atacado', 'hipermercado', 'extra', 'carrefour', 'walmart', 'assai']
   },
   'supermercado': {
     categories: ['Alimentação'],
     subcategories: ['supermercado'],
-    keywords: ['supermercado', 'mercado', 'atacadão']
+    keywords: ['supermercado', 'mercado', 'atacadão', 'atacado', 'hipermercado']
+  },
+  'alimentação': {
+    categories: ['Alimentação'],
+    subcategories: ['supermercado', 'feira', 'hortifruti', 'padaria', 'restaurante', 'lanchonete', 'delivery'],
+    keywords: ['alimentação', 'alimentacao', 'comida', 'mercado', 'supermercado']
+  },
+  'alimentacao': {
+    categories: ['Alimentação'],
+    subcategories: ['supermercado', 'feira', 'hortifruti', 'padaria', 'restaurante', 'lanchonete', 'delivery'],
+    keywords: ['alimentação', 'alimentacao', 'comida', 'mercado', 'supermercado']
   },
   'combustível': {
     categories: ['Transporte'],
     subcategories: ['combustível'],
-    keywords: ['combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'posto']
+    keywords: ['combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'posto', 'abastecimento', 'abastecer']
   },
   'combustivel': {
     categories: ['Transporte'],
     subcategories: ['combustível'],
-    keywords: ['combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'posto']
+    keywords: ['combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'posto', 'abastecimento', 'abastecer']
   },
   'gasolina': {
     categories: ['Transporte'],
     subcategories: ['combustível'],
-    keywords: ['gasolina', 'combustível', 'combustivel', 'posto']
+    keywords: ['gasolina', 'combustível', 'combustivel', 'posto', 'abastecimento']
+  },
+  'transporte': {
+    categories: ['Transporte'],
+    subcategories: ['combustível', 'transporte público', 'aplicativos (Uber/99)', 'estacionamento'],
+    keywords: ['transporte', 'uber', '99', 'taxi', 'onibus', 'ônibus', 'metro', 'metrô', 'combustível', 'gasolina']
   },
   'cartão': {
     categories: ['Financeiro e Obrigações'],
     subcategories: ['cartão de crédito'],
-    keywords: ['cartão', 'cartao', 'credito', 'crédito', 'fatura']
+    keywords: ['cartão', 'cartao', 'credito', 'crédito', 'fatura', 'cartão de crédito']
   },
   'cartao': {
     categories: ['Financeiro e Obrigações'],
     subcategories: ['cartão de crédito'],
-    keywords: ['cartão', 'cartao', 'credito', 'crédito', 'fatura']
+    keywords: ['cartão', 'cartao', 'credito', 'crédito', 'fatura', 'cartão de crédito']
   },
   'restaurante': {
     categories: ['Alimentação'],
     subcategories: ['restaurante', 'lanchonete', 'delivery'],
-    keywords: ['restaurante', 'lanchonete', 'delivery', 'ifood', 'uber eats']
-  },
-  'transporte': {
-    categories: ['Transporte'],
-    subcategories: ['transporte público', 'aplicativos (Uber/99)', 'estacionamento'],
-    keywords: ['transporte', 'uber', '99', 'taxi', 'onibus', 'ônibus', 'metro', 'metrô']
+    keywords: ['restaurante', 'lanchonete', 'delivery', 'ifood', 'uber eats', 'rappi']
   }
 }
 
