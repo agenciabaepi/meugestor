@@ -138,27 +138,31 @@ export function Sidebar() {
 
           {/* Upgrade Card */}
           <div className="px-4 pb-4">
-            <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-2xl p-6 overflow-hidden">
+            <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-3xl p-6 pt-8 overflow-hidden shadow-xl">
               {/* Ícone circular no topo */}
-              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-10">
                 <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white/20">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-inner">
-                      <Sparkles className="w-5 h-5 text-[#7A5AF8]" />
+                  {/* Círculo externo com gradiente */}
+                  <div className="w-14 h-14 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                    {/* Círculo interno branco com ícone */}
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-inner relative overflow-hidden">
+                      {/* Efeito de meia lua/crescente */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-[#7A5AF8]/20 rounded-full"></div>
+                      <Sparkles className="w-5 h-5 text-[#7A5AF8] relative z-10" />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Conteúdo */}
-              <div className="pt-6 text-center">
+              <div className="pt-4 text-center">
                 <h3 className="text-lg font-bold text-white mb-2">
                   Upgrade to PRO
                 </h3>
-                <p className="text-sm text-white/90 mb-4 leading-relaxed">
+                <p className="text-sm text-white/95 mb-5 leading-relaxed px-1">
                   Melhore seu processo de gestão e faça mais com Meu Gestor PRO!
                 </p>
-                <button className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/30">
+                <button className="w-full bg-white/25 hover:bg-white/35 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg active:scale-[0.98]">
                   Upgrade to PRO
                 </button>
               </div>
