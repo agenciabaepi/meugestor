@@ -338,10 +338,8 @@ async function handleRegisterExpense(
 
     // Prepara metadados
     const metadata: Record<string, any> = {
-      establishment: data.establishment || null,
-      paymentMethod: data.paymentMethod || null,
       extractedAt: new Date().toISOString(),
-      confidence: data.confidence || 0.8,
+      confidence: state.confidence || 0.8,
     }
 
     // Cria o registro
@@ -439,10 +437,8 @@ async function handleRegisterRevenue(
 
     // Prepara metadados
     const metadata: Record<string, any> = {
-      source: data.source || data.establishment || null,
-      paymentMethod: data.paymentMethod || null,
       extractedAt: new Date().toISOString(),
-      confidence: data.confidence || 0.8,
+      confidence: state.confidence || 0.8,
     }
 
     // Cria o registro (única diferença: transactionType: 'revenue')
@@ -559,12 +555,12 @@ async function handleCreateAppointment(
 
     // Se ainda não tem título, usa padrão
     if (!title) {
-      title = data?.title || 'Compromisso'
+      title = state.title || 'Compromisso'
     }
 
     // Se ainda não tem data/hora, tenta processar o scheduled_at original
-    if (!scheduledAt && data?.scheduled_at) {
-      scheduledAt = parseScheduledAt(data.scheduled_at, data?.title, originalMessage)
+    if (!scheduledAt && state.scheduled_at) {
+      scheduledAt = parseScheduledAt(state.scheduled_at, state.title, originalMessage)
     }
 
     // Se ainda não tem data/hora, retorna erro
@@ -573,7 +569,7 @@ async function handleCreateAppointment(
       console.error('handleCreateAppointment - Dados finais:', {
         title,
         scheduledAt,
-        data_scheduled_at: data?.scheduled_at,
+        state_scheduled_at: state.scheduled_at,
         originalMessage
       })
       return {
@@ -656,7 +652,7 @@ async function handleCreateAppointment(
 
     return {
       success: true,
-      message: `✅ Compromisso agendado!\n\n📅 ${title}\n🕐 ${new Date(scheduledAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}${data?.description ? `\n📝 ${data.description}` : ''}`,
+      message: `✅ Compromisso agendado!\n\n📅 ${title}\n🕐 ${new Date(scheduledAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}${state.description ? `\n📝 ${state.description}` : ''}`,
       data: compromisso,
     }
   } catch (error) {
@@ -683,6 +679,16 @@ async function handleCreateAppointment(
  * Apenas valida e executa baseado no estado
  * 
  * Função handleQuery antiga removida - substituída por handleQuerySimple em actions-query-simple.ts
+ */
+
+/**
+ * Gera relatório completo (financeiro + compromissos)
+ */
+async function handleReport(tenantId: string): Promise<ActionResult> {
+  try {
+    const now = new Date()
+    
+    // Busca relatório financeiro mensal
     const relatorio = await gerarResumoMensal(tenantId)
 
     // Busca TODOS os compromissos futuros (sem limite)
