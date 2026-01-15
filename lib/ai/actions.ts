@@ -3,7 +3,7 @@
  */
 
 import { analyzeIntention } from './conversation'
-import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory } from '../services/financeiro'
+import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
 import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
 import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relatorios'
 import { getFinanceiroRecords } from '../services/financeiro'
@@ -63,6 +63,29 @@ function validateAndCorrectIntention(
   // Verifica se há palavras de receita na mensagem
   const hasRevenueKeyword = revenueKeywords.some(keyword => lowerMessage.includes(keyword))
   const hasExpenseKeyword = expenseKeywords.some(keyword => lowerMessage.includes(keyword))
+  
+  // Palavras-chave que indicam CONSULTA DE GASTOS (não compromissos)
+  const expenseQueryKeywords = [
+    'quanto gastei', 'quantos gastei', 'quanto gasto', 'quantos gasto',
+    'quanto paguei', 'quantos paguei', 'quanto pago', 'quantos pago',
+    'quanto despesa', 'quantos despesa'
+  ]
+  
+  // Verifica se é consulta de gastos (deve ser query, não compromissos)
+  const isExpenseQuery = expenseQueryKeywords.some(keyword => lowerMessage.includes(keyword)) ||
+                         (hasExpenseKeyword && (lowerMessage.includes('quanto') || lowerMessage.includes('quantos')))
+  
+  // Se detectou compromissos mas a mensagem é sobre gastos, corrige para query de gastos
+  if (detectedIntention === 'query' && extractedData?.queryType === 'compromissos' && isExpenseQuery) {
+    console.log('⚠️ Correção: Era "compromissos", mas é sobre gastos. Corrigindo queryType.')
+    if (extractedData) {
+      extractedData.queryType = 'gasto'
+      extractedData.queryPeriod = lowerMessage.includes('ontem') ? 'ontem' :
+                                  lowerMessage.includes('hoje') ? 'hoje' :
+                                  lowerMessage.includes('semana') ? 'semana' :
+                                  lowerMessage.includes('mês') || lowerMessage.includes('mes') ? 'mês' : undefined
+    }
+  }
   
   // Se detectou receita mas a IA disse que é despesa, corrige
   if (hasRevenueKeyword && detectedIntention === 'register_expense') {
@@ -610,19 +633,33 @@ async function handleQuery(
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0]
 
-    // PRIORIDADE 1: Consulta de compromissos (verificar ANTES de gastos)
+    // PRIORIDADE 0: Verifica se é sobre GASTOS/DESPESAS primeiro (mais comum)
+    // Se menciona palavras de gasto, NÃO é sobre compromissos
+    const isAboutExpenses = lowerMessage.includes('gastei') || 
+                           lowerMessage.includes('gasto') || 
+                           lowerMessage.includes('gastar') ||
+                           lowerMessage.includes('gastos') ||
+                           lowerMessage.includes('despesa') ||
+                           lowerMessage.includes('despesas') ||
+                           lowerMessage.includes('paguei') ||
+                           lowerMessage.includes('pago') ||
+                           (lowerMessage.includes('quanto') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto'))) ||
+                           (lowerMessage.includes('quantos') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')))
+    
+    // PRIORIDADE 1: Consulta de compromissos (APENAS se NÃO for sobre gastos)
     // Verifica se é pergunta sobre compromissos/agenda
-    if (extractedData?.queryType === 'compromissos' || 
+    if (!isAboutExpenses && (
+        extractedData?.queryType === 'compromissos' || 
         extractedData?.queryType === 'agenda' ||
-        lowerMessage.includes('compromisso') || 
-        lowerMessage.includes('agenda') ||
-        lowerMessage.includes('reunião') ||
-        lowerMessage.includes('reuniao') ||
-        (lowerMessage.includes('quantos') && (lowerMessage.includes('tenho') || lowerMessage.includes('tem'))) ||
-        (lowerMessage.includes('quais') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda'))) ||
-        (lowerMessage.includes('tenho') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda') || lowerMessage.includes('reunião'))) ||
-        (lowerMessage.includes('amanhã') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda'))) ||
-        (lowerMessage.includes('amanha') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')))) {
+        (lowerMessage.includes('compromisso') && !lowerMessage.includes('gasto')) || 
+        (lowerMessage.includes('agenda') && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('reunião') && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('reuniao') && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('quantos') && (lowerMessage.includes('tenho') || lowerMessage.includes('tem')) && !lowerMessage.includes('gastei') && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('quais') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('tenho') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda') || lowerMessage.includes('reunião')) && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('amanhã') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) && !lowerMessage.includes('gasto')) ||
+        (lowerMessage.includes('amanha') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) && !lowerMessage.includes('gasto')))) {
       
       console.log('handleQuery - Consulta de COMPROMISSOS detectada')
       
@@ -803,35 +840,68 @@ async function handleQuery(
         lowerMessage.includes('combustivel') ||
         lowerMessage.includes('gasolina')) {
       
-      // Tenta buscar por subcategoria primeiro
-      const registrosSub = await getFinanceiroBySubcategoryRecords(
-        tenantId,
-        'Combustível',
-        startOfMonthStr
+      // Detecta período específico
+      const isHoje = lowerMessage.includes('hoje')
+      const isOntem = lowerMessage.includes('ontem')
+      const isSemana = lowerMessage.includes('semana')
+      
+      let startDate = startOfMonthStr
+      let endDate: string | undefined
+      let periodoTexto = 'este mês'
+      
+      if (isHoje) {
+        const hoje = new Date(now)
+        hoje.setHours(0, 0, 0, 0)
+        const hojeFim = new Date(now)
+        hojeFim.setHours(23, 59, 59, 999)
+        startDate = hoje.toISOString().split('T')[0]
+        endDate = hojeFim.toISOString().split('T')[0]
+        periodoTexto = 'hoje'
+      } else if (isOntem) {
+        const ontem = new Date(now)
+        ontem.setDate(ontem.getDate() - 1)
+        ontem.setHours(0, 0, 0, 0)
+        const ontemFim = new Date(ontem)
+        ontemFim.setHours(23, 59, 59, 999)
+        startDate = ontem.toISOString().split('T')[0]
+        endDate = ontemFim.toISOString().split('T')[0]
+        periodoTexto = 'ontem'
+      } else if (isSemana) {
+        const semanaInicio = new Date(now)
+        semanaInicio.setDate(semanaInicio.getDate() - 7)
+        semanaInicio.setHours(0, 0, 0, 0)
+        startDate = semanaInicio.toISOString().split('T')[0]
+        endDate = now.toISOString().split('T')[0]
+        periodoTexto = 'esta semana'
+      }
+      
+      // Busca APENAS DESPESAS
+      const registrosSub = await getDespesasRecords(tenantId, startDate, endDate)
+      const combustivelRecords = registrosSub.filter(r => 
+        r.subcategory === 'Combustível' || 
+        (r.category === 'Transporte' && (r.subcategory?.toLowerCase().includes('combust') || r.description.toLowerCase().includes('gasolina')))
       )
       
-      if (registrosSub.length > 0) {
-        const total = registrosSub.reduce((sum, r) => sum + Number(r.amount), 0)
-        const avgPerMonth = total
+      if (combustivelRecords.length > 0) {
+        const total = combustivelRecords.reduce((sum, r) => sum + Number(r.amount), 0)
         
         return {
           success: true,
-          message: `⛽ Gastos com Combustível (este mês):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${registrosSub.length}\n📊 Média: R$ ${(total / registrosSub.length).toFixed(2)} por abastecimento\n\n${registrosSub.slice(0, 5).map(r => 
+          message: `⛽ Gastos com Combustível (${periodoTexto}):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${combustivelRecords.length}\n📊 Média: R$ ${(total / combustivelRecords.length).toFixed(2)} por abastecimento\n\n${combustivelRecords.slice(0, 5).map(r => 
             `• ${r.description} - R$ ${Number(r.amount).toFixed(2)} (${new Date(r.date).toLocaleDateString('pt-BR')})`
           ).join('\n')}`,
-          data: { registros: registrosSub, total },
+          data: { registros: combustivelRecords, total },
         }
       }
       
       // Se não encontrou por subcategoria, busca por categoria Transporte
-      const registros = await getFinanceiroRecords(tenantId, startOfMonthStr)
-      const transportRecords = registros.filter(r => r.category === 'Transporte')
+      const transportRecords = registrosSub.filter(r => r.category === 'Transporte')
       
       if (transportRecords.length > 0) {
         const total = transportRecords.reduce((sum, r) => sum + Number(r.amount), 0)
         return {
           success: true,
-          message: `🚗 Gastos com Transporte (este mês):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${transportRecords.length}\n\n${transportRecords.slice(0, 5).map(r => 
+          message: `🚗 Gastos com Transporte (${periodoTexto}):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${transportRecords.length}\n\n${transportRecords.slice(0, 5).map(r => 
             `• ${r.description} - R$ ${Number(r.amount).toFixed(2)}${r.subcategory ? ` (${r.subcategory})` : ''}`
           ).join('\n')}`,
           data: { registros: transportRecords, total },
@@ -841,36 +911,149 @@ async function handleQuery(
 
     // Consulta por categoria específica
     if (extractedData?.queryCategory) {
-      const total = await calculateTotalByCategory(
-        tenantId,
-        extractedData.queryCategory,
-        startOfMonthStr
-      )
+      // Detecta período específico
+      const isHoje = lowerMessage.includes('hoje')
+      const isOntem = lowerMessage.includes('ontem')
+      const isSemana = lowerMessage.includes('semana')
       
-      const registros = await getFinanceiroRecords(tenantId, startOfMonthStr)
+      let startDate = startOfMonthStr
+      let endDate: string | undefined
+      let periodoTexto = 'este mês'
+      
+      if (isHoje) {
+        const hoje = new Date(now)
+        hoje.setHours(0, 0, 0, 0)
+        const hojeFim = new Date(now)
+        hojeFim.setHours(23, 59, 59, 999)
+        startDate = hoje.toISOString().split('T')[0]
+        endDate = hojeFim.toISOString().split('T')[0]
+        periodoTexto = 'hoje'
+      } else if (isOntem) {
+        const ontem = new Date(now)
+        ontem.setDate(ontem.getDate() - 1)
+        ontem.setHours(0, 0, 0, 0)
+        const ontemFim = new Date(ontem)
+        ontemFim.setHours(23, 59, 59, 999)
+        startDate = ontem.toISOString().split('T')[0]
+        endDate = ontemFim.toISOString().split('T')[0]
+        periodoTexto = 'ontem'
+      } else if (isSemana) {
+        const semanaInicio = new Date(now)
+        semanaInicio.setDate(semanaInicio.getDate() - 7)
+        semanaInicio.setHours(0, 0, 0, 0)
+        startDate = semanaInicio.toISOString().split('T')[0]
+        endDate = now.toISOString().split('T')[0]
+        periodoTexto = 'esta semana'
+      }
+      
+      // Busca APENAS DESPESAS da categoria
+      const registros = await getDespesasRecords(tenantId, startDate, endDate)
       const categoryRecords = registros.filter(r => r.category === extractedData.queryCategory)
+      const total = categoryRecords.reduce((sum, r) => sum + Number(r.amount), 0)
       
       return {
         success: true,
-        message: `📊 Gastos em ${extractedData.queryCategory} (este mês):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${categoryRecords.length}\n\n${categoryRecords.slice(0, 5).map(r => 
+        message: `📊 Gastos em ${extractedData.queryCategory} (${periodoTexto}):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${categoryRecords.length}\n\n${categoryRecords.slice(0, 5).map(r => 
           `• ${r.description} - R$ ${Number(r.amount).toFixed(2)}${r.subcategory ? ` (${r.subcategory})` : ''}`
         ).join('\n')}`,
         data: { registros: categoryRecords, total },
       }
     }
 
-    // Consulta geral de gastos
-    if (lowerMessage.includes('gasto') || lowerMessage.includes('gastei') || lowerMessage.includes('quanto')) {
-      const registros = await getFinanceiroRecords(tenantId, startOfMonthStr)
+    // Consulta geral de gastos/despesas
+    // IMPORTANTE: Detecta período específico (hoje, ontem, semana, mês)
+    if (lowerMessage.includes('gasto') || lowerMessage.includes('gastei') || 
+        (lowerMessage.includes('quanto') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')))) {
+      
+      // Detecta período específico na pergunta
+      // IMPORTANTE: Verifica "só hoje", "apenas hoje", "hoje" para garantir detecção correta
+      const isHoje = lowerMessage.includes('hoje') || lowerMessage.includes('só hoje') || lowerMessage.includes('apenas hoje')
+      const isOntem = lowerMessage.includes('ontem') || lowerMessage.includes('só ontem') || lowerMessage.includes('apenas ontem')
+      const isSemana = lowerMessage.includes('semana') && !lowerMessage.includes('mês') && !lowerMessage.includes('mes')
+      const isMes = lowerMessage.includes('mês') || lowerMessage.includes('mes') || lowerMessage.includes('mensal')
+      
+      console.log('handleQuery - Detecção de período:', { isHoje, isOntem, isSemana, isMes, lowerMessage })
+      
+      let startDate: string
+      let endDate: string | undefined
+      let periodoTexto = 'este mês'
+      
+      if (isHoje) {
+        // Gastos de HOJE - usa timezone do Brasil
+        const hoje = new Date(now)
+        hoje.setHours(0, 0, 0, 0)
+        const hojeFim = new Date(now)
+        hojeFim.setHours(23, 59, 59, 999)
+        // Usa apenas a data (YYYY-MM-DD) para comparação no banco
+        startDate = hoje.toISOString().split('T')[0]
+        endDate = hojeFim.toISOString().split('T')[0]
+        periodoTexto = 'hoje'
+        console.log('handleQuery - Buscando gastos de HOJE:', { startDate, endDate, now: now.toISOString() })
+      } else if (isOntem) {
+        // Gastos de ONTEM
+        const ontem = new Date(now)
+        ontem.setDate(ontem.getDate() - 1)
+        ontem.setHours(0, 0, 0, 0)
+        const ontemFim = new Date(ontem)
+        ontemFim.setHours(23, 59, 59, 999)
+        startDate = ontem.toISOString().split('T')[0]
+        endDate = ontemFim.toISOString().split('T')[0]
+        periodoTexto = 'ontem'
+      } else if (isSemana) {
+        // Gastos da SEMANA (últimos 7 dias)
+        const semanaInicio = new Date(now)
+        semanaInicio.setDate(semanaInicio.getDate() - 7)
+        semanaInicio.setHours(0, 0, 0, 0)
+        startDate = semanaInicio.toISOString().split('T')[0]
+        endDate = now.toISOString().split('T')[0]
+        periodoTexto = 'esta semana'
+      } else if (isMes) {
+        // Gastos do MÊS
+        startDate = startOfMonthStr
+        periodoTexto = 'este mês'
+      } else {
+        // Se não especificou período, mas perguntou sobre gastos, assume ESTE MÊS
+        // (mais útil para perguntas genéricas como "quanto gastei?")
+        startDate = startOfMonthStr
+        periodoTexto = 'este mês'
+      }
+      
+      // Busca APENAS DESPESAS (não receitas)
+      const registros = await getDespesasRecords(tenantId, startDate, endDate)
       const total = registros.reduce((sum, r) => sum + Number(r.amount), 0)
 
-      // Agrupa por categoria
+      // Se não há gastos no período, retorna mensagem simples
+      if (registros.length === 0) {
+        return {
+          success: true,
+          message: `💰 Você não teve despesas ${periodoTexto === 'hoje' ? 'hoje' : periodoTexto === 'ontem' ? 'ontem' : periodoTexto === 'esta semana' ? 'nesta semana' : 'este mês'}.`,
+          data: { registros: [], total: 0 },
+        }
+      }
+
+      // Para perguntas específicas (hoje, ontem), retorna resposta mais simples
+      if (isHoje || isOntem) {
+        let response = `💰 Seus gastos ${periodoTexto}:\n\n`
+        response += `Total: R$ ${total.toFixed(2)}\n`
+        response += `Registros: ${registros.length}\n\n`
+        response += `Detalhes:\n${registros.map(r => 
+          `• ${r.description} - R$ ${Number(r.amount).toFixed(2)} (${r.category}${r.subcategory ? ` - ${r.subcategory}` : ''})`
+        ).join('\n')}`
+        
+        return {
+          success: true,
+          message: response,
+          data: { registros, total },
+        }
+      }
+
+      // Para períodos maiores (semana, mês), mostra resumo com categorias
       const porCategoria: Record<string, number> = {}
       registros.forEach(r => {
         porCategoria[r.category] = (porCategoria[r.category] || 0) + Number(r.amount)
       })
 
-      let response = `📊 Seus gastos (este mês):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${registros.length}\n\n`
+      let response = `📊 Seus gastos (${periodoTexto}):\n\n💰 Total: R$ ${total.toFixed(2)}\n📝 Registros: ${registros.length}\n\n`
       
       if (Object.keys(porCategoria).length > 0) {
         response += `Por categoria:\n`

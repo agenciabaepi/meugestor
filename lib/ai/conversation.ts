@@ -223,10 +223,28 @@ IMPORTANTE - DISTINÇÃO ENTRE QUERY E REPORT:
 - query: perguntas específicas sobre dados existentes (ex: "quantos compromissos tenho?", "quanto gastei?", "quais são meus compromissos amanhã?")
 - report: pedido de relatório completo ou resumo geral (ex: "me mostre um relatório", "resumo dos meus gastos", "relatório financeiro")
 
+IMPORTANTE - INTERPRETAÇÃO DE PERÍODOS EM CONSULTAS:
+Quando o usuário fizer uma pergunta sobre gastos/receitas, SEMPRE identifique o período mencionado:
+- "quanto gastei HOJE?" → queryPeriod: "hoje" (NÃO "mês")
+- "quanto gastei ONTEM?" → queryPeriod: "ontem"
+- "quanto gastei esta SEMANA?" → queryPeriod: "semana"
+- "quanto gastei este MÊS?" → queryPeriod: "mês"
+- Se não mencionar período específico, mas perguntar "quanto gastei?", assuma "hoje" (mais útil)
+- NUNCA assuma "mês" quando o usuário perguntar sobre "hoje" ou "ontem"
+- Extraia queryPeriod corretamente para que o sistema filtre os dados pelo período correto
+
+IMPORTANTE - DISTINÇÃO CRÍTICA ENTRE GASTOS E COMPROMISSOS:
+- Se a mensagem menciona "gastei", "gasto", "gastar", "despesa", "paguei" → SEMPRE é sobre GASTOS, NUNCA sobre compromissos
+- "quantos eu gastei?" → query sobre GASTOS (queryType: "gasto" ou "despesa"), NÃO sobre compromissos
+- "quantos eu gastei ontem?" → query sobre GASTOS no período "ontem", NÃO sobre compromissos
+- "quanto gastei hoje?" → query sobre GASTOS no período "hoje", NÃO sobre compromissos
+- Só use queryType: "compromissos" se a mensagem EXPLICITAMENTE menciona "compromisso", "agenda", "reunião" E NÃO menciona "gastei", "gasto", "despesa"
+
 IMPORTANTE - CONSULTAS SOBRE COMPROMISSOS:
 Se o usuário perguntar sobre compromissos (ex: "quantos compromissos tenho?", "quais são meus compromissos amanhã?", "tenho compromissos hoje?"), SEMPRE use intenção "query" com:
 - queryType: "compromissos" ou "agenda"
 - queryPeriod: período mencionado (hoje, amanhã, semana, mês, etc)
+- IMPORTANTE: Se a mensagem menciona "gastei", "gasto", "despesa", "paguei", NÃO é sobre compromissos, é sobre gastos!
 
 DISTINÇÃO CRÍTICA ENTRE RECEITA E DESPESA:
 Para identificar se é RECEITA (register_revenue) ou DESPESA (register_expense), analise as palavras-chave na mensagem:
@@ -314,6 +332,9 @@ EXEMPLOS DE DESPESAS (register_expense):
 
 EXEMPLOS DE OUTRAS INTENÇÕES:
 - "quanto gasto por mês de combustível?" -> query, queryType: "categoria", queryCategory: "Transporte", queryPeriod: "mês"
+- "quanto gastei hoje?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "hoje" (NÃO "compromissos")
+- "quantos eu gastei ontem?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "ontem" (NÃO "compromissos")
+- "quanto gastei esta semana?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "semana" (NÃO "compromissos")
 - "quantos compromissos tenho amanhã?" -> query, queryType: "compromissos", queryPeriod: "amanhã"
 - "quais são meus compromissos hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
 - "tenho algum compromisso hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
@@ -326,6 +347,13 @@ EXEMPLOS DE OUTRAS INTENÇÕES:
 REGRA CRÍTICA - PERGUNTAS SOBRE COMPROMISSOS:
 Se a mensagem contém palavras como "compromissos", "agenda", "reuniões", "eventos" combinadas com perguntas (quantos, quais, tenho, tem), SEMPRE use intenção "query" com queryType: "compromissos".
 NUNCA use "report" para perguntas sobre compromissos.
+
+REGRA CRÍTICA - PERGUNTAS SOBRE GASTOS vs COMPROMISSOS:
+- Se a mensagem contém "gastei", "gasto", "gastar", "despesa", "paguei" → SEMPRE é sobre GASTOS, NUNCA sobre compromissos
+- "quantos eu gastei?" → queryType: "gasto" ou "despesa" (NÃO "compromissos")
+- "quanto gastei ontem?" → queryType: "gasto" ou "despesa", queryPeriod: "ontem" (NÃO "compromissos")
+- "quantos eu gastei hoje?" → queryType: "gasto" ou "despesa", queryPeriod: "hoje" (NÃO "compromissos")
+- Só use queryType: "compromissos" se a mensagem EXPLICITAMENTE menciona "compromisso", "agenda", "reunião" E NÃO menciona palavras de gasto
 
 IMPORTANTE: 
 - scheduled_at DEVE estar em formato ISO 8601 completo com timezone (ex: "2024-01-15T12:00:00.000Z")
