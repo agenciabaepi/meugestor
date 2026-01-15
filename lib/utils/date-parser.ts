@@ -77,6 +77,68 @@ export function getCurrentHourInBrazil(): number {
 }
 
 /**
+ * Obtém o início do dia atual no timezone do Brasil (00:00:00)
+ * Retorna uma string no formato YYYY-MM-DD para uso em queries
+ */
+export function getTodayStartInBrazil(): string {
+  const now = new Date()
+  const brazilDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now)
+  
+  return brazilDate // Retorna no formato YYYY-MM-DD
+}
+
+/**
+ * Obtém o fim do dia atual no timezone do Brasil (23:59:59)
+ * Retorna uma string no formato YYYY-MM-DD para uso em queries
+ */
+export function getTodayEndInBrazil(): string {
+  // Para queries de data, o fim do dia é o mesmo dia (YYYY-MM-DD)
+  // O banco compara apenas a data, não a hora
+  return getTodayStartInBrazil()
+}
+
+/**
+ * Obtém o início do dia de ontem no timezone do Brasil
+ * Retorna uma string no formato YYYY-MM-DD para uso em queries
+ */
+export function getYesterdayStartInBrazil(): string {
+  const now = new Date()
+  // Obtém a data atual no timezone do Brasil
+  const brazilToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now)
+  
+  // Converte para Date e subtrai 1 dia
+  const [year, month, day] = brazilToday.split('-').map(Number)
+  const todayDate = new Date(year, month - 1, day)
+  todayDate.setDate(todayDate.getDate() - 1)
+  
+  // Formata como YYYY-MM-DD
+  const yesterdayYear = todayDate.getFullYear()
+  const yesterdayMonth = String(todayDate.getMonth() + 1).padStart(2, '0')
+  const yesterdayDay = String(todayDate.getDate()).padStart(2, '0')
+  
+  return `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`
+}
+
+/**
+ * Obtém o fim do dia de ontem no timezone do Brasil
+ * Retorna uma string no formato YYYY-MM-DD para uso em queries
+ */
+export function getYesterdayEndInBrazil(): string {
+  // Para queries de data, o fim do dia é o mesmo dia
+  return getYesterdayStartInBrazil()
+}
+
+/**
  * Obtém o dia da semana atual no timezone do Brasil (0 = domingo, 6 = sábado)
  */
 export function getCurrentDayInBrazil(): number {

@@ -10,7 +10,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
-import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil } from '../utils/date-parser'
+import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 
 export interface ActionResult {
@@ -850,22 +850,25 @@ async function handleQuery(
       let periodoTexto = 'este mês'
       
       if (isHoje) {
-        const hoje = new Date(now)
-        hoje.setHours(0, 0, 0, 0)
-        const hojeFim = new Date(now)
-        hojeFim.setHours(23, 59, 59, 999)
-        startDate = hoje.toISOString().split('T')[0]
-        endDate = hojeFim.toISOString().split('T')[0]
+        // Gastos de HOJE - usa timezone do Brasil corretamente
+        startDate = getTodayStartInBrazil()
+        endDate = getTodayEndInBrazil()
         periodoTexto = 'hoje'
+        console.log('handleQuery - Buscando gastos de HOJE (combustível):', { 
+          startDate, 
+          endDate,
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
       } else if (isOntem) {
-        const ontem = new Date(now)
-        ontem.setDate(ontem.getDate() - 1)
-        ontem.setHours(0, 0, 0, 0)
-        const ontemFim = new Date(ontem)
-        ontemFim.setHours(23, 59, 59, 999)
-        startDate = ontem.toISOString().split('T')[0]
-        endDate = ontemFim.toISOString().split('T')[0]
+        // Gastos de ONTEM - usa timezone do Brasil corretamente
+        startDate = getYesterdayStartInBrazil()
+        endDate = getYesterdayEndInBrazil()
         periodoTexto = 'ontem'
+        console.log('handleQuery - Buscando gastos de ONTEM (combustível):', { 
+          startDate, 
+          endDate,
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
       } else if (isSemana) {
         const semanaInicio = new Date(now)
         semanaInicio.setDate(semanaInicio.getDate() - 7)
@@ -921,22 +924,25 @@ async function handleQuery(
       let periodoTexto = 'este mês'
       
       if (isHoje) {
-        const hoje = new Date(now)
-        hoje.setHours(0, 0, 0, 0)
-        const hojeFim = new Date(now)
-        hojeFim.setHours(23, 59, 59, 999)
-        startDate = hoje.toISOString().split('T')[0]
-        endDate = hojeFim.toISOString().split('T')[0]
+        // Gastos de HOJE - usa timezone do Brasil corretamente
+        startDate = getTodayStartInBrazil()
+        endDate = getTodayEndInBrazil()
         periodoTexto = 'hoje'
+        console.log('handleQuery - Buscando gastos de HOJE (categoria):', { 
+          startDate, 
+          endDate,
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
       } else if (isOntem) {
-        const ontem = new Date(now)
-        ontem.setDate(ontem.getDate() - 1)
-        ontem.setHours(0, 0, 0, 0)
-        const ontemFim = new Date(ontem)
-        ontemFim.setHours(23, 59, 59, 999)
-        startDate = ontem.toISOString().split('T')[0]
-        endDate = ontemFim.toISOString().split('T')[0]
+        // Gastos de ONTEM - usa timezone do Brasil corretamente
+        startDate = getYesterdayStartInBrazil()
+        endDate = getYesterdayEndInBrazil()
         periodoTexto = 'ontem'
+        console.log('handleQuery - Buscando gastos de ONTEM (categoria):', { 
+          startDate, 
+          endDate,
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
       } else if (isSemana) {
         const semanaInicio = new Date(now)
         semanaInicio.setDate(semanaInicio.getDate() - 7)
@@ -979,26 +985,27 @@ async function handleQuery(
       let periodoTexto = 'este mês'
       
       if (isHoje) {
-        // Gastos de HOJE - usa timezone do Brasil
-        const hoje = new Date(now)
-        hoje.setHours(0, 0, 0, 0)
-        const hojeFim = new Date(now)
-        hojeFim.setHours(23, 59, 59, 999)
-        // Usa apenas a data (YYYY-MM-DD) para comparação no banco
-        startDate = hoje.toISOString().split('T')[0]
-        endDate = hojeFim.toISOString().split('T')[0]
+        // Gastos de HOJE - usa timezone do Brasil corretamente
+        startDate = getTodayStartInBrazil()
+        endDate = getTodayEndInBrazil()
         periodoTexto = 'hoje'
-        console.log('handleQuery - Buscando gastos de HOJE:', { startDate, endDate, now: now.toISOString() })
+        console.log('handleQuery - Buscando gastos de HOJE:', { 
+          startDate, 
+          endDate, 
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          nowUTC: now.toISOString()
+        })
       } else if (isOntem) {
-        // Gastos de ONTEM
-        const ontem = new Date(now)
-        ontem.setDate(ontem.getDate() - 1)
-        ontem.setHours(0, 0, 0, 0)
-        const ontemFim = new Date(ontem)
-        ontemFim.setHours(23, 59, 59, 999)
-        startDate = ontem.toISOString().split('T')[0]
-        endDate = ontemFim.toISOString().split('T')[0]
+        // Gastos de ONTEM - usa timezone do Brasil corretamente
+        startDate = getYesterdayStartInBrazil()
+        endDate = getYesterdayEndInBrazil()
         periodoTexto = 'ontem'
+        console.log('handleQuery - Buscando gastos de ONTEM:', { 
+          startDate, 
+          endDate,
+          nowBrazil: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          nowUTC: now.toISOString()
+        })
       } else if (isSemana) {
         // Gastos da SEMANA (últimos 7 dias)
         const semanaInicio = new Date(now)
