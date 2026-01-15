@@ -12,6 +12,7 @@ import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
+import { extractContextFromConversations, isContinuationQuestion, reconstructContinuationMessage } from './context-manager'
 
 export interface ActionResult {
   success: boolean
@@ -119,9 +120,32 @@ export async function processAction(
       message: c.message
     }))
     
+    // Extrai contexto conversacional (memória curta)
+    const conversationContext = extractContextFromConversations(recentContext)
+    console.log('processAction - Contexto extraído:', conversationContext)
+    
+    // Detecta perguntas de continuação e reconstrói usando contexto
+    let effectiveMessage = message
+    let contextExtractedData: any = {}
+    
+    if (isContinuationQuestion(message) && conversationContext) {
+      console.log('processAction - PERGUNTA DE CONTINUAÇÃO detectada, reconstruindo...')
+      const reconstructed = reconstructContinuationMessage(message, conversationContext)
+      effectiveMessage = reconstructed.message
+      contextExtractedData = reconstructed.extractedData
+      console.log('processAction - Mensagem reconstruída:', {
+        original: message,
+        reconstruida: effectiveMessage,
+        extractedData: contextExtractedData
+      })
+    }
+    
     // Analisa a intenção com contexto
     console.log('processAction - Analisando intenção com contexto...')
-    const { intention, extractedData } = await analyzeIntention(message, recentContext)
+    const { intention, extractedData: aiExtractedData } = await analyzeIntention(effectiveMessage, recentContext)
+    
+    // Mescla dados extraídos do contexto com dados da IA
+    const extractedData = { ...contextExtractedData, ...aiExtractedData }
 
     console.log('processAction - Intenção detectada:', intention)
     console.log('processAction - Dados extraídos:', JSON.stringify(extractedData, null, 2))
@@ -221,6 +245,29 @@ export async function processAction(
         return await handleCreateAppointment(extractedData, tenantId, message)
 
       case 'query':
+        // Validação anti-burrice: verifica se a intenção corresponde ao domínio
+        const queryDomain = extractedData?.domain || 
+                           (extractedData?.queryType === 'gasto' ? 'financeiro' : 
+                            extractedData?.queryType === 'compromissos' ? 'agenda' : null)
+        
+        console.log('processAction - Validação de domínio:', {
+          queryDomain,
+          queryType: extractedData?.queryType,
+          intention: correctedIntention
+        })
+        
+        // Se detectou query mas não tem domínio claro, tenta inferir da mensagem
+        if (!queryDomain && !extractedData?.queryType) {
+          const lowerMessage = message.toLowerCase()
+          if (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')) {
+            extractedData.queryType = 'gasto'
+            extractedData.domain = 'financeiro'
+          } else if (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) {
+            extractedData.queryType = 'compromissos'
+            extractedData.domain = 'agenda'
+          }
+        }
+        
         return await handleQuery(message, tenantId, extractedData, recentContext)
 
       case 'report':
@@ -639,80 +686,52 @@ async function handleQuery(
   try {
     const lowerMessage = message.toLowerCase()
     
-    // Detecta perguntas de continuação e reconstrói usando contexto
-    // Padrões mais flexíveis para capturar variações
-    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes|agora))[?]?\.?$/i.test(lowerMessage.trim()) ||
-                                   /^(e\s+isso)[?]?\.?$/i.test(lowerMessage.trim()) ||
-                                   lowerMessage.trim() === 'e hoje' ||
-                                   lowerMessage.trim() === 'e ontem' ||
-                                   lowerMessage.trim() === 'e amanhã' ||
-                                   lowerMessage.trim() === 'e amanha'
+    // Extrai contexto conversacional (memória curta)
+    const conversationContext = extractContextFromConversations(recentConversations || [])
     
-    let effectiveMessage = message
+    // Detecta perguntas de continuação e reconstrói usando contexto
     let shouldForceExpenseQuery = false
     let forcedPeriod: string | undefined = undefined
     
-    if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
+    if (isContinuationQuestion(message) && conversationContext) {
       console.log('handleQuery - PERGUNTA DE CONTINUAÇÃO DETECTADA:', message)
       
-      // Busca a última pergunta do usuário sobre gastos/compromissos
-      const lastUserQuery = [...recentConversations].reverse().find(c => 
-        c.role === 'user' && 
-        (c.message.toLowerCase().includes('gastei') || 
-         c.message.toLowerCase().includes('gasto') ||
-         c.message.toLowerCase().includes('gastos') ||
-         c.message.toLowerCase().includes('compromisso') ||
-         c.message.toLowerCase().includes('agenda') ||
-         c.message.toLowerCase().includes('quantos') ||
-         c.message.toLowerCase().includes('quanto'))
-      )
+      const reconstructed = reconstructContinuationMessage(message, conversationContext)
       
-      if (lastUserQuery) {
-        effectiveMessage = `${lastUserQuery.message} ${message}`
-        console.log('handleQuery - Contexto reconstruído:', {
-          original: message,
-          contexto: lastUserQuery.message,
-          reconstruida: effectiveMessage
-        })
+      // Força queryType baseado no contexto
+      if (conversationContext.lastDomain === 'financeiro' && conversationContext.lastQueryType === 'gasto') {
+        if (!extractedData) extractedData = {}
+        extractedData.queryType = 'gasto'
+        extractedData.domain = 'financeiro'
+        shouldForceExpenseQuery = true
         
-        const lowerEffectiveMessage = effectiveMessage.toLowerCase()
-        const lowerLastQuery = lastUserQuery.message.toLowerCase()
-        
-        // Se a última pergunta era sobre gastos, esta também é sobre gastos
-        if (lowerLastQuery.includes('gastei') || 
-            lowerLastQuery.includes('gasto') ||
-            lowerLastQuery.includes('gastos') ||
-            (lowerLastQuery.includes('quantos') && lowerLastQuery.includes('gastei')) ||
-            (lowerLastQuery.includes('quanto') && lowerLastQuery.includes('gastei'))) {
-          
-          // Força queryType para gasto
-          if (!extractedData) extractedData = {}
-          extractedData.queryType = 'gasto'
-          shouldForceExpenseQuery = true
-          
-          // Detecta período na continuação
-          if (lowerMessage.includes('hoje')) {
-            extractedData.queryPeriod = 'hoje'
-            forcedPeriod = 'hoje'
-          } else if (lowerMessage.includes('ontem')) {
-            extractedData.queryPeriod = 'ontem'
-            forcedPeriod = 'ontem'
-          } else if (lowerMessage.includes('amanhã') || lowerMessage.includes('amanha')) {
-            extractedData.queryPeriod = 'amanhã'
-            forcedPeriod = 'amanhã'
-          } else if (lowerMessage.includes('semana')) {
-            extractedData.queryPeriod = 'semana'
-            forcedPeriod = 'semana'
-          } else if (lowerMessage.includes('mês') || lowerMessage.includes('mes')) {
-            extractedData.queryPeriod = 'mês'
-            forcedPeriod = 'mês'
-          }
-          
-          console.log('handleQuery - QueryType forçado para gasto:', {
-            queryType: extractedData.queryType,
-            queryPeriod: extractedData.queryPeriod
-          })
+        // Detecta período na continuação
+        if (lowerMessage.includes('hoje')) {
+          extractedData.queryPeriod = 'hoje'
+          forcedPeriod = 'hoje'
+        } else if (lowerMessage.includes('ontem')) {
+          extractedData.queryPeriod = 'ontem'
+          forcedPeriod = 'ontem'
+        } else if (lowerMessage.includes('amanhã') || lowerMessage.includes('amanha')) {
+          extractedData.queryPeriod = 'amanhã'
+          forcedPeriod = 'amanhã'
+        } else if (lowerMessage.includes('semana')) {
+          extractedData.queryPeriod = 'semana'
+          forcedPeriod = 'semana'
+        } else if (lowerMessage.includes('mês') || lowerMessage.includes('mes')) {
+          extractedData.queryPeriod = 'mês'
+          forcedPeriod = 'mês'
+        } else if (conversationContext.lastPeriod) {
+          // Mantém período anterior se não mencionou novo
+          extractedData.queryPeriod = conversationContext.lastPeriod
+          forcedPeriod = conversationContext.lastPeriod
         }
+        
+        console.log('handleQuery - QueryType forçado baseado em contexto:', {
+          queryType: extractedData.queryType,
+          queryPeriod: extractedData.queryPeriod,
+          domain: extractedData.domain
+        })
       }
     }
     
@@ -720,9 +739,16 @@ async function handleQuery(
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0]
 
+    // VALIDAÇÃO ANTI-BURRICE: Verifica domínio antes de processar
+    const queryDomain = extractedData?.domain || 
+                       (extractedData?.queryType === 'gasto' ? 'financeiro' : 
+                        extractedData?.queryType === 'compromissos' ? 'agenda' : null)
+    
     // PRIORIDADE 0: Verifica se é sobre GASTOS/DESPESAS primeiro (mais comum)
     // Se menciona palavras de gasto, NÃO é sobre compromissos
-    const isAboutExpenses = lowerMessage.includes('gastei') || 
+    const isAboutExpenses = queryDomain === 'financeiro' ||
+                           extractedData?.queryType === 'gasto' ||
+                           lowerMessage.includes('gastei') || 
                            lowerMessage.includes('gasto') || 
                            lowerMessage.includes('gastar') ||
                            lowerMessage.includes('gastos') ||
@@ -733,9 +759,13 @@ async function handleQuery(
                            (lowerMessage.includes('quanto') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto'))) ||
                            (lowerMessage.includes('quantos') && (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')))
     
-    // PRIORIDADE 1: Consulta de compromissos (APENAS se NÃO for sobre gastos)
+    // PRIORIDADE 1: Consulta de compromissos (APENAS se NÃO for sobre gastos E domínio é agenda)
     // Verifica se é pergunta sobre compromissos/agenda
-    if (!isAboutExpenses && (
+    const isAboutAppointments = queryDomain === 'agenda' ||
+                               extractedData?.queryType === 'compromissos' ||
+                               extractedData?.queryType === 'agenda'
+    
+    if (!isAboutExpenses && isAboutAppointments && (
         extractedData?.queryType === 'compromissos' || 
         extractedData?.queryType === 'agenda' ||
         (lowerMessage.includes('compromisso') && !lowerMessage.includes('gasto')) || 
@@ -912,6 +942,16 @@ async function handleQuery(
           }
           response += `\n`
         })
+      }
+      
+      // VALIDAÇÃO ANTI-BURRICE: Verifica se retornou dados do domínio correto
+      if (compromissos.length > 0 && !isAboutAppointments) {
+        console.error('handleQuery - ERRO: Retornou compromissos quando deveria retornar gastos!')
+        // Não retorna compromissos se a pergunta era sobre gastos
+        return {
+          success: false,
+          message: 'Desculpe, não entendi sua pergunta. Você quer saber sobre gastos ou compromissos?',
+        }
       }
       
       return {
@@ -1174,6 +1214,13 @@ async function handleQuery(
         `• ${r.description} - R$ ${Number(r.amount).toFixed(2)} (${r.category}${r.subcategory ? ` - ${r.subcategory}` : ''})`
       ).join('\n')}`
 
+      // VALIDAÇÃO ANTI-BURRICE: Verifica se retornou dados do domínio correto
+      // Se a pergunta era sobre gastos, não deve retornar compromissos
+      if (extractedData?.queryType === 'gasto' && extractedData?.domain === 'financeiro') {
+        // Validação passou - é realmente sobre gastos
+        console.log('handleQuery - Validação de domínio: OK (financeiro)')
+      }
+      
       return {
         success: true,
         message: response,
