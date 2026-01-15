@@ -651,13 +651,31 @@ async function handleQuery(
         })
         
         // Busca compromissos no intervalo de amanhã
+        // Usa uma margem maior para garantir que pega todos (1 dia antes e 1 dia depois)
+        const amanhaInicio = new Date(amanha)
+        amanhaInicio.setDate(amanhaInicio.getDate() - 1) // 1 dia antes para margem
+        amanhaInicio.setHours(0, 0, 0, 0)
+        
+        const amanhaFimMargem = new Date(amanhaFim)
+        amanhaFimMargem.setDate(amanhaFimMargem.getDate() + 1) // 1 dia depois para margem
+        amanhaFimMargem.setHours(23, 59, 59, 999)
+        
+        console.log('handleQuery - Buscando com margem para garantir todos:', {
+          inicio: amanhaInicio.toISOString(),
+          fim: amanhaFimMargem.toISOString(),
+          inicioLocal: amanhaInicio.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          fimLocal: amanhaFimMargem.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
+        
         const todosCompromissos = await getCompromissosRecords(
           tenantId,
-          amanha.toISOString(),
-          amanhaFim.toISOString()
+          amanhaInicio.toISOString(),
+          amanhaFimMargem.toISOString()
         )
         
-        // Filtra novamente no cliente para garantir que está no dia correto (timezone)
+        console.log(`handleQuery - Total de compromissos encontrados no intervalo ampliado: ${todosCompromissos.length}`)
+        
+        // Filtra no cliente para garantir que está no dia correto (timezone do Brasil)
         compromissos = todosCompromissos.filter(c => {
           const dataCompromisso = new Date(c.scheduled_at)
           const dataCompromissoBrazil = dataCompromisso.toLocaleDateString('en-CA', {
@@ -672,7 +690,18 @@ async function handleQuery(
             month: '2-digit',
             day: '2-digit'
           })
-          return dataCompromissoBrazil === amanhaKey
+          const matches = dataCompromissoBrazil === amanhaKey
+          
+          if (!matches) {
+            console.log(`handleQuery - Compromisso filtrado (não é amanhã):`, {
+              title: c.title,
+              scheduled_at: c.scheduled_at,
+              dataCompromissoBrazil,
+              amanhaKey
+            })
+          }
+          
+          return matches
         })
         
         console.log(`handleQuery - Compromissos encontrados para amanhã: ${compromissos.length} (de ${todosCompromissos.length} no intervalo)`, {
