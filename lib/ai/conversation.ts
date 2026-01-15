@@ -11,6 +11,7 @@ import type { Conversation } from '../db/types'
 
 export interface ConversationContext {
   tenantId: string
+  userId?: string | null
   recentMessages?: Conversation[]
   financeiroSummary?: string
   compromissosSummary?: string
@@ -29,14 +30,14 @@ export async function processMessage(
     
     // Carrega contexto recente (aumenta para 10 para ter mais contexto)
     const recentConversations = context.recentMessages || 
-      await getRecentConversations(context.tenantId, 10)
+      await getRecentConversations(context.tenantId, 10, context.userId || null)
 
     // Usa resumos fornecidos ou gera novos
     const financeiroSummary = context.financeiroSummary || 
-      await getFinanceiroSummary(context.tenantId)
+      await getFinanceiroSummary(context.tenantId, context.userId || null)
     
     const compromissosSummary = context.compromissosSummary || 
-      await getCompromissosSummary(context.tenantId)
+      await getCompromissosSummary(context.tenantId, context.userId || null)
 
     // Monta o prompt com contexto mais rico
     const contextPrompt = getContextPrompt(
@@ -108,17 +109,19 @@ NÃO crie um novo compromisso só para lembrete.`
 /**
  * Gera resumo financeiro para contexto
  */
-async function getFinanceiroSummary(tenantId: string): Promise<string | undefined> {
+async function getFinanceiroSummary(tenantId: string, userId?: string | null): Promise<string | undefined> {
   try {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     
     const totalMes = await calculateTotalSpent(
       tenantId,
-      startOfMonth.toISOString().split('T')[0]
+      startOfMonth.toISOString().split('T')[0],
+      undefined,
+      userId || null
     )
 
-    const registros = await getFinanceiroRecords(tenantId, startOfMonth.toISOString().split('T')[0])
+    const registros = await getFinanceiroRecords(tenantId, startOfMonth.toISOString().split('T')[0], undefined, undefined, userId || null)
 
     if (registros.length === 0) {
       return undefined
@@ -138,12 +141,14 @@ Registros: ${registros.length}
 /**
  * Gera resumo de compromissos para contexto
  */
-async function getCompromissosSummary(tenantId: string): Promise<string | undefined> {
+async function getCompromissosSummary(tenantId: string, userId?: string | null): Promise<string | undefined> {
   try {
-    const hoje = await getTodayCompromissos(tenantId)
+    const hoje = await getTodayCompromissos(tenantId, userId || null)
     const proximos = await getCompromissosRecords(
       tenantId,
-      new Date().toISOString()
+      new Date().toISOString(),
+      undefined,
+      userId || null
     )
 
     if (hoje.length === 0 && proximos.length === 0) {

@@ -121,7 +121,8 @@ export async function createFinanceiro(
   subcategory?: string | null,
   metadata?: Record<string, any> | null,
   tags?: string[] | null,
-  transactionType: 'expense' | 'revenue' = 'expense'
+  transactionType: 'expense' | 'revenue' = 'expense',
+  userId?: string | null
 ): Promise<Financeiro | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -133,6 +134,7 @@ export async function createFinanceiro(
   // Prepara dados para inserção
   const insertData: any = {
     tenant_id: tenantId,
+    user_id: userId || null,
     amount,
     description,
     category,
@@ -190,7 +192,8 @@ export async function getFinanceiroByTenant(
   tenantId: string,
   startDate?: string,
   endDate?: string,
-  transactionType?: 'expense' | 'revenue'
+  transactionType?: 'expense' | 'revenue',
+  userId?: string | null
 ): Promise<Financeiro[]> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -204,6 +207,10 @@ export async function getFinanceiroByTenant(
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
 
   if (startDate) {
     query = query.gte('date', startDate)
@@ -224,12 +231,16 @@ export async function getFinanceiroByTenant(
     }
   }
 
-  const { data, error } = await query
+  let { data, error } = await query
 
   if (error) {
-    // Se o erro for sobre transaction_type não existir, tenta sem o filtro
-    if (error.message?.includes('transaction_type') || error.code === '42703') {
-      console.warn('Campo transaction_type não existe, buscando sem filtro')
+    const isMissingColumn = error.message?.includes('column') || error.code === '42703'
+    const missingTransactionType = error.message?.includes('transaction_type')
+    const missingUserId = error.message?.includes('user_id')
+
+    // Se o erro for sobre colunas não existirem, tenta sem esses filtros
+    if (isMissingColumn && (missingTransactionType || missingUserId)) {
+      console.warn('Campo transaction_type/user_id não existe, buscando sem filtro (aplique a migration 011 para user_id)')
       let retryQuery = client
         .from('financeiro')
         .select('*')
@@ -311,7 +322,8 @@ export async function createCompromisso(
   tenantId: string,
   title: string,
   scheduledAt: string,
-  description?: string | null
+  description?: string | null,
+  userId?: string | null
 ): Promise<Compromisso | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -326,6 +338,7 @@ export async function createCompromisso(
     .from('compromissos')
     .insert({
       tenant_id: tenantId,
+      user_id: userId || null,
       title,
       description: description || null,
       scheduled_at: scheduledAt,
@@ -428,7 +441,8 @@ export async function updateCompromisso(
 export async function getCompromissosByTenant(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<Compromisso[]> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -443,6 +457,10 @@ export async function getCompromissosByTenant(
     .eq('tenant_id', tenantId)
     .order('scheduled_at', { ascending: true })
 
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
   if (startDate) {
     query = query.gte('scheduled_at', startDate)
   }
@@ -455,6 +473,22 @@ export async function getCompromissosByTenant(
   // Para garantir que buscamos todos, vamos usar range se necessário
   // Mas para uso normal (poucos compromissos), não deve ser problema
   let { data, error, count } = await query
+
+  // Compatibilidade: se user_id não existe ainda, tenta novamente sem filtro
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em compromissos, buscando sem filtro (aplique a migration 011)')
+    let retryQuery = client
+      .from('compromissos')
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('scheduled_at', { ascending: true })
+    if (startDate) retryQuery = retryQuery.gte('scheduled_at', startDate)
+    if (endDate) retryQuery = retryQuery.lte('scheduled_at', endDate)
+    const retry = await retryQuery
+    data = retry.data as any
+    error = retry.error as any
+    count = retry.count as any
+  }
   
   // Se houver mais de 1000 registros, precisaríamos paginar
   // Mas para compromissos de um dia específico, não deve ser necessário
@@ -502,7 +536,8 @@ export async function getCompromissosByTenant(
 export async function createConversation(
   tenantId: string,
   message: string,
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant',
+  userId?: string | null
 ): Promise<Conversation | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -515,6 +550,7 @@ export async function createConversation(
     .from('conversations')
     .insert({
       tenant_id: tenantId,
+      user_id: userId || null,
       message,
       role,
     })
@@ -531,7 +567,8 @@ export async function createConversation(
 
 export async function getRecentConversations(
   tenantId: string,
-  limit: number = 10
+  limit: number = 10,
+  userId?: string | null
 ): Promise<Conversation[]> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -540,12 +577,30 @@ export async function getRecentConversations(
   }
   const client = supabaseAdmin
   
-  const { data, error } = await client
+  let query = client
     .from('conversations')
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
     .limit(limit)
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  let { data, error } = await query
+
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em conversations, buscando sem filtro (aplique a migration 011)')
+    const retry = await client
+      .from('conversations')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) {
     console.error('Error fetching conversations:', error)

@@ -9,6 +9,7 @@ import type { Financeiro } from '../db/types'
 
 export interface CreateFinanceiroInput {
   tenantId: string
+  userId?: string | null
   amount: number
   description: string
   category: string
@@ -56,7 +57,8 @@ export async function createFinanceiroRecord(
     input.subcategory,
     input.metadata,
     input.tags,
-    input.transactionType || 'expense'
+    input.transactionType || 'expense',
+    input.userId || null
   )
 
   if (!record) {
@@ -118,9 +120,10 @@ export async function getFinanceiroRecords(
   tenantId: string,
   startDate?: string,
   endDate?: string,
-  transactionType?: 'expense' | 'revenue'
+  transactionType?: 'expense' | 'revenue',
+  userId?: string | null
 ): Promise<Financeiro[]> {
-  return getFinanceiroByTenant(tenantId, startDate, endDate, transactionType)
+  return getFinanceiroByTenant(tenantId, startDate, endDate, transactionType, userId || null)
 }
 
 /**
@@ -129,9 +132,10 @@ export async function getFinanceiroRecords(
 export async function getDespesasRecords(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<Financeiro[]> {
-  return getFinanceiroByTenant(tenantId, startDate, endDate, 'expense')
+  return getFinanceiroByTenant(tenantId, startDate, endDate, 'expense', userId || null)
 }
 
 /**
@@ -140,9 +144,10 @@ export async function getDespesasRecords(
 export async function getReceitasRecords(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<Financeiro[]> {
-  return getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue')
+  return getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue', userId || null)
 }
 
 /**
@@ -245,9 +250,10 @@ export async function getFinanceiroByTagsRecords(
 export async function calculateTotalSpent(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<number> {
-  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'expense')
+  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'expense', userId || null)
   return records.reduce((total, record) => total + Number(record.amount), 0)
 }
 
@@ -257,9 +263,10 @@ export async function calculateTotalSpent(
 export async function calculateTotalRevenue(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<number> {
-  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue')
+  const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue', userId || null)
   return records.reduce((total, record) => total + Number(record.amount), 0)
 }
 
@@ -269,10 +276,11 @@ export async function calculateTotalRevenue(
 export async function calculateBalance(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<number> {
-  const receitas = await calculateTotalRevenue(tenantId, startDate, endDate)
-  const despesas = await calculateTotalSpent(tenantId, startDate, endDate)
+  const receitas = await calculateTotalRevenue(tenantId, startDate, endDate, userId || null)
+  const despesas = await calculateTotalSpent(tenantId, startDate, endDate, userId || null)
   return receitas - despesas
 }
 
@@ -283,7 +291,8 @@ export async function calculateTotalByCategory(
   tenantId: string,
   category: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<number> {
   const records = await getFinanceiroByCategoryRecords(
     tenantId,

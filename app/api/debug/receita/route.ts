@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/db/client'
 
 export async function POST(request: Request) {
   try {
-    const { message, tenantId } = await request.json()
+    const { message, tenantId, userId } = await request.json()
     
     if (!message || !tenantId) {
       return NextResponse.json(
@@ -35,8 +35,27 @@ export async function POST(request: Request) {
       )
     }
     
+    // Busca um userId se não fornecido (debug)
+    let finalUserId = userId
+    if (!finalUserId && supabaseAdmin) {
+      const { data } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('tenant_id', finalTenantId)
+        .limit(1)
+        .single()
+      finalUserId = data?.id || null
+    }
+
+    if (!finalUserId) {
+      return NextResponse.json(
+        { error: 'userId é obrigatório (ou não foi possível inferir)' },
+        { status: 400 }
+      )
+    }
+
     console.log('Processando ação...')
-    const result = await processAction(message, finalTenantId)
+    const result = await processAction(message, finalTenantId, finalUserId)
     
     console.log('Resultado:', JSON.stringify(result, null, 2))
     

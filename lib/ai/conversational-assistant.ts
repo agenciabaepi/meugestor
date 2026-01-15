@@ -55,6 +55,7 @@ export async function analyzeConversationalIntention(
   message: string,
   recentConversations: Array<{ role: string; message: string }>,
   tenantId: string,
+  userId: string,
   activeTask?: ActiveTask | null
 ): Promise<SemanticState> {
   try {
@@ -63,10 +64,10 @@ export async function analyzeConversationalIntention(
       : ''
     
     // Busca última ação criada para detectar correções
-    const lastExpense = getLastAction(tenantId, 'expense')
-    const lastRevenue = getLastAction(tenantId, 'revenue')
-    const lastAppointment = getLastAction(tenantId, 'appointment')
-    const lastAny = getLastAnyAction(tenantId)
+    const lastExpense = getLastAction(tenantId, userId, 'expense')
+    const lastRevenue = getLastAction(tenantId, userId, 'revenue')
+    const lastAppointment = getLastAction(tenantId, userId, 'appointment')
+    const lastAny = getLastAnyAction(tenantId, userId)
     
     const lastActionContext = lastAny ? `
 ÚLTIMA AÇÃO CRIADA (para detectar correções):
@@ -88,7 +89,7 @@ Se o usuário estiver corrigindo algo (ex: "não, é amanhã", "não, foi 45"), 
 ` : ''
     
     // Verifica se há foco travado (usuário repetiu o mesmo compromisso)
-    const focusLock = hasFocusLock(tenantId, 'appointment')
+    const focusLock = hasFocusLock(tenantId, userId, 'appointment')
     const focusLockContext = focusLock ? `
 FOCO TRAVADO (usuário repetiu o mesmo compromisso ${focusLock.mentions} vezes):
 - targetId: ${focusLock.targetId || 'null'}
@@ -291,7 +292,7 @@ REGRAS IMPORTANTES:
       
       // Estratégia 1: Focus Lock (prioridade máxima)
       if (semanticState.intent === 'update_appointment') {
-        const focusLock = hasFocusLock(tenantId, 'appointment')
+        const focusLock = hasFocusLock(tenantId, userId, 'appointment')
         if (focusLock?.targetId) {
           semanticState.targetId = focusLock.targetId
           console.log('conversational-assistant - TargetId definido pelo focus lock:', semanticState.targetId)
@@ -303,14 +304,14 @@ REGRAS IMPORTANTES:
           if (semanticState.scheduled_at) criteria.date = semanticState.scheduled_at
           
           if (Object.keys(criteria).length > 0) {
-            const matches = await findMatchingAppointments(tenantId, criteria)
+            const matches = await findMatchingAppointments(tenantId, userId, criteria)
             if (matches.length === 1) {
               // Apenas um match, usa esse
               semanticState.targetId = matches[0].id
               console.log('conversational-assistant - TargetId definido por busca única:', semanticState.targetId)
               
               // Registra menção para focus lock
-              registerMention(tenantId, 'appointment', {
+              registerMention(tenantId, userId, 'appointment', {
                 targetId: matches[0].id,
                 title: matches[0].title,
                 location: matches[0].description || undefined,
@@ -323,7 +324,7 @@ REGRAS IMPORTANTES:
               console.log('conversational-assistant - TargetId definido por busca (melhor match, score:', bestMatch.score, '):', semanticState.targetId)
               
               // Registra menção para focus lock
-              registerMention(tenantId, 'appointment', {
+              registerMention(tenantId, userId, 'appointment', {
                 targetId: bestMatch.id,
                 title: bestMatch.title,
                 location: bestMatch.description || undefined,
@@ -338,6 +339,7 @@ REGRAS IMPORTANTES:
       if (!semanticState.targetId) {
         const lastAction = getLastAction(
           tenantId,
+          userId,
           semanticState.intent === 'update_expense' ? 'expense' :
           semanticState.intent === 'update_revenue' ? 'revenue' : 'appointment'
         )
@@ -352,7 +354,7 @@ REGRAS IMPORTANTES:
     if (semanticState.intent === 'update_appointment') {
       if (semanticState.targetId) {
         // Tem targetId, registra com ele
-        registerMention(tenantId, 'appointment', {
+        registerMention(tenantId, userId, 'appointment', {
           targetId: semanticState.targetId,
           title: semanticState.title || undefined,
           location: semanticState.description || undefined,
@@ -360,7 +362,7 @@ REGRAS IMPORTANTES:
         })
       } else if (semanticState.title || semanticState.description || semanticState.scheduled_at) {
         // Não tem targetId ainda, mas tem dados do compromisso - registra para busca futura
-        registerMention(tenantId, 'appointment', {
+        registerMention(tenantId, userId, 'appointment', {
           title: semanticState.title || undefined,
           location: semanticState.description || undefined,
           date: semanticState.scheduled_at || undefined
@@ -370,7 +372,7 @@ REGRAS IMPORTANTES:
     
     // Se há foco travado e dados estão completos, força readyToSave
     if (semanticState.intent === 'update_appointment') {
-      const focusLock = hasFocusLock(tenantId, 'appointment')
+      const focusLock = hasFocusLock(tenantId, userId, 'appointment')
       if (focusLock && focusLock.confidence >= 0.8 && semanticState.targetId) {
         // Foco travado com alta confiança, não precisa confirmação
         semanticState.readyToSave = true

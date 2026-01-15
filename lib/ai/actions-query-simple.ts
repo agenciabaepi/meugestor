@@ -96,25 +96,27 @@ function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDat
  */
 async function queryCompromissos(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   const { periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
   
   let compromissos: any[] = []
   
   if (state.periodo === 'hoje') {
-    compromissos = await getTodayCompromissos(tenantId)
+    compromissos = await getTodayCompromissos(tenantId, userId)
   } else if (state.periodo === 'amanhã') {
     // Range correto: amanhã no Brasil (00:00 -> 23:59:59.999)
     const start = getTomorrowStartISOInBrazil()
     const end = getTomorrowEndISOInBrazil()
-    compromissos = await getCompromissosRecords(tenantId, start, end)
+    compromissos = await getCompromissosRecords(tenantId, start, end, userId)
   } else {
     const { startDate, endDate } = getDateRangeFromPeriodo(state.periodo || null)
     compromissos = await getCompromissosRecords(
       tenantId,
       startDate,
-      endDate || undefined
+      endDate || undefined,
+      userId
     )
   }
   
@@ -166,12 +168,13 @@ async function queryCompromissos(
  */
 async function queryGastos(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
   
   // Busca apenas despesas
-  const registros = await getDespesasRecords(tenantId, startDate, endDate)
+  const registros = await getDespesasRecords(tenantId, startDate, endDate, userId)
   
   // FILTRO SEMÂNTICO: Se tem categoria/subcategoria, usa filtro semântico
   // Isso resolve o problema de "mercado" não encontrar "supermercado"
@@ -264,7 +267,8 @@ async function queryGastos(
  */
 export async function handleQuerySimple(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   // Validação rígida
   if (!state.queryType) {
@@ -283,11 +287,11 @@ export async function handleQuerySimple(
   
   // Executa baseado no tipo de query
   if (state.queryType === 'compromissos' && state.domain === 'agenda') {
-    return await queryCompromissos(state, tenantId)
+    return await queryCompromissos(state, tenantId, userId)
   }
   
   if (state.queryType === 'gasto' && state.domain === 'financeiro') {
-    return await queryGastos(state, tenantId)
+    return await queryGastos(state, tenantId, userId)
   }
   
   return {

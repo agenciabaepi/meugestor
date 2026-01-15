@@ -154,8 +154,8 @@ async function processWhatsAppMessage(
             `Pode me enviar uma mensagem e eu te ajudo! 😉`
           
           await sendTextMessage(from, presentation)
-          await createConversation(tenantId, message.text.body, 'user')
-          await createConversation(tenantId, presentation, 'assistant')
+          await createConversation(tenantId, message.text.body, 'user', userId)
+          await createConversation(tenantId, presentation, 'assistant', userId)
           
           console.log(`Apresentação enviada para ${from}`)
           return
@@ -164,7 +164,7 @@ async function processWhatsAppMessage(
       // Verifica se é confirmação de registro de comprovante
       if (userMessage === 'sim' || userMessage === 's' || userMessage === 'confirmar') {
         // Busca última conversa com dados extraídos
-        const recentMessages = await getRecentConversations(tenantId, 10)
+        const recentMessages = await getRecentConversations(tenantId, 10, userId)
         const lastImageData = recentMessages.find(m => 
           m.role === 'assistant' && m.message.includes('[Imagem processada]')
         )
@@ -185,6 +185,7 @@ async function processWhatsAppMessage(
               // Registra o gasto
               const record = await createFinanceiroRecord({
                 tenantId: tenantId,
+                userId: userId,
                 amount: extractedData.amount || 0,
                 description: extractedData.description || extractedData.establishment || 'Gasto do comprovante',
                 category: extractedData.category || 'Outros',
@@ -197,8 +198,8 @@ async function processWhatsAppMessage(
                 `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${extractedData.amount?.toFixed(2) || '0.00'}\n📝 Descrição: ${extractedData.description || extractedData.establishment || 'Gasto do comprovante'}\n🏷️ Categoria: ${extractedData.category || 'Outros'}`
               )
               
-              await createConversation(tenantId, userMessage, 'user')
-              await createConversation(tenantId, 'Gasto registrado com sucesso', 'assistant')
+              await createConversation(tenantId, userMessage, 'user', userId)
+              await createConversation(tenantId, 'Gasto registrado com sucesso', 'assistant', userId)
               
               console.log(`Gasto registrado via confirmação de imagem de ${from}`)
               return
@@ -210,7 +211,7 @@ async function processWhatsAppMessage(
       }
       
         // Salva mensagem do usuário
-        await createConversation(tenantId, message.text.body, 'user')
+        await createConversation(tenantId, message.text.body, 'user', userId)
         
         // Processa ação (registro de gastos, compromissos, etc)
         let actionResult
@@ -220,7 +221,7 @@ async function processWhatsAppMessage(
           console.log('Webhook - TenantId:', tenantId)
           console.log('Webhook - From:', from)
           
-          actionResult = await processAction(message.text.body, tenantId)
+          actionResult = await processAction(message.text.body, tenantId, userId)
           
           console.log('Webhook - Resultado da ação:', {
             success: actionResult.success,
@@ -239,14 +240,15 @@ async function processWhatsAppMessage(
           // Tenta usar fallback conversacional antes de enviar erro genérico
           try {
             console.log('Webhook - Tentando fallback conversacional após erro...')
-            const recentMessages = await getRecentConversations(tenantId, 5)
+            const recentMessages = await getRecentConversations(tenantId, 5, userId)
             const aiResponse = await processMessage(message.text.body, {
               tenantId: tenantId,
+              userId: userId,
               recentMessages,
             })
             
             await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant')
+            await createConversation(tenantId, aiResponse, 'assistant', userId)
             return
           } catch (aiError) {
             console.error('Webhook - Erro também no fallback conversacional:', aiError)
@@ -266,36 +268,38 @@ async function processWhatsAppMessage(
         // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
-          await createConversation(tenantId, actionResult.message, 'assistant')
+          await createConversation(tenantId, actionResult.message, 'assistant', userId)
         } else if (!actionResult.success) {
           // Se a ação falhou, tenta processar com IA para dar uma resposta mais útil
           // Isso ajuda com perguntas simples que não foram identificadas como ações
           try {
-            const recentMessages = await getRecentConversations(tenantId, 5)
+            const recentMessages = await getRecentConversations(tenantId, 5, userId)
             const aiResponse = await processMessage(message.text.body, {
               tenantId: tenantId,
+              userId: userId,
               recentMessages,
             })
             
             await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant')
+            await createConversation(tenantId, aiResponse, 'assistant', userId)
           } catch (aiError) {
             // Se a IA também falhar, envia mensagem de erro
             console.error('Erro ao processar com IA:', aiError)
             await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender. Pode reformular sua pergunta?')
-            await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant')
+            await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant', userId)
           }
         } else {
           // Processa com IA para gerar resposta conversacional
-          const recentMessages = await getRecentConversations(tenantId, 5)
+          const recentMessages = await getRecentConversations(tenantId, 5, userId)
           const aiResponse = await processMessage(message.text.body, {
             tenantId: tenantId,
+            userId: userId,
             recentMessages,
           })
           
           // Envia resposta
           await sendTextMessage(from, aiResponse)
-          await createConversation(tenantId, aiResponse, 'assistant')
+          await createConversation(tenantId, aiResponse, 'assistant', userId)
         }
         
         console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
@@ -314,39 +318,42 @@ async function processWhatsAppMessage(
         await createConversation(
           tenantId,
           `[Áudio transcrito]: ${audioResult.text}`,
-          'user'
+          'user',
+          userId
         )
 
         // Processa a mensagem transcrita normalmente
-        const actionResult = await processAction(audioResult.text, tenantId)
+        const actionResult = await processAction(audioResult.text, tenantId, userId)
 
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
-          await createConversation(tenantId, actionResult.message, 'assistant')
+          await createConversation(tenantId, actionResult.message, 'assistant', userId)
         } else if (!actionResult.success) {
           // Se a ação falhou, tenta processar com IA
           try {
-            const recentMessages = await getRecentConversations(tenantId, 5)
+            const recentMessages = await getRecentConversations(tenantId, 5, userId)
             const aiResponse = await processMessage(audioResult.text, {
               tenantId: tenantId,
+              userId: userId,
               recentMessages,
             })
             
             await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant')
+            await createConversation(tenantId, aiResponse, 'assistant', userId)
           } catch (aiError) {
             console.error('Erro ao processar áudio com IA:', aiError)
             await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender o áudio. Pode repetir?')
-            await createConversation(tenantId, actionResult.message || 'Erro ao processar áudio', 'assistant')
+            await createConversation(tenantId, actionResult.message || 'Erro ao processar áudio', 'assistant', userId)
           }
         } else {
-          const recentMessages = await getRecentConversations(tenantId, 5)
+          const recentMessages = await getRecentConversations(tenantId, 5, userId)
           const aiResponse = await processMessage(audioResult.text, {
             tenantId: tenantId,
+            userId: userId,
             recentMessages,
           })
           await sendTextMessage(from, aiResponse)
-          await createConversation(tenantId, aiResponse, 'assistant')
+          await createConversation(tenantId, aiResponse, 'assistant', userId)
         }
       } else {
         await sendTextMessage(
@@ -398,7 +405,8 @@ async function processWhatsAppMessage(
           await createConversation(
             tenantId,
             `[Imagem processada]: ${JSON.stringify(dataToSave)}`,
-            'assistant'
+            'assistant',
+            userId
           )
         } else {
           // Dados não confiáveis ou incompletos

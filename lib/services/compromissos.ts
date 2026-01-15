@@ -8,6 +8,7 @@ import type { Compromisso } from '../db/types'
 
 export interface CreateCompromissoInput {
   tenantId: string
+  userId?: string | null
   title: string
   scheduledAt: string
   description?: string | null
@@ -47,7 +48,8 @@ export async function createCompromissoRecord(
     input.tenantId,
     input.title.trim(),
     input.scheduledAt,
-    input.description?.trim() || null
+    input.description?.trim() || null,
+    input.userId || null
   )
 
   if (!compromisso) {
@@ -100,9 +102,10 @@ export async function updateCompromissoRecord(
 export async function getCompromissosRecords(
   tenantId: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  userId?: string | null
 ): Promise<Compromisso[]> {
-  return getCompromissosByTenant(tenantId, startDate, endDate)
+  return getCompromissosByTenant(tenantId, startDate, endDate, userId || null)
 }
 
 /**
@@ -110,10 +113,11 @@ export async function getCompromissosRecords(
  */
 export async function getUpcomingCompromissos(
   tenantId: string,
-  limit: number = 10
+  limit: number = 10,
+  userId?: string | null
 ): Promise<Compromisso[]> {
   const now = new Date().toISOString()
-  const compromissos = await getCompromissosByTenant(tenantId, now)
+  const compromissos = await getCompromissosByTenant(tenantId, now, undefined, userId || null)
   return compromissos.slice(0, limit)
 }
 
@@ -121,7 +125,8 @@ export async function getUpcomingCompromissos(
  * Obtém compromissos do dia
  */
 export async function getTodayCompromissos(
-  tenantId: string
+  tenantId: string,
+  userId?: string | null
 ): Promise<Compromisso[]> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -132,7 +137,8 @@ export async function getTodayCompromissos(
   const compromissos = await getCompromissosByTenant(
     tenantId,
     today.toISOString(),
-    tomorrow.toISOString()
+    tomorrow.toISOString(),
+    userId || null
   )
   
   // Filtra apenas os compromissos que são realmente de hoje (evita problemas de timezone)

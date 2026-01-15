@@ -17,25 +17,26 @@ function safeJsonParse<T>(text: string): T | null {
   }
 }
 
-export async function persistPendingConfirmation(tenantId: string, state: SemanticState): Promise<void> {
+export async function persistPendingConfirmation(tenantId: string, userId: string, state: SemanticState): Promise<void> {
   const { createConversation } = await import('../db/queries')
   const payload = {
     version: 1,
     tenantId,
+    userId,
     createdAt: new Date().toISOString(),
     state,
   }
-  await createConversation(tenantId, `${PENDING_PREFIX}${JSON.stringify(payload)}`, 'assistant')
+  await createConversation(tenantId, `${PENDING_PREFIX}${JSON.stringify(payload)}`, 'assistant', userId)
 }
 
-export async function persistResolvedConfirmation(tenantId: string): Promise<void> {
+export async function persistResolvedConfirmation(tenantId: string, userId: string): Promise<void> {
   const { createConversation } = await import('../db/queries')
-  await createConversation(tenantId, `${RESOLVED_PREFIX}${new Date().toISOString()}`, 'assistant')
+  await createConversation(tenantId, `${RESOLVED_PREFIX}${new Date().toISOString()}`, 'assistant', userId)
 }
 
-export async function loadLatestPendingConfirmation(tenantId: string): Promise<PendingConfirmation | null> {
+export async function loadLatestPendingConfirmation(tenantId: string, userId: string): Promise<PendingConfirmation | null> {
   const { getRecentConversations } = await import('../db/queries')
-  const recents = await getRecentConversations(tenantId, 30)
+  const recents = await getRecentConversations(tenantId, 30, userId)
   for (const msg of recents) {
     if (msg.role !== 'assistant') continue
     if (msg.message.startsWith(RESOLVED_PREFIX)) {
@@ -44,10 +45,11 @@ export async function loadLatestPendingConfirmation(tenantId: string): Promise<P
     }
     if (msg.message.startsWith(PENDING_PREFIX)) {
       const raw = msg.message.slice(PENDING_PREFIX.length)
-      const parsed = safeJsonParse<{ state: SemanticState; createdAt: string }>(raw)
+      const parsed = safeJsonParse<{ state: SemanticState; createdAt: string; userId?: string }>(raw)
       if (!parsed?.state) return null
       return {
         tenantId,
+        userId,
         state: parsed.state,
         createdAt: new Date(parsed.createdAt || Date.now()),
       }
@@ -58,24 +60,31 @@ export async function loadLatestPendingConfirmation(tenantId: string): Promise<P
 
 export interface PendingConfirmation {
   tenantId: string
+  userId: string
   state: SemanticState
   createdAt: Date
 }
 
-// Armazena confirmações pendentes por tenant (em memória)
+// Armazena confirmações pendentes por (tenant+user) (em memória)
 const pendingConfirmations: Map<string, PendingConfirmation> = new Map()
+
+function key(tenantId: string, userId: string): string {
+  return `${tenantId}:${userId}`
+}
 
 /**
  * Salva uma confirmação pendente
  */
-export function savePendingConfirmation(tenantId: string, state: SemanticState): void {
-  pendingConfirmations.set(tenantId, {
+export function savePendingConfirmation(tenantId: string, userId: string, state: SemanticState): void {
+  pendingConfirmations.set(key(tenantId, userId), {
     tenantId,
+    userId,
     state,
     createdAt: new Date()
   })
   console.log('confirmation-manager - Confirmação pendente salva:', {
     tenantId,
+    userId,
     intent: state.intent
   })
 }
@@ -83,16 +92,16 @@ export function savePendingConfirmation(tenantId: string, state: SemanticState):
 /**
  * Busca confirmação pendente de um tenant
  */
-export function getPendingConfirmation(tenantId: string): PendingConfirmation | null {
-  return pendingConfirmations.get(tenantId) || null
+export function getPendingConfirmation(tenantId: string, userId: string): PendingConfirmation | null {
+  return pendingConfirmations.get(key(tenantId, userId)) || null
 }
 
 /**
  * Remove confirmação pendente (após confirmação ou cancelamento)
  */
-export function clearPendingConfirmation(tenantId: string): void {
-  pendingConfirmations.delete(tenantId)
-  console.log('confirmation-manager - Confirmação pendente removida:', tenantId)
+export function clearPendingConfirmation(tenantId: string, userId: string): void {
+  pendingConfirmations.delete(key(tenantId, userId))
+  console.log('confirmation-manager - Confirmação pendente removida:', { tenantId, userId })
 }
 
 /**

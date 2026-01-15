@@ -11,6 +11,7 @@ export type ActiveTaskType = 'create_appointment' | 'update_appointment'
 
 export interface ActiveTask {
   tenantId: string
+  userId: string
   type: ActiveTaskType
   state: SemanticState
   createdAt: Date
@@ -20,13 +21,18 @@ export interface ActiveTask {
 
 const activeTasks = new Map<string, ActiveTask>()
 
-export function setActiveTask(tenantId: string, type: ActiveTaskType, state: SemanticState): void {
-  const existing = activeTasks.get(tenantId)
+function key(tenantId: string, userId: string): string {
+  return `${tenantId}:${userId}`
+}
+
+export function setActiveTask(tenantId: string, userId: string, type: ActiveTaskType, state: SemanticState): void {
+  const existing = activeTasks.get(key(tenantId, userId))
   const now = new Date()
 
   // Sempre atualiza; preserva fila se já existia
-  activeTasks.set(tenantId, {
+  activeTasks.set(key(tenantId, userId), {
     tenantId,
+    userId,
     type,
     state,
     createdAt: existing?.createdAt ?? now,
@@ -35,39 +41,39 @@ export function setActiveTask(tenantId: string, type: ActiveTaskType, state: Sem
   })
 }
 
-export function getActiveTask(tenantId: string): ActiveTask | null {
-  const task = activeTasks.get(tenantId)
+export function getActiveTask(tenantId: string, userId: string): ActiveTask | null {
+  const task = activeTasks.get(key(tenantId, userId))
   if (!task) return null
 
   // expira em 10 minutos para não prender o usuário
   const ageMs = Date.now() - task.updatedAt.getTime()
   if (ageMs > 10 * 60 * 1000) {
-    activeTasks.delete(tenantId)
+    activeTasks.delete(key(tenantId, userId))
     return null
   }
 
   return task
 }
 
-export function clearActiveTask(tenantId: string): void {
-  activeTasks.delete(tenantId)
+export function clearActiveTask(tenantId: string, userId: string): void {
+  activeTasks.delete(key(tenantId, userId))
 }
 
-export function queueMessageForTask(tenantId: string, message: string): void {
-  const task = activeTasks.get(tenantId)
+export function queueMessageForTask(tenantId: string, userId: string, message: string): void {
+  const task = activeTasks.get(key(tenantId, userId))
   if (!task) return
   task.queuedMessage = message
   task.updatedAt = new Date()
-  activeTasks.set(tenantId, task)
+  activeTasks.set(key(tenantId, userId), task)
 }
 
-export function consumeQueuedMessage(tenantId: string): string | null {
-  const task = activeTasks.get(tenantId)
+export function consumeQueuedMessage(tenantId: string, userId: string): string | null {
+  const task = activeTasks.get(key(tenantId, userId))
   if (!task?.queuedMessage) return null
   const msg = task.queuedMessage
   task.queuedMessage = null
   task.updatedAt = new Date()
-  activeTasks.set(tenantId, task)
+  activeTasks.set(key(tenantId, userId), task)
   return msg
 }
 

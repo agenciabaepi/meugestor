@@ -7,6 +7,7 @@
 
 export interface FocusTarget {
   tenantId: string
+  userId: string
   type: 'appointment' | 'expense' | 'revenue'
   targetId?: string
   title?: string
@@ -20,11 +21,16 @@ export interface FocusTarget {
 // Armazena foco atual por tenant
 const focusLocks: Map<string, FocusTarget> = new Map()
 
+function key(tenantId: string, userId: string, type: string): string {
+  return `${tenantId}:${userId}:${type}`
+}
+
 /**
  * Registra uma menção de compromisso/gasto
  */
 export function registerMention(
   tenantId: string,
+  userId: string,
   type: 'appointment' | 'expense' | 'revenue',
   data: {
     targetId?: string
@@ -33,8 +39,8 @@ export function registerMention(
     date?: string
   }
 ): void {
-  const key = `${tenantId}:${type}`
-  const existing = focusLocks.get(key)
+  const k = key(tenantId, userId, type)
+  const existing = focusLocks.get(k)
   
   if (existing) {
     // Verifica se é o mesmo compromisso (mesmo título/local/data)
@@ -64,8 +70,9 @@ export function registerMention(
       })
     } else {
       // Novo alvo, reseta
-      focusLocks.set(key, {
+      focusLocks.set(k, {
         tenantId,
+        userId,
         type,
         ...data,
         mentions: 1,
@@ -76,8 +83,9 @@ export function registerMention(
     }
   } else {
     // Primeira menção
-    focusLocks.set(key, {
+    focusLocks.set(k, {
       tenantId,
+      userId,
       type,
       ...data,
       mentions: 1,
@@ -93,10 +101,11 @@ export function registerMention(
  */
 export function hasFocusLock(
   tenantId: string,
+  userId: string,
   type: 'appointment' | 'expense' | 'revenue'
 ): FocusTarget | null {
-  const key = `${tenantId}:${type}`
-  const focus = focusLocks.get(key)
+  const k = key(tenantId, userId, type)
+  const focus = focusLocks.get(k)
   
   if (!focus) return null
   
@@ -104,7 +113,7 @@ export function hasFocusLock(
   const age = Date.now() - focus.lastMention.getTime()
   if (age > 5 * 60 * 1000) {
     // Foco expirado
-    focusLocks.delete(key)
+    focusLocks.delete(k)
     return null
   }
   
@@ -127,9 +136,13 @@ export function hasFocusLock(
  * Limpa o foco (após execução bem-sucedida ou cancelamento)
  */
 export function clearFocus(tenantId: string, type: 'appointment' | 'expense' | 'revenue'): void {
-  const key = `${tenantId}:${type}`
-  focusLocks.delete(key)
-  console.log('focus-lock - Foco limpo:', { tenantId, type })
+  // Back-compat: mantém assinatura antiga, mas limpa todos os focos do tenant para segurança
+  for (const k of focusLocks.keys()) {
+    if (k.startsWith(`${tenantId}:`) && k.endsWith(`:${type}`)) {
+      focusLocks.delete(k)
+    }
+  }
+  console.log('focus-lock - Foco limpo (tenant):', { tenantId, type })
 }
 
 /**
@@ -148,6 +161,7 @@ function normalizeString(str: string): string {
  */
 export async function findMatchingAppointments(
   tenantId: string,
+  userId: string,
   criteria: {
     title?: string
     location?: string
@@ -158,7 +172,7 @@ export async function findMatchingAppointments(
   
   // Busca compromissos futuros
   const now = new Date().toISOString()
-  const compromissos = await getCompromissosRecords(tenantId, now)
+  const compromissos = await getCompromissosRecords(tenantId, now, undefined, userId)
   
   const matches: Array<{ id: string; title: string; scheduled_at: string; description?: string | null; score: number }> = []
   

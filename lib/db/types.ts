@@ -20,6 +20,7 @@ export interface User {
 export interface Financeiro {
   id: string
   tenant_id: string
+  user_id?: string | null
   amount: number
   description: string
   category: string
@@ -35,6 +36,7 @@ export interface Financeiro {
 export interface Compromisso {
   id: string
   tenant_id: string
+  user_id?: string | null
   title: string
   description: string | null
   scheduled_at: string
@@ -47,6 +49,7 @@ export interface Compromisso {
 export interface Conversation {
   id: string
   tenant_id: string
+  user_id?: string | null
   message: string
   role: 'user' | 'assistant'
   created_at: string

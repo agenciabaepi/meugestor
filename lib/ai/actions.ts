@@ -68,7 +68,8 @@ function validateAndCorrectIntention(
 
 export async function processAction(
   message: string,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   try {
     console.log('=== PROCESS ACTION INICIADO ===')
@@ -77,7 +78,7 @@ export async function processAction(
     
     // Busca contexto recente para o GPT entender a conversa completa
     const { getRecentConversations } = await import('../db/queries')
-    const recentConversations = await getRecentConversations(tenantId, 10)
+    const recentConversations = await getRecentConversations(tenantId, 10, userId)
     const recentContext = recentConversations.map(c => ({
       role: c.role,
       message: c.message
@@ -88,33 +89,33 @@ export async function processAction(
     const isPositiveConfirm = ['sim', 's', 'confirmar', 'ok', 'isso', 'isso mesmo', 'pode', 'pode sim', 'pode salvar', 'confirmo'].includes(lowerMessage)
     const isNegativeConfirm = ['não', 'nao', 'cancelar', 'cancela'].includes(lowerMessage)
 
-    let pendingConfirmation = getPendingConfirmation(tenantId)
+    let pendingConfirmation = getPendingConfirmation(tenantId, userId)
     if (!pendingConfirmation) {
-      pendingConfirmation = await loadLatestPendingConfirmation(tenantId)
+      pendingConfirmation = await loadLatestPendingConfirmation(tenantId, userId)
     }
 
     // Session focus: ação ativa (create/update compromisso)
-    const activeTask = getActiveTask(tenantId)
+    const activeTask = getActiveTask(tenantId, userId)
     
     // COMMIT POINT: Se há confirmação pendente e usuário confirmou/cancelou, executa imediatamente.
     if (pendingConfirmation) {
       if (isPositiveConfirm) {
         console.log('processAction - Confirmação recebida, executando ação pendente')
-        clearPendingConfirmation(tenantId)
+        clearPendingConfirmation(tenantId, userId)
         // Usa o estado da confirmação pendente
         const semanticState = { ...pendingConfirmation.state }
 
         // Nunca confirmar duas vezes: marca resolvido imediatamente (idempotência)
-        await persistResolvedConfirmation(tenantId)
+        await persistResolvedConfirmation(tenantId, userId)
 
         // Executa imediatamente (gatilho de execução)
-        const actionResult = await executeAction(semanticState, tenantId, message)
+        const actionResult = await executeAction(semanticState, tenantId, userId, message)
 
         // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
-        const queued = consumeQueuedMessage(tenantId)
-        clearActiveTask(tenantId)
+        const queued = consumeQueuedMessage(tenantId, userId)
+        clearActiveTask(tenantId, userId)
         if (queued) {
-          const followUp = await processAction(queued, tenantId)
+          const followUp = await processAction(queued, tenantId, userId)
           if (followUp?.message) {
             return {
               success: true,
@@ -141,9 +142,9 @@ export async function processAction(
         }
       } else if (isNegativeConfirm) {
         console.log('processAction - Cancelamento recebido')
-        clearPendingConfirmation(tenantId)
-        clearActiveTask(tenantId)
-        await persistResolvedConfirmation(tenantId)
+        clearPendingConfirmation(tenantId, userId)
+        clearActiveTask(tenantId, userId)
+        await persistResolvedConfirmation(tenantId, userId)
         return {
           success: true,
           message: 'Entendido, cancelado. Como posso ajudar?'
@@ -153,7 +154,7 @@ export async function processAction(
     
     // Usa assistente conversacional (novo modelo)
     console.log('processAction - Analisando intenção conversacional...')
-    const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId, activeTask)
+    const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId, userId, activeTask)
     
     console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
@@ -170,17 +171,17 @@ export async function processAction(
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
       console.log('processAction - Dados completos, executando diretamente sem confirmação')
-      return await executeAction(semanticState, tenantId, message)
+      return await executeAction(semanticState, tenantId, userId, message)
     }
     
     // Se precisa confirmação (ambiguidade real), salva e retorna mensagem
     if (semanticState.needsConfirmation && semanticState.confirmationMessage) {
       // Marca ação ativa se for compromisso (não deixa perder o foco)
       if (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment') {
-        setActiveTask(tenantId, semanticState.intent, semanticState)
+        setActiveTask(tenantId, userId, semanticState.intent, semanticState)
       }
-      savePendingConfirmation(tenantId, semanticState)
-      await persistPendingConfirmation(tenantId, semanticState)
+      savePendingConfirmation(tenantId, userId, semanticState)
+      await persistPendingConfirmation(tenantId, userId, semanticState)
       return {
         success: true,
         message: semanticState.confirmationMessage,
@@ -191,7 +192,7 @@ export async function processAction(
     if (semanticState.intent === 'chat') {
       // Se existe ação ativa, não deixa cair em chat fora de contexto
       if (activeTask) {
-        queueMessageForTask(tenantId, message)
+        queueMessageForTask(tenantId, userId, message)
         return {
           success: true,
           message: buildKeepFocusMessage(activeTask),
@@ -258,7 +259,7 @@ export async function processAction(
     // Session focus: se há ação ativa e a mensagem mudou de assunto (query/report),
     // não ignora a ação ativa — guarda pergunta e pede para concluir/cancelar.
     if (activeTask && (semanticState.intent === 'query' || semanticState.intent === 'report')) {
-      queueMessageForTask(tenantId, message)
+      queueMessageForTask(tenantId, userId, message)
       return {
         success: true,
         message: buildKeepFocusMessage(activeTask),
@@ -268,13 +269,13 @@ export async function processAction(
     // Se esta mensagem inicia/continua uma ação de compromisso mas ainda não está pronta, mantém foco.
     if ((semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment') &&
         (!semanticState.readyToSave || (semanticState.intent === 'update_appointment' && !semanticState.targetId))) {
-      setActiveTask(tenantId, semanticState.intent, semanticState)
+      setActiveTask(tenantId, userId, semanticState.intent, semanticState)
     }
 
-    const result = await executeAction(semanticState, tenantId, message)
+    const result = await executeAction(semanticState, tenantId, userId, message)
     // Se concluiu uma ação de compromisso com sucesso, limpa foco
     if (result.success && (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment')) {
-      clearActiveTask(tenantId)
+      clearActiveTask(tenantId, userId)
     }
     return result
   } catch (error) {
@@ -338,18 +339,20 @@ function buildCommitFinalMessage(state: SemanticState, actionResult: ActionResul
 async function executeAction(
   semanticState: SemanticState,
   tenantId: string,
+  userId: string,
   message: string
 ): Promise<ActionResult> {
   switch (semanticState.intent) {
     case 'register_expense':
       console.log('executeAction - Chamando handleRegisterExpense')
-      const expenseResult = await handleRegisterExpense(semanticState, tenantId)
+      const expenseResult = await handleRegisterExpense(semanticState, tenantId, userId)
       if (expenseResult.success && expenseResult.data) {
         // Salva no histórico de ações
         saveRecentAction({
           id: expenseResult.data.id,
           type: 'expense',
           tenantId,
+          userId,
           createdAt: new Date(),
           data: {
             amount: semanticState.amount ?? undefined,
@@ -362,12 +365,13 @@ async function executeAction(
 
     case 'register_revenue':
       console.log('executeAction - Chamando handleRegisterRevenue')
-      const revenueResult = await handleRegisterRevenue(semanticState, tenantId)
+      const revenueResult = await handleRegisterRevenue(semanticState, tenantId, userId)
       if (revenueResult.success && revenueResult.data) {
         saveRecentAction({
           id: revenueResult.data.id,
           type: 'revenue',
           tenantId,
+          userId,
           createdAt: new Date(),
           data: {
             amount: semanticState.amount ?? undefined,
@@ -380,10 +384,10 @@ async function executeAction(
 
     case 'update_expense':
     case 'update_revenue':
-      return await handleUpdateFinanceiro(semanticState, tenantId)
+      return await handleUpdateFinanceiro(semanticState, tenantId, userId)
 
     case 'update_appointment':
-      return await handleUpdateAppointment(semanticState, tenantId)
+      return await handleUpdateAppointment(semanticState, tenantId, userId)
 
     case 'create_appointment':
         // Análise específica para compromissos
@@ -398,7 +402,9 @@ async function executeAction(
         const now = new Date()
         const existingAppointments = await getCompromissosRecords(
           tenantId,
-          now.toISOString()
+          now.toISOString(),
+          undefined,
+          userId
         )
         console.log('processAction - Compromissos futuros encontrados:', existingAppointments.length)
         
@@ -420,12 +426,13 @@ async function executeAction(
         }
         
         console.log('executeAction - Prosseguindo com criação de compromisso')
-        const appointmentResult = await handleCreateAppointment(semanticState, tenantId, message)
+        const appointmentResult = await handleCreateAppointment(semanticState, tenantId, userId, message)
         if (appointmentResult.success && appointmentResult.data) {
           saveRecentAction({
             id: appointmentResult.data.id,
             type: 'appointment',
             tenantId,
+            userId,
             createdAt: new Date(),
             data: {
               title: semanticState.title ?? undefined,
@@ -452,7 +459,7 @@ async function executeAction(
         }
         
         const { handleQuerySimple } = await import('./actions-query-simple')
-        return await handleQuerySimple(semanticState, tenantId)
+        return await handleQuerySimple(semanticState, tenantId, userId)
 
       case 'chat':
         // Mensagens conversacionais simples - retorna false para usar fallback conversacional
@@ -478,7 +485,8 @@ async function executeAction(
  */
 async function handleUpdateFinanceiro(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   try {
     if (!state.targetId) {
@@ -509,7 +517,7 @@ async function handleUpdateFinanceiro(
     
     // Remove do histórico após update bem-sucedido
     const { removeAction } = await import('./action-history')
-    removeAction(tenantId, state.targetId)
+    removeAction(tenantId, userId, state.targetId)
     
     let responseMessage = `✅ Registro atualizado com sucesso!\n\n`
     if (updates.amount) responseMessage += `💰 Valor: R$ ${updates.amount.toFixed(2)}\n`
@@ -537,7 +545,8 @@ async function handleUpdateFinanceiro(
  */
 async function handleUpdateAppointment(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   try {
     if (!state.targetId) {
@@ -565,7 +574,7 @@ async function handleUpdateAppointment(
     
     // Remove do histórico após update bem-sucedido
     const { removeAction } = await import('./action-history')
-    removeAction(tenantId, state.targetId)
+    removeAction(tenantId, userId, state.targetId)
     
     // Limpa o focus lock após update bem-sucedido
     const { clearFocus } = await import('./focus-lock')
@@ -604,7 +613,8 @@ async function handleUpdateAppointment(
  */
 async function handleRegisterExpense(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   try {
     // Validação rígida: verifica dados obrigatórios
@@ -663,6 +673,7 @@ async function handleRegisterExpense(
     // Cria o registro
     const record = await createFinanceiroRecord({
       tenantId,
+      userId,
       amount,
       description: description.trim(),
       category,
@@ -703,7 +714,8 @@ async function handleRegisterExpense(
  */
 async function handleRegisterRevenue(
   state: SemanticState,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Promise<ActionResult> {
   try {
     // Validação rígida: verifica dados obrigatórios
@@ -762,6 +774,7 @@ async function handleRegisterRevenue(
     // Cria o registro (única diferença: transactionType: 'revenue')
     const record = await createFinanceiroRecord({
       tenantId,
+      userId,
       amount,
       description: description.trim(),
       category,
@@ -802,6 +815,7 @@ async function handleRegisterRevenue(
 async function handleCreateAppointment(
   state: SemanticState,
   tenantId: string,
+  userId: string,
   originalMessage?: string
 ): Promise<ActionResult> {
   try {
@@ -954,6 +968,7 @@ async function handleCreateAppointment(
 
     const compromisso = await createCompromissoRecord({
       tenantId,
+      userId,
       title: title.trim(),
       scheduledAt: scheduledAt,
       description: state.description || null,
