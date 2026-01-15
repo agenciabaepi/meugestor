@@ -21,6 +21,13 @@ export function analyzeAppointmentContext(
 ): ContextAnalysis {
   const lowerMessage = message.toLowerCase()
   
+  // PRIORIDADE 1: Se tem título E horário extraídos, é novo compromisso - SEMPRE permite
+  const hasNewAppointmentData = extractedData?.title && extractedData?.scheduled_at
+  if (hasNewAppointmentData) {
+    console.log('analyzeAppointmentContext - Dados de novo compromisso detectados, permitindo criação')
+    // Continua para verificar duplicatas, mas não bloqueia por pedido de lembrete
+  }
+  
   // Palavras-chave que indicam pedido de lembrete/alerta
   const reminderKeywords = [
     'lembre', 'lembrar', 'me avise', 'me avisa', 'avise', 'avisa',
@@ -29,21 +36,39 @@ export function analyzeAppointmentContext(
     'me fale', 'me fala', 'fale', 'fala antes'
   ]
   
-  // Verifica se está pedindo lembrete
-  const isAskingForReminder = reminderKeywords.some(keyword => 
+  // Verifica se está pedindo lembrete de um compromisso EXISTENTE
+  // IMPORTANTE: Só bloqueia se mencionar "dessa agenda", "desse compromisso", etc
+  // Se mencionar horário + título novo = é novo compromisso, não pedido de lembrete
+  const hasReminderKeyword = reminderKeywords.some(keyword => 
     lowerMessage.includes(keyword)
   )
   
-  if (isAskingForReminder) {
-    // Verifica se menciona um compromisso existente
-    const hasAppointmentReference = existingAppointments?.some(apt => 
-      lowerMessage.includes(apt.title.toLowerCase()) ||
-      lowerMessage.includes('dessa agenda') ||
-      lowerMessage.includes('desse compromisso') ||
-      lowerMessage.includes('deste compromisso')
-    )
+  // Indicadores de que está se referindo a um compromisso EXISTENTE
+  const existingAppointmentIndicators = [
+    'dessa agenda', 'desse compromisso', 'deste compromisso',
+    'dessa reunião', 'desse evento', 'deste evento',
+    'dela', 'dele', 'disso', 'desse', 'desta'
+  ]
+  
+  // Verifica se menciona compromisso existente por título
+  const mentionsExistingByTitle = existingAppointments?.some(apt => {
+    const aptTitle = apt.title.toLowerCase()
+    // Verifica se a mensagem menciona o título do compromisso existente
+    return lowerMessage.includes(aptTitle) && aptTitle.length > 3
+  })
+  
+  // Só bloqueia se:
+  // 1. Tem palavra de lembrete E
+  // 2. (Menciona compromisso existente OU tem indicador de referência a algo existente) E
+  // 3. NÃO tem dados de novo compromisso (título + horário)
+  if (hasReminderKeyword && !hasNewAppointmentData) {
+    const hasExistingReference = existingAppointmentIndicators.some(indicator => 
+      lowerMessage.includes(indicator)
+    ) || mentionsExistingByTitle
     
-    if (hasAppointmentReference || lowerMessage.includes('dessa') || lowerMessage.includes('desse')) {
+    // Se tem referência a existente E não tem dados de novo compromisso
+    if (hasExistingReference) {
+      console.log('analyzeAppointmentContext - Pedido de lembrete detectado, bloqueando criação')
       return {
         shouldProceed: false,
         message: `😊 Não precisa se preocupar! O sistema já envia lembretes automáticos para todos os seus compromissos! 📅\n\n` +
@@ -56,41 +81,54 @@ export function analyzeAppointmentContext(
         suggestedAction: 'explain_reminder_system'
       }
     }
+    // Se tem palavra de lembrete mas tem dados de novo compromisso, deixa criar
   }
   
   // Verifica se está tentando criar compromisso duplicado
-  if (extractedData?.title && existingAppointments) {
-    const similarAppointment = existingAppointments.find(apt => {
-      const aptTitle = apt.title.toLowerCase()
-      const newTitle = extractedData.title.toLowerCase()
+  // IMPORTANTE: Só bloqueia se for EXATAMENTE o mesmo (mesmo título E mesmo horário)
+  // Permite múltiplos compromissos com mesmo título em horários diferentes
+  if (extractedData?.title && extractedData?.scheduled_at && existingAppointments) {
+    const newTitle = extractedData.title.toLowerCase().trim()
+    const newDate = new Date(extractedData.scheduled_at)
+    
+    // Verifica se já existe compromisso com mesmo título E mesmo horário (dentro de 30 minutos)
+    const exactDuplicate = existingAppointments.find(apt => {
+      const aptTitle = apt.title.toLowerCase().trim()
+      const aptDate = new Date(apt.scheduled_at)
       
-      // Verifica similaridade (títulos muito parecidos)
-      return aptTitle.includes(newTitle) || 
-             newTitle.includes(aptTitle) ||
-             (aptTitle.length > 5 && newTitle.length > 5 && 
-              aptTitle.substring(0, 5) === newTitle.substring(0, 5))
+      // Títulos muito similares (mesma palavra principal)
+      const titlesMatch = aptTitle === newTitle || 
+                         (aptTitle.includes(newTitle) && newTitle.length > 3) ||
+                         (newTitle.includes(aptTitle) && aptTitle.length > 3)
+      
+      if (!titlesMatch) return false
+      
+      // Verifica se é o mesmo horário (dentro de 30 minutos)
+      const diffMinutes = Math.abs(newDate.getTime() - aptDate.getTime()) / (1000 * 60)
+      
+      // Se é mesmo título E mesmo horário (dentro de 30min) = duplicata exata
+      if (diffMinutes < 30) {
+        return true
+      }
+      
+      return false
     })
     
-    if (similarAppointment) {
-      const aptDate = new Date(similarAppointment.scheduled_at)
-      const newDate = extractedData.scheduled_at ? new Date(extractedData.scheduled_at) : null
-      
-      // Se as datas são muito próximas (mesmo dia ou próximo)
-      if (newDate) {
-        const diffHours = Math.abs(newDate.getTime() - aptDate.getTime()) / (1000 * 60 * 60)
-        if (diffHours < 24) {
-          return {
-            shouldProceed: false,
-            message: `🤔 Parece que você já tem um compromisso similar agendado!\n\n` +
-              `📅 *${similarAppointment.title}*\n` +
-              `🕐 ${aptDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n` +
-              `Deseja mesmo criar outro compromisso? Se quiser, posso criar! 😊`,
-            reason: 'possible_duplicate',
-            suggestedAction: 'ask_confirmation'
-          }
-        }
+    if (exactDuplicate) {
+      const aptDate = new Date(exactDuplicate.scheduled_at)
+      return {
+        shouldProceed: false,
+        message: `🤔 Você já tem um compromisso idêntico agendado!\n\n` +
+          `📅 *${exactDuplicate.title}*\n` +
+          `🕐 ${aptDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n` +
+          `Deseja mesmo criar outro compromisso igual? Se quiser, posso criar! 😊`,
+        reason: 'exact_duplicate',
+        suggestedAction: 'ask_confirmation'
       }
     }
+    
+    // Se tem mesmo título mas horário diferente, permite (ex: "salão 8h" e "salão 9h")
+    // Não bloqueia, deixa criar normalmente
   }
   
   return {
@@ -100,9 +138,19 @@ export function analyzeAppointmentContext(
 
 /**
  * Analisa se uma mensagem está pedindo algo que o sistema já faz automaticamente
+ * IMPORTANTE: Só bloqueia se for claramente uma pergunta sobre funcionalidade
+ * Não bloqueia criação de compromissos que mencionam essas palavras
  */
 export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
   const lowerMessage = message.toLowerCase()
+  
+  // Verifica se é uma PERGUNTA sobre funcionalidade (não uma ação)
+  const isQuestion = lowerMessage.includes('?') || 
+                    lowerMessage.startsWith('como') ||
+                    lowerMessage.startsWith('pode') ||
+                    lowerMessage.startsWith('consegue') ||
+                    lowerMessage.startsWith('você pode') ||
+                    lowerMessage.startsWith('vc pode')
   
   // Mapeamento de funcionalidades do sistema
   const systemFeatures = [
@@ -125,13 +173,20 @@ export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
   
   for (const feature of systemFeatures) {
     if (feature.keywords.some(keyword => lowerMessage.includes(keyword))) {
-      // Verifica se está perguntando sobre a funcionalidade
-      const isAsking = lowerMessage.includes('?') || 
-                      lowerMessage.includes('como') ||
-                      lowerMessage.includes('pode') ||
-                      lowerMessage.includes('consegue')
+      // Só bloqueia se for claramente uma PERGUNTA sobre a funcionalidade
+      // Não bloqueia se for criação de compromisso (ex: "tenho salão às 9h")
+      // Verifica se tem indicadores de que é pergunta E não é criação de compromisso
+      const hasAppointmentKeywords = lowerMessage.includes('tenho') ||
+                                    lowerMessage.includes('tenho') ||
+                                    lowerMessage.includes('marcar') ||
+                                    lowerMessage.includes('agendar') ||
+                                    lowerMessage.includes('reunião') ||
+                                    lowerMessage.includes('consulta') ||
+                                    lowerMessage.includes('compromisso') ||
+                                    /\d{1,2}h/.test(lowerMessage) // Tem horário
       
-      if (isAsking) {
+      // Se é pergunta E não parece ser criação de compromisso
+      if (isQuestion && !hasAppointmentKeywords) {
         return {
           shouldProceed: false,
           message: `💡 ${feature.explanation}\n\n` +
@@ -140,6 +195,7 @@ export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
           suggestedAction: 'inform_user'
         }
       }
+      // Se tem palavras de funcionalidade mas parece ser criação de compromisso, deixa passar
     }
   }
   

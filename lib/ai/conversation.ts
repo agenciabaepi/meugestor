@@ -215,9 +215,18 @@ INTENÇÕES:
 - register_expense: usuário quer registrar um gasto/despesa (ex: "gastei 50 reais de gasolina", "coloquei 50 reais de gasolina", "despesa de 100 reais", "paguei 30 no mercado")
 - register_revenue: usuário quer registrar uma receita/entrada de dinheiro (ex: "recebi 2000 de salário", "entrada de 500 reais", "ganhei 1000", "recebi 10 reais de comissão")
 - create_appointment: usuário quer criar um compromisso/agendamento (ex: "reunião 12h", "tenho reunião amanhã às 10h", "marcar consulta médica para segunda às 14h")
-- query: usuário quer consultar informações (ex: "quanto gastei de combustível?", "quanto gasto por mês de gasolina?")
-- report: usuário quer um relatório completo
+- query: usuário quer CONSULTAR informações existentes (ex: "quanto gastei de combustível?", "quanto gasto por mês de gasolina?", "quantos compromissos tenho amanhã?", "quais são meus compromissos?", "tenho algum compromisso hoje?", "meus compromissos da semana")
+- report: usuário quer um relatório completo de gastos/receitas
 - chat: conversa geral sem ação específica
+
+IMPORTANTE - DISTINÇÃO ENTRE QUERY E REPORT:
+- query: perguntas específicas sobre dados existentes (ex: "quantos compromissos tenho?", "quanto gastei?", "quais são meus compromissos amanhã?")
+- report: pedido de relatório completo ou resumo geral (ex: "me mostre um relatório", "resumo dos meus gastos", "relatório financeiro")
+
+IMPORTANTE - CONSULTAS SOBRE COMPROMISSOS:
+Se o usuário perguntar sobre compromissos (ex: "quantos compromissos tenho?", "quais são meus compromissos amanhã?", "tenho compromissos hoje?"), SEMPRE use intenção "query" com:
+- queryType: "compromissos" ou "agenda"
+- queryPeriod: período mencionado (hoje, amanhã, semana, mês, etc)
 
 DISTINÇÃO CRÍTICA ENTRE RECEITA E DESPESA:
 Para identificar se é RECEITA (register_revenue) ou DESPESA (register_expense), analise as palavras-chave na mensagem:
@@ -305,10 +314,18 @@ EXEMPLOS DE DESPESAS (register_expense):
 
 EXEMPLOS DE OUTRAS INTENÇÕES:
 - "quanto gasto por mês de combustível?" -> query, queryType: "categoria", queryCategory: "Transporte", queryPeriod: "mês"
+- "quantos compromissos tenho amanhã?" -> query, queryType: "compromissos", queryPeriod: "amanhã"
+- "quais são meus compromissos hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
+- "tenho algum compromisso hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
+- "meus compromissos da semana" -> query, queryType: "compromissos", queryPeriod: "semana"
 - "reunião 12h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-15T12:00:00.000Z" (use data de HOJE)
 - "tenho reunião amanhã às 10h" -> create_appointment, title: "Reunião", scheduled_at: "2024-01-16T10:00:00.000Z"
 - "marcar consulta médica segunda às 14h" -> create_appointment, title: "Consulta médica", scheduled_at: "2024-01-20T14:00:00.000Z"
 - "agendar reunião" -> create_appointment, title: "Reunião", scheduled_at: (use data/hora atual + 1 hora como padrão)
+
+REGRA CRÍTICA - PERGUNTAS SOBRE COMPROMISSOS:
+Se a mensagem contém palavras como "compromissos", "agenda", "reuniões", "eventos" combinadas com perguntas (quantos, quais, tenho, tem), SEMPRE use intenção "query" com queryType: "compromissos".
+NUNCA use "report" para perguntas sobre compromissos.
 
 IMPORTANTE: 
 - scheduled_at DEVE estar em formato ISO 8601 completo com timezone (ex: "2024-01-15T12:00:00.000Z")

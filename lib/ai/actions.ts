@@ -124,12 +124,16 @@ export async function processAction(
     }
 
     // Verifica se está pedindo funcionalidade que já existe
-    const featuresAnalysis = analyzeSystemFeaturesRequest(message)
-    if (!featuresAnalysis.shouldProceed && featuresAnalysis.message) {
-      console.log('processAction - Usuário pedindo funcionalidade que já existe')
-      return {
-        success: true,
-        message: featuresAnalysis.message,
+    // IMPORTANTE: Só aplica se NÃO for criação de compromisso
+    // Se for criação de compromisso, pula essa análise
+    if (correctedIntention !== 'create_appointment') {
+      const featuresAnalysis = analyzeSystemFeaturesRequest(message)
+      if (!featuresAnalysis.shouldProceed && featuresAnalysis.message) {
+        console.log('processAction - Usuário pedindo funcionalidade que já existe')
+        return {
+          success: true,
+          message: featuresAnalysis.message,
+        }
       }
     }
 
@@ -591,6 +595,110 @@ async function handleQuery(
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0]
+
+    // PRIORIDADE 1: Consulta de compromissos (verificar ANTES de gastos)
+    // Verifica se é pergunta sobre compromissos/agenda
+    if (extractedData?.queryType === 'compromissos' || 
+        extractedData?.queryType === 'agenda' ||
+        lowerMessage.includes('compromisso') || 
+        lowerMessage.includes('agenda') ||
+        lowerMessage.includes('reunião') ||
+        lowerMessage.includes('reuniao') ||
+        (lowerMessage.includes('quantos') && (lowerMessage.includes('tenho') || lowerMessage.includes('tem'))) ||
+        (lowerMessage.includes('quais') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda'))) ||
+        (lowerMessage.includes('tenho') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda') || lowerMessage.includes('reunião'))) ||
+        (lowerMessage.includes('amanhã') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda'))) ||
+        (lowerMessage.includes('amanha') && (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')))) {
+      
+      console.log('handleQuery - Consulta de COMPROMISSOS detectada')
+      
+      // Determina o período da consulta
+      const isAmanha = lowerMessage.includes('amanhã') || lowerMessage.includes('amanha')
+      const isHoje = lowerMessage.includes('hoje')
+      const isSemana = lowerMessage.includes('semana')
+      
+      let compromissos: any[] = []
+      let periodoTexto = ''
+      
+      if (isAmanha) {
+        // Compromissos de amanhã
+        const amanha = new Date(now)
+        amanha.setDate(amanha.getDate() + 1)
+        amanha.setHours(0, 0, 0, 0)
+        const amanhaFim = new Date(amanha)
+        amanhaFim.setHours(23, 59, 59, 999)
+        
+        compromissos = await getCompromissosRecords(
+          tenantId,
+          amanha.toISOString(),
+          amanhaFim.toISOString()
+        )
+        periodoTexto = 'amanhã'
+      } else if (isHoje) {
+        // Compromissos de hoje
+        compromissos = await getTodayCompromissos(tenantId)
+        periodoTexto = 'hoje'
+      } else if (isSemana) {
+        // Compromissos da semana
+        const semanaFim = new Date(now)
+        semanaFim.setDate(semanaFim.getDate() + 7)
+        compromissos = await getCompromissosRecords(
+          tenantId,
+          now.toISOString(),
+          semanaFim.toISOString()
+        )
+        periodoTexto = 'esta semana'
+      } else {
+        // Todos os compromissos futuros
+        compromissos = await getCompromissosRecords(
+          tenantId,
+          now.toISOString()
+        )
+        periodoTexto = 'futuros'
+      }
+      
+      // Ordena por data
+      compromissos.sort((a, b) => 
+        new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+      )
+      
+      let response = ''
+      
+      if (compromissos.length === 0) {
+        response = `📅 Você não tem compromissos ${periodoTexto === 'futuros' ? 'futuros' : periodoTexto}.`
+      } else {
+        const quantidade = compromissos.length
+        response = `📅 Você tem ${quantidade} ${quantidade === 1 ? 'compromisso' : 'compromissos'} ${periodoTexto}:\n\n`
+        
+        compromissos.forEach((c, index) => {
+          const dataHora = new Date(c.scheduled_at)
+          const data = dataHora.toLocaleDateString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })
+          const hora = dataHora.toLocaleTimeString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+          
+          response += `${index + 1}. ${c.title}\n`
+          response += `   🕐 ${hora} - ${data}\n`
+          if (c.description) {
+            response += `   📝 ${c.description}\n`
+          }
+          response += `\n`
+        })
+      }
+      
+      return {
+        success: true,
+        message: response,
+        data: { compromissos, periodo: periodoTexto },
+      }
+    }
 
     // Consulta específica por categoria/subcategoria (ex: "quanto gasto de combustível?")
     if (extractedData?.queryType === 'categoria' || 
