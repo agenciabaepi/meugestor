@@ -187,6 +187,20 @@ export async function analyzeIntention(
       ? recentConversations.slice(-10).map(c => `${c.role === 'user' ? 'Usuário' : 'Assistente'}: ${c.message}`).join('\n')
       : ''
     
+    // Busca último estado válido para contexto adicional
+    const { getLastValidState } = await import('./semantic-state')
+    const lastState = getLastValidState()
+    const lastStateContext = lastState ? `
+ÚLTIMO ESTADO VÁLIDO (para herança de contexto):
+- intent: ${lastState.intent}
+- domain: ${lastState.domain || 'null'}
+- periodo: ${lastState.periodo || 'null'}
+- categoria: ${lastState.categoria || 'null'}
+- queryType: ${lastState.queryType || 'null'}
+
+Se a mensagem atual for um follow-up curto (ex: "e mercado?", "e combustível?"), use este estado como base e aplique apenas as mudanças mencionadas.
+` : ''
+    
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-5.2',
       messages: [
@@ -207,6 +221,7 @@ SEU PAPEL:
 ${conversationContext ? `
 CONTEXTO DA CONVERSA RECENTE:
 ${conversationContext}
+${lastStateContext}
 
 REGRA CRÍTICA - PERGUNTAS DE CONTINUAÇÃO (FOLLOW-UPS):
 Quando a mensagem é curta (ex: "e hoje?", "e mercado?", "e combustível?", "e cartão?"), você DEVE:
