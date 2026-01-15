@@ -14,9 +14,11 @@ export interface ContextAnalysis {
  * Analisa se uma ação de criar compromisso é realmente necessária
  * ou se o usuário está pedindo algo que o sistema já faz
  */
+import type { SemanticState } from './semantic-state'
+
 export function analyzeAppointmentContext(
   message: string,
-  extractedData: any,
+  state: SemanticState,
   existingAppointments?: Array<{ title: string; scheduled_at: string }>
 ): ContextAnalysis {
   const lowerMessage = message.toLowerCase()
@@ -73,7 +75,7 @@ export function analyzeAppointmentContext(
   ) || mentionsExistingByTitle || mentionsExistingByContext
   
   // Verifica se o título extraído é "Lembrete" ou similar
-  const extractedTitle = extractedData?.title?.toLowerCase() || ''
+  const extractedTitle = state.title?.toLowerCase() || ''
   const isReminderTitle = extractedTitle.includes('lembrete') || 
                           extractedTitle.includes('aviso') ||
                           extractedTitle.includes('alerta') ||
@@ -83,7 +85,7 @@ export function analyzeAppointmentContext(
   // PRIORIDADE 1: Se tem palavra de lembrete E menciona compromisso existente, é pedido de lembrete
   if (hasReminderKeyword && hasExistingReference) {
     // Se título é "Lembrete" OU não tem título válido (só tem horário), é pedido de lembrete
-    if (isReminderTitle || !extractedData?.title || extractedTitle.length < 3) {
+    if (isReminderTitle || !state.title || extractedTitle.length < 3) {
       console.log('analyzeAppointmentContext - Pedido de lembrete de compromisso existente detectado')
       
       const mentionedAppointment = existingAppointments?.find(apt => {
@@ -136,7 +138,7 @@ export function analyzeAppointmentContext(
   }
   
   // PRIORIDADE 3: Se tem título E horário extraídos E não é pedido de lembrete, é novo compromisso
-  const hasNewAppointmentData = extractedData?.title && extractedData?.scheduled_at
+  const hasNewAppointmentData = state.title && state.scheduled_at
   if (hasNewAppointmentData && !isReminderTitle) {
     console.log('analyzeAppointmentContext - Dados de novo compromisso detectados, permitindo criação')
     // Continua para verificar duplicatas, mas não bloqueia por pedido de lembrete
@@ -145,9 +147,9 @@ export function analyzeAppointmentContext(
   // Verifica se está tentando criar compromisso duplicado
   // IMPORTANTE: Só bloqueia se for EXATAMENTE o mesmo (mesmo título E mesmo horário)
   // Permite múltiplos compromissos com mesmo título em horários diferentes
-  if (extractedData?.title && extractedData?.scheduled_at && existingAppointments) {
-    const newTitle = extractedData.title.toLowerCase().trim()
-    const newDate = new Date(extractedData.scheduled_at)
+  if (state.title && state.scheduled_at && existingAppointments) {
+    const newTitle = state.title.toLowerCase().trim()
+    const newDate = new Date(state.scheduled_at)
     
     // Verifica se já existe compromisso com mesmo título E mesmo horário (dentro de 30 minutos)
     const exactDuplicate = existingAppointments.find(apt => {
