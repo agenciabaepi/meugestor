@@ -208,9 +208,30 @@ ${conversationContext ? `
 CONTEXTO DA CONVERSA RECENTE:
 ${conversationContext}
 
-IMPORTANTE - PERGUNTAS DE CONTINUAÇÃO:
-Se a mensagem atual é curta (ex: "e hoje?", "e mercado?", "e cartão?"), use o contexto da conversa anterior para entender a intenção completa.
-Exemplo: Se o usuário perguntou "quanto gastei ontem?" e depois pergunta "e mercado?", interprete como "quanto gastei de mercado ontem?".
+REGRA CRÍTICA - PERGUNTAS DE CONTINUAÇÃO (FOLLOW-UPS):
+Quando a mensagem é curta (ex: "e hoje?", "e mercado?", "e combustível?", "e cartão?"), você DEVE:
+
+1. Herdar TODOS os campos do contexto anterior que não foram mencionados na mensagem atual
+2. Aplicar APENAS as mudanças mencionadas na mensagem curta
+3. NUNCA resetar campos que não foram mencionados
+
+EXEMPLOS CORRETOS:
+- Contexto: "quanto gastei ontem?" (periodo: "ontem", queryType: "gasto")
+  → Nova: "e mercado?" 
+  → Resultado: { periodo: "ontem", queryType: "gasto", categoria: "Alimentação" }
+  → NÃO resetar período para "mês"!
+
+- Contexto: "quanto gastei no mercado ontem?" (periodo: "ontem", categoria: "Alimentação")
+  → Nova: "e combustível?"
+  → Resultado: { periodo: "ontem", queryType: "gasto", categoria: "Transporte" }
+  → Mudou categoria, MAS manteve período "ontem"!
+
+- Contexto: "quanto gastei ontem?" (periodo: "ontem")
+  → Nova: "e hoje?"
+  → Resultado: { periodo: "hoje", queryType: "gasto" }
+  → Mencionou novo período, então usa "hoje"
+
+REGRA DE OURO: Se não mencionar período na mensagem curta, SEMPRE herde do contexto anterior.
 ` : ''}
 
 Analise a mensagem do usuário e retorne um ESTADO SEMÂNTICO COMPLETO.
@@ -254,7 +275,9 @@ DOMÍNIOS (domain):
 
 PERÍODOS (periodo):
 - hoje, ontem, amanhã, semana, mês, ano
-- Se não mencionar, deixe null (sistema herdará do contexto se necessário)
+- REGRA CRÍTICA: Se a mensagem é um follow-up curto (ex: "e mercado?", "e combustível?") e NÃO menciona período, deixe null para o sistema herdar do contexto anterior
+- Se mencionar período explicitamente, use esse período
+- NUNCA assuma "mês" como default se houver contexto anterior com período específico (hoje, ontem, semana)
 
 QUERY TYPES (queryType):
 - gasto: consulta sobre gastos/despesas
@@ -379,10 +402,15 @@ EXEMPLOS DE OUTRAS INTENÇÕES:
 - "quanto gastei esta semana?" -> query, queryType: "gasto" ou "despesa", queryPeriod: "semana" (NÃO "compromissos")
 
 EXEMPLOS DE PERGUNTAS DE CONTINUAÇÃO (usar contexto anterior):
-- Contexto: "quantos gastei ontem?" → Nova mensagem: "e hoje?" → query, queryType: "gasto", queryPeriod: "hoje"
-- Contexto: "quanto gastei hoje?" → Nova mensagem: "e ontem?" → query, queryType: "gasto", queryPeriod: "ontem"
-- Contexto: "quantos compromissos tenho amanhã?" → Nova mensagem: "e hoje?" → query, queryType: "compromissos", queryPeriod: "hoje"
-- IMPORTANTE: Quando a mensagem é curta e parece continuação (ex: "e hoje?", "e ontem?"), SEMPRE use o contexto da conversa anterior para entender a intenção completa
+- Contexto: "quantos gastei ontem?" → Nova: "e hoje?" → { intent: "query", queryType: "gasto", periodo: "hoje" }
+- Contexto: "quanto gastei hoje?" → Nova: "e ontem?" → { intent: "query", queryType: "gasto", periodo: "ontem" }
+- Contexto: "quanto gastei ontem?" → Nova: "e mercado?" → { intent: "query", queryType: "gasto", periodo: "ontem", categoria: "Alimentação" }
+  → IMPORTANTE: Manteve período "ontem", apenas mudou categoria!
+- Contexto: "quanto gastei no mercado ontem?" → Nova: "e combustível?" → { intent: "query", queryType: "gasto", periodo: "ontem", categoria: "Transporte" }
+  → IMPORTANTE: Manteve período "ontem", mudou categoria de "Alimentação" para "Transporte"!
+- Contexto: "quanto gastei ontem?" → Nova: "e cartão?" → { intent: "query", queryType: "gasto", periodo: "ontem", categoria: "Financeiro e Obrigações" }
+  → IMPORTANTE: Manteve período "ontem", apenas mudou categoria!
+- IMPORTANTE: Quando a mensagem é curta (ex: "e mercado?", "e combustível?", "e cartão?"), SEMPRE herde período do contexto anterior se não mencionar novo período
 - "quantos compromissos tenho amanhã?" -> query, queryType: "compromissos", queryPeriod: "amanhã"
 - "quais são meus compromissos hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"
 - "tenho algum compromisso hoje?" -> query, queryType: "compromissos", queryPeriod: "hoje"

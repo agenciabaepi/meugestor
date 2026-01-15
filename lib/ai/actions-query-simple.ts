@@ -20,6 +20,7 @@ import {
   getYesterdayEndInBrazil,
   getNowInBrazil
 } from '../utils/date-parser'
+import { filterBySemanticCategory } from '../utils/semantic-filter'
 
 /**
  * Converte período semântico em range de datas
@@ -183,10 +184,19 @@ async function queryGastos(
   // Busca apenas despesas
   const registros = await getDespesasRecords(tenantId, startDate, endDate)
   
-  // Se tem categoria, filtra por categoria
+  // FILTRO SEMÂNTICO: Se tem categoria/subcategoria, usa filtro semântico
+  // Isso resolve o problema de "mercado" não encontrar "supermercado"
   let registrosFiltrados = registros
-  if (state.categoria) {
-    registrosFiltrados = registros.filter(r => r.category === state.categoria)
+  if (state.categoria || state.subcategoria) {
+    // Usa subcategoria se disponível, senão usa categoria
+    const searchTerm = state.subcategoria || state.categoria || ''
+    registrosFiltrados = filterBySemanticCategory(registros, searchTerm)
+    
+    console.log('queryGastos - Filtro semântico aplicado:', {
+      searchTerm,
+      totalRegistros: registros.length,
+      registrosFiltrados: registrosFiltrados.length
+    })
   }
   
   const total = registrosFiltrados.reduce((sum, r) => sum + Number(r.amount), 0)

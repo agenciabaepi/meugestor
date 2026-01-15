@@ -70,12 +70,14 @@ export function inheritContext(newState: SemanticState): SemanticState {
     console.log('semantic-state - Herdou domínio:', inherited.domain)
   }
 
-  // Herda período se não foi especificado (exceto para registros)
+  // REGRA CRÍTICA: Herda período se não foi especificado (exceto para registros)
+  // Default só é usado se NÃO existir contexto anterior
+  // Mudança de categoria NÃO pode resetar período
   if (!inherited.periodo && 
       lastValidState.periodo && 
       (inherited.intent === 'query' || inherited.intent === 'report')) {
     inherited.periodo = lastValidState.periodo
-    console.log('semantic-state - Herdou período:', inherited.periodo)
+    console.log('semantic-state - Herdou período do contexto:', inherited.periodo)
   }
 
   // Herda queryType se não foi especificado
@@ -84,21 +86,27 @@ export function inheritContext(newState: SemanticState): SemanticState {
     console.log('semantic-state - Herdou queryType:', inherited.queryType)
   }
 
-  // Herda categoria APENAS se não foi mencionada nova categoria
-  // Se usuário mencionou nova categoria, descarta a anterior
-  if (!inherited.categoria && lastValidState.categoria && inherited.intent === 'query') {
+  // REGRA CRÍTICA: Mudança de categoria NÃO pode resetar período
+  // Se usuário mencionou nova categoria, mantém o período do contexto anterior
+  if (inherited.categoria && inherited.categoria !== lastValidState.categoria) {
+    // Nova categoria mencionada - descarta categoria anterior
+    // MAS mantém período se não foi mencionado novo período
+    if (!inherited.periodo && lastValidState.periodo) {
+      inherited.periodo = lastValidState.periodo
+      console.log('semantic-state - Nova categoria detectada, mantendo período do contexto:', inherited.periodo)
+    }
+  } else if (!inherited.categoria && lastValidState.categoria && inherited.intent === 'query') {
+    // Não mencionou categoria - herda do contexto
     inherited.categoria = lastValidState.categoria
     console.log('semantic-state - Herdou categoria:', inherited.categoria)
+    
+    // Herda subcategoria se categoria foi herdada
+    if (!inherited.subcategoria && lastValidState.subcategoria) {
+      inherited.subcategoria = lastValidState.subcategoria
+      console.log('semantic-state - Herdou subcategoria:', inherited.subcategoria)
+    }
   }
-
-  // Herda subcategoria se categoria foi herdada
-  if (inherited.categoria === lastValidState.categoria && 
-      !inherited.subcategoria && 
-      lastValidState.subcategoria) {
-    inherited.subcategoria = lastValidState.subcategoria
-    console.log('semantic-state - Herdou subcategoria:', inherited.subcategoria)
-  }
-
+  
   return inherited
 }
 
