@@ -294,9 +294,11 @@ DOMÍNIOS (domain):
 
 PERÍODOS (periodo):
 - hoje, ontem, amanhã, semana, mês, ano
-- REGRA CRÍTICA: Se a mensagem é um follow-up curto (ex: "e mercado?", "e combustível?") e NÃO menciona período, deixe null para o sistema herdar do contexto anterior
-- Se mencionar período explicitamente, use esse período
-- NUNCA assuma "mês" como default se houver contexto anterior com período específico (hoje, ontem, semana)
+- REGRA CRÍTICA PARA FOLLOW-UPS: Se a mensagem é curta (ex: "e mercado?", "e combustível?") e NÃO menciona período, você DEVE retornar o período do contexto anterior explicitamente
+- Exemplo: Se contexto tem periodo: "ontem" e mensagem é "e mercado?", retorne periodo: "ontem" (NÃO null!)
+- Se mencionar período explicitamente na mensagem, use esse período
+- NUNCA retorne null para período em follow-ups se houver contexto anterior válido
+- NUNCA assuma "mês" como default se houver contexto anterior com período específico
 
 QUERY TYPES (queryType):
 - gasto: consulta sobre gastos/despesas
