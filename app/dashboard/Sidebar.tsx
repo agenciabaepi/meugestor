@@ -138,30 +138,41 @@ export function Sidebar() {
 
           {/* Upgrade Card */}
           <div className="px-4 pb-4">
-            <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-3xl p-6 pt-8 overflow-hidden shadow-xl">
+            <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-3xl p-6 pt-10 overflow-hidden shadow-xl">
               {/* Ícone circular no topo */}
-              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-10">
+              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
                 <div className="relative">
                   {/* Círculo externo com gradiente e borda branca */}
-                  <div className="w-14 h-14 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                  <div className="w-16 h-16 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white">
                     {/* Círculo interno branco com meia lua crescente */}
-                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-inner">
-                      {/* Meia lua crescente branca usando ícone Moon */}
-                      <Moon className="w-5 h-5 text-[#7A5AF8] fill-white stroke-white" />
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-inner relative">
+                      {/* Meia lua crescente branca - SVG customizado */}
+                      <svg 
+                        className="w-6 h-6" 
+                        viewBox="0 0 24 24" 
+                        fill="none"
+                      >
+                        <path 
+                          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.54 0 3-.37 4.29-1.02C15.37 20.5 13.5 20 12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.5 0 2.87.37 4.29 1.02C15.37 2.37 13.54 2 12 2z" 
+                          fill="white"
+                          stroke="white"
+                          strokeWidth="0.5"
+                        />
+                      </svg>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Conteúdo */}
-              <div className="pt-4 text-center">
+              <div className="pt-6 text-center">
                 <h3 className="text-lg font-bold text-white mb-2">
                   Upgrade to PRO
                 </h3>
-                <p className="text-sm text-white/95 mb-5 leading-relaxed px-1">
+                <p className="text-sm text-white/90 mb-5 leading-relaxed px-1">
                   Melhore seu processo de gestão e faça mais com Meu Gestor PRO!
                 </p>
-                <button className="w-full bg-white/25 hover:bg-white/35 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/40 shadow-md hover:shadow-lg active:scale-[0.98]">
+                <button className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/30 shadow-md hover:shadow-lg">
                   Upgrade to PRO
                 </button>
               </div>
