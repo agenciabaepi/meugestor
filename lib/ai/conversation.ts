@@ -171,133 +171,95 @@ async function getCompromissosSummary(tenantId: string): Promise<string | undefi
   }
 }
 
+import { SemanticState, inheritContext, saveLastValidState } from './semantic-state'
+
 /**
- * Analisa a intenção do usuário na mensagem
- * Agora com suporte a contexto conversacional para entender perguntas de continuação
+ * Analisa a intenção do usuário e retorna estado semântico completo
+ * GPT conversa. Sistema valida. Sistema executa.
  */
 export async function analyzeIntention(
   message: string,
   recentConversations?: Array<{ role: string; message: string }>
-): Promise<{
-  intention: 'register_expense' | 'register_revenue' | 'create_appointment' | 'query' | 'report' | 'chat'
-  confidence: number
-  extractedData?: any
-}> {
+): Promise<SemanticState> {
   try {
-    // Detecta perguntas de continuação (ex: "e hoje?", "e ontem?", "e amanhã?")
-    const lowerMessage = message.toLowerCase().trim()
-    // Padrões mais flexíveis para capturar variações
-    const isContinuationQuestion = /^(e\s+(hoje|ontem|amanhã|amanha|semana|mês|mes|agora))[?]?\.?$/i.test(lowerMessage) ||
-                                   /^(e\s+isso)[?]?\.?$/i.test(lowerMessage) ||
-                                   lowerMessage === 'e hoje' ||
-                                   lowerMessage === 'e ontem' ||
-                                   lowerMessage === 'e amanhã' ||
-                                   lowerMessage === 'e amanha' ||
-                                   lowerMessage === 'e hoje?' ||
-                                   lowerMessage === 'e ontem?' ||
-                                   lowerMessage === 'e amanhã?' ||
-                                   lowerMessage === 'e amanha?'
-    
-    // Se é pergunta de continuação, usa contexto anterior
-    let contextMessage = message
-    if (isContinuationQuestion && recentConversations && recentConversations.length > 0) {
-      console.log('analyzeIntention - PERGUNTA DE CONTINUAÇÃO DETECTADA:', message)
-      
-      // Busca a última pergunta do usuário sobre gastos/compromissos
-      const lastUserQuery = [...recentConversations].reverse().find(c => 
-        c.role === 'user' && 
-        (c.message.toLowerCase().includes('gastei') || 
-         c.message.toLowerCase().includes('gasto') ||
-         c.message.toLowerCase().includes('gastos') ||
-         c.message.toLowerCase().includes('compromisso') ||
-         c.message.toLowerCase().includes('agenda') ||
-         c.message.toLowerCase().includes('quantos') ||
-         c.message.toLowerCase().includes('quanto'))
-      )
-      
-      if (lastUserQuery) {
-        // Reconstrói a pergunta completa usando contexto
-        contextMessage = `${lastUserQuery.message} ${message}`
-        console.log('analyzeIntention - Contexto reconstruído:', {
-          original: message,
-          contexto: lastUserQuery.message,
-          reconstruida: contextMessage
-        })
-      } else {
-        console.log('analyzeIntention - Pergunta de continuação detectada, mas não encontrou contexto relevante')
-      }
-    }
+    // Monta contexto completo da conversa para o GPT entender
+    const conversationContext = recentConversations && recentConversations.length > 0
+      ? recentConversations.slice(-10).map(c => `${c.role === 'user' ? 'Usuário' : 'Assistente'}: ${c.message}`).join('\n')
+      : ''
     
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-5.2',
       messages: [
         {
           role: 'system',
-          content: `Você é um CLASSIFICADOR DE INTENÇÃO especializado em análise de mensagens financeiras e agendamento.
+          content: `Você é um ANALISADOR SEMÂNTICO especializado em entender conversas sobre gestão financeira e agendamento.
 
-SEU PAPEL (MUITO IMPORTANTE):
-- Você é APENAS um classificador, NÃO um assistente conversacional
+SEU PAPEL:
+- Você entende a conversa COMPLETA, incluindo contexto de mensagens anteriores
+- Você identifica perguntas de continuação (ex: "e hoje?", "e mercado?") e usa o contexto para entender
+- Você retorna um ESTADO SEMÂNTICO ÚNICO estruturado em JSON
 - Você NÃO responde texto ao usuário
 - Você NÃO executa ações
 - Você NÃO acessa banco de dados
-- Você APENAS retorna JSON estruturado com intenção e dados extraídos
-- Se não tiver certeza sobre a intenção, retorne confidence baixo (< 0.7) e deixe o sistema perguntar ao usuário
-- NUNCA invente dados - se não conseguir extrair, deixe o campo vazio ou null
+- Se não tiver certeza, retorne confidence < 0.7 e deixe o sistema perguntar
+- NUNCA invente dados - se não conseguir extrair, deixe o campo null ou undefined
 
-${recentConversations && recentConversations.length > 0 ? `
+${conversationContext ? `
 CONTEXTO DA CONVERSA RECENTE:
-${recentConversations.slice(-5).map(c => `${c.role === 'user' ? 'Usuário' : 'Assistente'}: ${c.message}`).join('\n')}
+${conversationContext}
 
 IMPORTANTE - PERGUNTAS DE CONTINUAÇÃO:
-Se a mensagem atual é curta e parece uma continuação (ex: "e hoje?", "e ontem?", "e amanhã?"), use o contexto da conversa anterior para entender a intenção completa.
-Exemplo: Se o usuário perguntou "quantos gastei ontem?" e depois pergunta "e hoje?", interprete como "quantos gastei hoje?".
+Se a mensagem atual é curta (ex: "e hoje?", "e mercado?", "e cartão?"), use o contexto da conversa anterior para entender a intenção completa.
+Exemplo: Se o usuário perguntou "quanto gastei ontem?" e depois pergunta "e mercado?", interprete como "quanto gastei de mercado ontem?".
 ` : ''}
 
-Analise a mensagem do usuário e identifique a intenção. Extraia TODAS as informações relevantes.
+Analise a mensagem do usuário e retorne um ESTADO SEMÂNTICO COMPLETO.
 
 REGRA CRÍTICA - SEPARAÇÃO DE DOMÍNIOS:
-- Financeiro: intenções relacionadas a gastos, receitas, despesas (register_expense, register_revenue, query sobre gastos)
-- Agenda: intenções relacionadas a compromissos, reuniões, eventos (create_appointment, query sobre compromissos)
-- NUNCA misture domínios. Uma intenção financeira NUNCA pode retornar dados de agenda.
-- Se a mensagem menciona "gastei", "gasto", "despesa" → SEMPRE é domínio financeiro
-- Se a mensagem menciona "compromisso", "agenda", "reunião" → SEMPRE é domínio agenda
-- Se não tiver certeza, retorne confidence baixo e deixe o sistema perguntar
-
-FORMATO DE RESPOSTA OBRIGATÓRIO:
-Você DEVE retornar APENAS JSON válido, sem texto adicional, sem explicações, sem markdown.
-Exemplo de resposta correta:
-{"intention": "query", "confidence": 0.9, "extractedData": {"queryType": "gasto", "queryPeriod": "hoje"}}
-
-Exemplo de resposta ERRADA (NÃO FAÇA ISSO):
-"O usuário quer consultar gastos de hoje. Aqui está o JSON: {...}"
+- Financeiro: gastos, receitas, despesas (register_expense, register_revenue, query sobre gastos)
+- Agenda: compromissos, reuniões, eventos (create_appointment, query sobre compromissos)
+- NUNCA misture domínios
+- "gastei", "gasto", "despesa" → SEMPRE domínio financeiro
+- "compromisso", "agenda", "reunião" → SEMPRE domínio agenda
 
 Responda APENAS com JSON no formato:
 {
-  "intention": "register_expense" | "register_revenue" | "create_appointment" | "query" | "report" | "chat",
+  "intent": "register_expense" | "register_revenue" | "create_appointment" | "query" | "report" | "chat",
+  "domain": "financeiro" | "agenda" | "geral" | null,
+  "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
+  "categoria": string | null,
+  "subcategoria": string | null,
+  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | null,
+  "amount": number | null,
+  "title": string | null,
+  "scheduled_at": string (ISO 8601) | null,
+  "description": string | null,
   "confidence": 0.0-1.0,
-  "extractedData": {
-    "amount": número se mencionado (extrair valor numérico),
-    "category": categoria principal se mencionada ou inferida,
-    "description": descrição completa e detalhada (do gasto ou receita),
-    "date": data se mencionada (formato YYYY-MM-DD),
-    "establishment": nome do estabelecimento se mencionado,
-    "paymentMethod": método de pagamento se mencionado (cartão, dinheiro, pix, etc),
-    "title": título do compromisso se for agendamento (ex: "Reunião", "Consulta médica"),
-    "scheduled_at": data/hora completa em ISO 8601 se for compromisso (ex: "2024-01-15T12:00:00.000Z"). Se mencionar apenas horário sem data, use a data de HOJE. Se mencionar "amanhã", use amanhã. Se mencionar dia da semana, calcule a próxima ocorrência,
-    "description": descrição adicional do compromisso se houver,
-    "queryType": tipo de consulta se for query (gasto, categoria, período, etc),
-    "queryCategory": categoria específica se a consulta for sobre uma categoria,
-    "queryPeriod": período se mencionado (mês, semana, ano, etc)
-  }
+  "needsClarification": boolean,
+  "clarificationMessage": string | null
 }
 
-INTENÇÕES:
-- register_expense: usuário quer registrar um gasto/despesa (ex: "gastei 50 reais de gasolina", "coloquei 50 reais de gasolina", "despesa de 100 reais", "paguei 30 no mercado")
-- register_revenue: usuário quer registrar uma receita/entrada de dinheiro (ex: "recebi 2000 de salário", "entrada de 500 reais", "ganhei 1000", "recebi 10 reais de comissão")
-- create_appointment: usuário quer criar um compromisso/agendamento (ex: "reunião 12h", "tenho reunião amanhã às 10h", "marcar consulta médica para segunda às 14h")
-- query: usuário quer CONSULTAR informações existentes (ex: "quanto gastei de combustível?", "quanto gasto por mês de gasolina?", "quantos compromissos tenho amanhã?", "quais são meus compromissos?", "tenho algum compromisso hoje?", "meus compromissos da semana")
-- report: usuário quer um relatório completo de gastos/receitas
-- chat: conversa geral sem ação específica
+INTENÇÕES (intent):
+- register_expense: registrar gasto/despesa
+- register_revenue: registrar receita/entrada
+- create_appointment: criar compromisso/agendamento
+- query: consultar informações existentes
+- report: relatório completo
+- chat: conversa geral
+
+DOMÍNIOS (domain):
+- financeiro: gastos, receitas, despesas
+- agenda: compromissos, reuniões, eventos
+- geral: conversa sem domínio específico
+
+PERÍODOS (periodo):
+- hoje, ontem, amanhã, semana, mês, ano
+- Se não mencionar, deixe null (sistema herdará do contexto se necessário)
+
+QUERY TYPES (queryType):
+- gasto: consulta sobre gastos/despesas
+- compromissos: consulta sobre compromissos/agenda
+- categoria: consulta sobre categoria específica
 
 IMPORTANTE - DISTINÇÃO ENTRE QUERY E REPORT:
 - query: perguntas específicas sobre dados existentes (ex: "quantos compromissos tenho?", "quanto gastei?", "quais são meus compromissos amanhã?")
@@ -458,17 +420,49 @@ IMPORTANTE:
 
     const response = completion.choices[0]?.message?.content
     if (!response) {
-      return { intention: 'chat', confidence: 0.5 }
+      return {
+        intent: 'chat',
+        confidence: 0.5,
+        needsClarification: true,
+        clarificationMessage: 'Não consegui entender sua mensagem. Pode reformular?'
+      }
     }
 
     const parsed = JSON.parse(response)
-    return {
-      intention: parsed.intention || 'chat',
+    
+    // Constrói estado semântico completo
+    const semanticState: SemanticState = {
+      intent: parsed.intent || 'chat',
+      domain: parsed.domain || null,
+      periodo: parsed.periodo || null,
+      categoria: parsed.categoria || null,
+      subcategoria: parsed.subcategoria || null,
+      queryType: parsed.queryType || null,
+      amount: parsed.amount || null,
+      title: parsed.title || null,
+      scheduled_at: parsed.scheduled_at || null,
+      description: parsed.description || null,
       confidence: parsed.confidence || 0.5,
-      extractedData: parsed.extractedData,
+      needsClarification: parsed.needsClarification || false,
+      clarificationMessage: parsed.clarificationMessage || null
     }
+    
+    // Aplica herança de contexto
+    const stateWithContext = inheritContext(semanticState)
+    
+    // Salva estado válido se confidence >= 0.7
+    if (stateWithContext.confidence >= 0.7) {
+      saveLastValidState(stateWithContext)
+    }
+    
+    return stateWithContext
   } catch (error) {
     console.error('Erro ao analisar intenção:', error)
-    return { intention: 'chat', confidence: 0.5 }
+    return {
+      intent: 'chat',
+      confidence: 0.5,
+      needsClarification: true,
+      clarificationMessage: 'Erro ao processar mensagem. Pode tentar novamente?'
+    }
   }
 }

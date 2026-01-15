@@ -12,7 +12,7 @@ import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
-import { extractContextFromConversations, isContinuationQuestion, reconstructContinuationMessage } from './context-manager'
+import type { SemanticState } from './semantic-state'
 
 export interface ActionResult {
   success: boolean
@@ -112,60 +112,35 @@ export async function processAction(
     console.log('processAction - Mensagem:', message)
     console.log('processAction - TenantId:', tenantId)
     
-    // Busca contexto recente para entender perguntas de continuação
+    // Busca contexto recente para o GPT entender a conversa completa
     const { getRecentConversations } = await import('../db/queries')
-    const recentConversations = await getRecentConversations(tenantId, 5)
+    const recentConversations = await getRecentConversations(tenantId, 10)
     const recentContext = recentConversations.map(c => ({
       role: c.role,
       message: c.message
     }))
     
-    // Extrai contexto conversacional (memória curta)
-    const conversationContext = extractContextFromConversations(recentContext)
-    console.log('processAction - Contexto extraído:', conversationContext)
+    // GPT analisa e retorna estado semântico completo (com herança de contexto)
+    console.log('processAction - Analisando estado semântico...')
+    const semanticState = await analyzeIntention(message, recentContext)
     
-    // Detecta perguntas de continuação e reconstrói usando contexto
-    let effectiveMessage = message
-    let contextExtractedData: any = {}
+    console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
-    if (isContinuationQuestion(message) && conversationContext) {
-      console.log('processAction - PERGUNTA DE CONTINUAÇÃO detectada, reconstruindo...')
-      const reconstructed = reconstructContinuationMessage(message, conversationContext)
-      effectiveMessage = reconstructed.message
-      contextExtractedData = reconstructed.extractedData
-      console.log('processAction - Mensagem reconstruída:', {
-        original: message,
-        reconstruida: effectiveMessage,
-        extractedData: contextExtractedData
-      })
+    // Se precisa esclarecimento, retorna mensagem
+    if (semanticState.needsClarification && semanticState.clarificationMessage) {
+      return {
+        success: true,
+        message: semanticState.clarificationMessage,
+      }
     }
     
-    // Analisa a intenção com contexto
-    console.log('processAction - Analisando intenção com contexto...')
-    const { intention, extractedData: aiExtractedData } = await analyzeIntention(effectiveMessage, recentContext)
-    
-    // Mescla dados extraídos do contexto com dados da IA
-    const extractedData = { ...contextExtractedData, ...aiExtractedData }
-
-    console.log('processAction - Intenção detectada:', intention)
-    console.log('processAction - Dados extraídos:', JSON.stringify(extractedData, null, 2))
-    
-    // Log específico para compromissos
-    if (intention === 'create_appointment') {
-      console.log('processAction - COMPROMISSO DETECTADO')
-      console.log('processAction - extractedData.title:', extractedData?.title)
-      console.log('processAction - extractedData.scheduled_at:', extractedData?.scheduled_at)
-      console.log('processAction - Mensagem original:', message)
+    // Validação rígida: verifica se estado é válido
+    if (semanticState.confidence < 0.7) {
+      return {
+        success: false,
+        message: 'Não entendi completamente. Pode reformular sua pergunta?',
+      }
     }
-
-    // Valida e corrige a intenção baseado em palavras-chave
-    const correctedIntention = validateAndCorrectIntention(message, intention, extractedData)
-    
-    if (correctedIntention !== intention) {
-      console.log(`processAction - ✅ Intenção corrigida: ${intention} -> ${correctedIntention}`)
-    }
-
-    console.log('processAction - Intenção final:', correctedIntention)
 
     // Análise de contexto inteligente ANTES de executar ações
     // Verifica se é apenas conversa casual
@@ -192,30 +167,40 @@ export async function processAction(
       }
     }
 
-    switch (correctedIntention) {
+    // Validação de domínio: verifica se domínio está correto
+    if (semanticState.domain && 
+        ((semanticState.intent === 'query' && semanticState.queryType === 'gasto' && semanticState.domain !== 'financeiro') ||
+         (semanticState.intent === 'query' && semanticState.queryType === 'compromissos' && semanticState.domain !== 'agenda'))) {
+      console.error('processAction - ERRO: Domínio incorreto no estado semântico')
+      return {
+        success: false,
+        message: 'Erro interno ao processar. Tente novamente.',
+      }
+    }
+
+    switch (semanticState.intent) {
       case 'register_expense':
         console.log('processAction - Chamando handleRegisterExpense')
-        const expenseResult = await handleRegisterExpense(extractedData, tenantId)
+        const expenseResult = await handleRegisterExpense(semanticState, tenantId)
         console.log('processAction - Resultado handleRegisterExpense:', expenseResult.success)
         return expenseResult
 
       case 'register_revenue':
         console.log('processAction - Chamando handleRegisterRevenue')
-        const revenueResult = await handleRegisterRevenue(extractedData, tenantId)
+        const revenueResult = await handleRegisterRevenue(semanticState, tenantId)
         console.log('processAction - Resultado handleRegisterRevenue:', revenueResult.success)
         return revenueResult
 
       case 'create_appointment':
         // Análise específica para compromissos
         console.log('processAction - Analisando contexto de compromisso...')
-        console.log('processAction - Dados extraídos:', {
-          title: extractedData?.title,
-          scheduled_at: extractedData?.scheduled_at,
-          description: extractedData?.description
+        console.log('processAction - Estado semântico:', {
+          title: semanticState.title,
+          scheduled_at: semanticState.scheduled_at,
+          description: semanticState.description
         })
         
         // Busca compromissos existentes para verificar duplicatas e pedidos de lembrete
-        // Busca apenas compromissos futuros para análise de contexto
         const now = new Date()
         const existingAppointments = await getCompromissosRecords(
           tenantId,
@@ -225,7 +210,7 @@ export async function processAction(
         
         const appointmentAnalysis = analyzeAppointmentContext(
           message,
-          extractedData,
+          semanticState,
           existingAppointments.map(apt => ({
             title: apt.title,
             scheduled_at: apt.scheduled_at,
@@ -234,7 +219,6 @@ export async function processAction(
         
         if (!appointmentAnalysis.shouldProceed && appointmentAnalysis.message) {
           console.log('processAction - Ação de compromisso bloqueada pela análise de contexto')
-          console.log('processAction - Razão:', appointmentAnalysis.reason)
           return {
             success: true,
             message: appointmentAnalysis.message,
@@ -242,33 +226,26 @@ export async function processAction(
         }
         
         console.log('processAction - Prosseguindo com criação de compromisso')
-        return await handleCreateAppointment(extractedData, tenantId, message)
+        return await handleCreateAppointment(semanticState, tenantId, message)
 
       case 'query':
-        // Validação anti-burrice: verifica se a intenção corresponde ao domínio
-        const queryDomain = extractedData?.domain || 
-                           (extractedData?.queryType === 'gasto' ? 'financeiro' : 
-                            extractedData?.queryType === 'compromissos' ? 'agenda' : null)
-        
-        console.log('processAction - Validação de domínio:', {
-          queryDomain,
-          queryType: extractedData?.queryType,
-          intention: correctedIntention
-        })
-        
-        // Se detectou query mas não tem domínio claro, tenta inferir da mensagem
-        if (!queryDomain && !extractedData?.queryType) {
-          const lowerMessage = message.toLowerCase()
-          if (lowerMessage.includes('gastei') || lowerMessage.includes('gasto')) {
-            extractedData.queryType = 'gasto'
-            extractedData.domain = 'financeiro'
-          } else if (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) {
-            extractedData.queryType = 'compromissos'
-            extractedData.domain = 'agenda'
+        // Validação rígida: verifica se queryType e domain estão corretos
+        if (!semanticState.queryType) {
+          return {
+            success: false,
+            message: 'Não entendi o que você quer consultar. Pode especificar?',
           }
         }
         
-        return await handleQuery(message, tenantId, extractedData, recentContext)
+        if (!semanticState.domain) {
+          return {
+            success: false,
+            message: 'Erro ao identificar o tipo de consulta. Tente novamente.',
+          }
+        }
+        
+        const { handleQuerySimple } = await import('./actions-query-simple')
+        return await handleQuerySimple(semanticState, tenantId)
 
       case 'chat':
         // Mensagens conversacionais simples - retorna false para usar fallback conversacional
@@ -308,33 +285,33 @@ export async function processAction(
  * Registra um gasto
  */
 async function handleRegisterExpense(
-  data: any,
+  state: SemanticState,
   tenantId: string
 ): Promise<ActionResult> {
   try {
-    // Valida dados mínimos
-    if (!data?.amount) {
+    // Validação rígida: verifica dados obrigatórios
+    if (!state.amount || state.amount <= 0) {
       return {
         success: false,
         message: 'Preciso saber o valor do gasto. Quanto foi?',
       }
     }
 
-    if (!data?.description) {
+    if (!state.description) {
       return {
         success: false,
         message: 'Preciso saber o que foi comprado. Pode descrever?',
       }
     }
 
-    // Define valores padrão
-    const amount = parseFloat(data.amount) || 0
-    let description = data.description || 'Gasto'
-    const date = data.date || new Date().toISOString().split('T')[0]
+    // Usa dados do estado semântico
+    const amount = state.amount
+    const description = state.description
+    const date = new Date().toISOString().split('T')[0] // Sempre usa hoje para registros
 
-    // Usa categorização inteligente se não foi fornecida categoria
-    let category = data.category
-    let subcategory: string | null = null
+    // Usa categoria do estado ou categoriza automaticamente
+    let category = state.categoria || 'Outros'
+    let subcategory = state.subcategoria || null
     let tags: string[] = []
 
     if (!category || category === 'Outros') {
@@ -409,33 +386,33 @@ async function handleRegisterExpense(
  * Mesma lógica de handleRegisterExpense, apenas muda transactionType e mensagens
  */
 async function handleRegisterRevenue(
-  data: any,
+  state: SemanticState,
   tenantId: string
 ): Promise<ActionResult> {
   try {
-    // Valida dados mínimos
-    if (!data?.amount) {
+    // Validação rígida: verifica dados obrigatórios
+    if (!state.amount || state.amount <= 0) {
       return {
         success: false,
         message: 'Preciso saber o valor da receita. Quanto foi?',
       }
     }
 
-    if (!data?.description) {
+    if (!state.description) {
       return {
         success: false,
         message: 'Preciso saber de onde veio essa receita. Pode descrever?',
       }
     }
 
-    // Define valores padrão
-    const amount = parseFloat(data.amount) || 0
-    let description = data.description || 'Receita'
-    const date = data.date || new Date().toISOString().split('T')[0]
+    // Usa dados do estado semântico
+    const amount = state.amount
+    const description = state.description
+    const date = new Date().toISOString().split('T')[0] // Sempre usa hoje para registros
 
-    // Usa categorização inteligente se não foi fornecida categoria
-    let category = data.category
-    let subcategory: string | null = null
+    // Usa categoria do estado ou categoriza automaticamente
+    let category = state.categoria || 'Outros'
+    let subcategory = state.subcategoria || null
     let tags: string[] = []
 
     if (!category || category === 'Outros') {
@@ -685,11 +662,14 @@ async function handleCreateAppointment(
 /**
  * Consulta informações
  */
+/**
+ * Consulta informações baseado no estado semântico
+ * SEM heurísticas, SEM if/else complexos, SEM reconstrução manual
+ * Apenas valida e executa baseado no estado
+ */
 async function handleQuery(
-  message: string,
-  tenantId: string,
-  extractedData?: any,
-  recentConversations?: Array<{ role: string; message: string }>
+  state: SemanticState,
+  tenantId: string
 ): Promise<ActionResult> {
   try {
     const lowerMessage = message.toLowerCase()
