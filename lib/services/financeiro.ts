@@ -67,6 +67,51 @@ export async function createFinanceiroRecord(
 }
 
 /**
+ * Atualiza um registro financeiro existente
+ */
+export async function updateFinanceiroRecord(
+  id: string,
+  tenantId: string,
+  updates: {
+    amount?: number
+    description?: string
+    category?: string
+    subcategory?: string | null
+    date?: string
+    receiptImageUrl?: string | null
+    metadata?: Record<string, any> | null
+    tags?: string[] | null
+    transactionType?: 'expense' | 'revenue'
+  }
+): Promise<Financeiro> {
+  // Validações apenas para campos fornecidos
+  if (updates.amount !== undefined && !isValidAmount(updates.amount)) {
+    throw new ValidationError('Valor deve ser maior que zero')
+  }
+  
+  if (updates.description !== undefined && (!updates.description || updates.description.trim().length === 0)) {
+    throw new ValidationError('Descrição não pode ser vazia')
+  }
+  
+  if (updates.category !== undefined && !isValidCategory(updates.category)) {
+    throw new ValidationError('Categoria inválida')
+  }
+  
+  if (updates.date !== undefined && !isValidDate(updates.date)) {
+    throw new ValidationError('Data inválida')
+  }
+  
+  const { updateFinanceiro } = await import('../db/queries')
+  const record = await updateFinanceiro(id, tenantId, updates)
+  
+  if (!record) {
+    throw new ValidationError('Erro ao atualizar registro financeiro')
+  }
+  
+  return record
+}
+
+/**
  * Obtém registros financeiros de um tenant
  */
 export async function getFinanceiroRecords(

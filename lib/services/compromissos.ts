@@ -60,6 +60,41 @@ export async function createCompromissoRecord(
 }
 
 /**
+ * Atualiza um compromisso existente
+ */
+export async function updateCompromissoRecord(
+  id: string,
+  tenantId: string,
+  updates: {
+    title?: string
+    description?: string | null
+    scheduledAt?: string
+  }
+): Promise<Compromisso> {
+  // Validações apenas para campos fornecidos
+  if (updates.title !== undefined && (!updates.title || updates.title.trim().length === 0)) {
+    throw new ValidationError('Título não pode ser vazio')
+  }
+  
+  if (updates.scheduledAt !== undefined && !isValidDate(updates.scheduledAt)) {
+    throw new ValidationError('Data/hora agendada inválida')
+  }
+  
+  const { updateCompromisso } = await import('../db/queries')
+  const compromisso = await updateCompromisso(id, tenantId, {
+    title: updates.title,
+    description: updates.description,
+    scheduled_at: updates.scheduledAt
+  })
+  
+  if (!compromisso) {
+    throw new ValidationError('Erro ao atualizar compromisso')
+  }
+  
+  return compromisso
+}
+
+/**
  * Obtém compromissos de um tenant
  */
 export async function getCompromissosRecords(

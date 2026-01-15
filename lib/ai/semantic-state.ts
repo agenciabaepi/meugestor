@@ -6,7 +6,7 @@
  */
 
 export interface SemanticState {
-  intent: 'register_expense' | 'register_revenue' | 'create_appointment' | 'query' | 'report' | 'chat'
+  intent: 'register_expense' | 'register_revenue' | 'create_appointment' | 'update_expense' | 'update_revenue' | 'update_appointment' | 'query' | 'report' | 'chat' | 'confirm' | 'cancel'
   domain?: 'financeiro' | 'agenda' | 'geral'
   periodo?: 'hoje' | 'ontem' | 'amanhã' | 'semana' | 'mês' | 'ano'
   categoria?: string
@@ -19,6 +19,9 @@ export interface SemanticState {
   confidence: number
   needsClarification?: boolean
   clarificationMessage?: string
+  needsConfirmation?: boolean
+  confirmationMessage?: string
+  targetId?: string // ID do registro a ser atualizado (para updates)
 }
 
 /**

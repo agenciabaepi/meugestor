@@ -3,6 +3,9 @@
  */
 
 import { analyzeIntention } from './conversation'
+import { analyzeConversationalIntention } from './conversational-assistant'
+import { getPendingConfirmation, savePendingConfirmation, clearPendingConfirmation } from './confirmation-manager'
+import { saveRecentAction } from './action-history'
 import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
 import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
 import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relatorios'
@@ -72,9 +75,32 @@ export async function processAction(
       message: c.message
     }))
     
-    // GPT analisa e retorna estado semântico completo (com herança de contexto)
-    console.log('processAction - Analisando estado semântico...')
-    const semanticState = await analyzeIntention(message, recentContext)
+    // Verifica se há confirmação pendente
+    const pendingConfirmation = getPendingConfirmation(tenantId)
+    const lowerMessage = message.toLowerCase().trim()
+    
+    // Se há confirmação pendente e usuário confirmou/cancelou
+    if (pendingConfirmation) {
+      if (lowerMessage === 'sim' || lowerMessage === 's' || lowerMessage === 'confirmar' || lowerMessage === 'ok') {
+        console.log('processAction - Confirmação recebida, executando ação pendente')
+        clearPendingConfirmation(tenantId)
+        // Usa o estado da confirmação pendente
+        const semanticState = pendingConfirmation.state
+        semanticState.intent = semanticState.intent.replace('confirm', '') as any // Remove 'confirm' do intent
+        return await executeAction(semanticState, tenantId, message)
+      } else if (lowerMessage === 'não' || lowerMessage === 'nao' || lowerMessage === 'cancelar') {
+        console.log('processAction - Cancelamento recebido')
+        clearPendingConfirmation(tenantId)
+        return {
+          success: true,
+          message: 'Entendido, cancelado. Como posso ajudar?'
+        }
+      }
+    }
+    
+    // Usa assistente conversacional (novo modelo)
+    console.log('processAction - Analisando intenção conversacional...')
+    const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId)
     
     console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
@@ -86,8 +112,25 @@ export async function processAction(
       }
     }
     
-    // Validação rígida: verifica se estado é válido
-    if (semanticState.confidence < 0.7) {
+    // Se precisa confirmação, salva e retorna mensagem
+    if (semanticState.needsConfirmation && semanticState.confirmationMessage) {
+      savePendingConfirmation(tenantId, semanticState)
+      return {
+        success: true,
+        message: semanticState.confirmationMessage,
+      }
+    }
+    
+    // Se é conversa casual, usa fallback conversacional
+    if (semanticState.intent === 'chat') {
+      return {
+        success: false, // Indica para usar processMessage
+        message: 'Mensagem conversacional',
+      }
+    }
+    
+    // Validação rígida: verifica se estado é válido (exceto chat)
+    if (semanticState.confidence < 0.7 && (semanticState.intent !== 'chat' as any)) {
       return {
         success: false,
         message: 'Não entendi completamente. Pode reformular sua pergunta?',
@@ -137,20 +180,79 @@ export async function processAction(
       }
     }
 
-    switch (semanticState.intent) {
-      case 'register_expense':
-        console.log('processAction - Chamando handleRegisterExpense')
-        const expenseResult = await handleRegisterExpense(semanticState, tenantId)
-        console.log('processAction - Resultado handleRegisterExpense:', expenseResult.success)
-        return expenseResult
+    // Delega execução para função separada
+    return await executeAction(semanticState, tenantId, message)
+  } catch (error) {
+    console.error('=== ERRO EM PROCESS ACTION ===')
+    console.error('processAction - Erro capturado:', error)
+    console.error('processAction - Tipo:', error?.constructor?.name)
+    console.error('processAction - Mensagem:', error instanceof Error ? error.message : String(error))
+    console.error('processAction - Stack:', error instanceof Error ? error.stack : 'N/A')
+    console.error('processAction - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
+    return {
+      success: false,
+      message: error instanceof Error 
+        ? `Erro ao processar: ${error.message}` 
+        : 'Erro desconhecido ao processar ação',
+    }
+  }
+}
 
-      case 'register_revenue':
-        console.log('processAction - Chamando handleRegisterRevenue')
-        const revenueResult = await handleRegisterRevenue(semanticState, tenantId)
-        console.log('processAction - Resultado handleRegisterRevenue:', revenueResult.success)
-        return revenueResult
+/**
+ * Executa ação baseada no estado semântico
+ */
+async function executeAction(
+  semanticState: SemanticState,
+  tenantId: string,
+  message: string
+): Promise<ActionResult> {
+  switch (semanticState.intent) {
+    case 'register_expense':
+      console.log('executeAction - Chamando handleRegisterExpense')
+      const expenseResult = await handleRegisterExpense(semanticState, tenantId)
+      if (expenseResult.success && expenseResult.data) {
+        // Salva no histórico de ações
+        saveRecentAction({
+          id: expenseResult.data.id,
+          type: 'expense',
+          tenantId,
+          createdAt: new Date(),
+          data: {
+            amount: semanticState.amount,
+            description: semanticState.description,
+            category: semanticState.categoria
+          }
+        })
+      }
+      return expenseResult
 
-      case 'create_appointment':
+    case 'register_revenue':
+      console.log('executeAction - Chamando handleRegisterRevenue')
+      const revenueResult = await handleRegisterRevenue(semanticState, tenantId)
+      if (revenueResult.success && revenueResult.data) {
+        saveRecentAction({
+          id: revenueResult.data.id,
+          type: 'revenue',
+          tenantId,
+          createdAt: new Date(),
+          data: {
+            amount: semanticState.amount,
+            description: semanticState.description,
+            category: semanticState.categoria
+          }
+        })
+      }
+      return revenueResult
+
+    case 'update_expense':
+    case 'update_revenue':
+      return await handleUpdateFinanceiro(semanticState, tenantId)
+
+    case 'update_appointment':
+      return await handleUpdateAppointment(semanticState, tenantId)
+
+    case 'create_appointment':
         // Análise específica para compromissos
         console.log('processAction - Analisando contexto de compromisso...')
         console.log('processAction - Estado semântico:', {
@@ -184,8 +286,21 @@ export async function processAction(
           }
         }
         
-        console.log('processAction - Prosseguindo com criação de compromisso')
-        return await handleCreateAppointment(semanticState, tenantId, message)
+        console.log('executeAction - Prosseguindo com criação de compromisso')
+        const appointmentResult = await handleCreateAppointment(semanticState, tenantId, message)
+        if (appointmentResult.success && appointmentResult.data) {
+          saveRecentAction({
+            id: appointmentResult.data.id,
+            type: 'appointment',
+            tenantId,
+            createdAt: new Date(),
+            data: {
+              title: semanticState.title,
+              scheduled_at: semanticState.scheduled_at
+            }
+          })
+        }
+        return appointmentResult
 
       case 'query':
         // Validação rígida: verifica se queryType e domain estão corretos
@@ -223,20 +338,122 @@ export async function processAction(
           message: 'Mensagem recebida. Processando...',
         }
     }
-  } catch (error) {
-    console.error('=== ERRO EM PROCESS ACTION ===')
-    console.error('processAction - Erro capturado:', error)
-    console.error('processAction - Tipo:', error?.constructor?.name)
-    console.error('processAction - Mensagem:', error instanceof Error ? error.message : String(error))
-    console.error('processAction - Stack:', error instanceof Error ? error.stack : 'N/A')
-    console.error('processAction - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+}
+
+/**
+ * Atualiza um registro financeiro (expense ou revenue)
+ */
+async function handleUpdateFinanceiro(
+  state: SemanticState,
+  tenantId: string
+): Promise<ActionResult> {
+  try {
+    if (!state.targetId) {
+      return {
+        success: false,
+        message: 'Não encontrei o registro para atualizar. Pode especificar qual?'
+      }
+    }
+    
+    const { updateFinanceiroRecord } = await import('../services/financeiro')
+    
+    // Prepara updates apenas com campos fornecidos
+    const updates: any = {}
+    if (state.amount !== undefined && state.amount > 0) {
+      updates.amount = state.amount
+    }
+    if (state.description) {
+      updates.description = state.description
+    }
+    if (state.categoria) {
+      updates.category = state.categoria
+    }
+    if (state.subcategoria !== undefined) {
+      updates.subcategory = state.subcategoria
+    }
+    
+    const record = await updateFinanceiroRecord(state.targetId, tenantId, updates)
+    
+    // Remove do histórico após update bem-sucedido
+    const { removeAction } = await import('./action-history')
+    removeAction(tenantId, state.targetId)
+    
+    let responseMessage = `✅ Registro atualizado com sucesso!\n\n`
+    if (updates.amount) responseMessage += `💰 Valor: R$ ${updates.amount.toFixed(2)}\n`
+    if (updates.description) responseMessage += `📝 Descrição: ${updates.description}\n`
+    if (updates.category) responseMessage += `🏷️ Categoria: ${updates.category}\n`
     
     return {
-      success: false,
-      message: error instanceof Error 
-        ? `Erro ao processar: ${error.message}` 
-        : 'Erro desconhecido ao processar ação',
+      success: true,
+      message: responseMessage,
+      data: record
     }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return {
+        success: false,
+        message: error.message
+      }
+    }
+    throw error
+  }
+}
+
+/**
+ * Atualiza um compromisso
+ */
+async function handleUpdateAppointment(
+  state: SemanticState,
+  tenantId: string
+): Promise<ActionResult> {
+  try {
+    if (!state.targetId) {
+      return {
+        success: false,
+        message: 'Não encontrei o compromisso para atualizar. Pode especificar qual?'
+      }
+    }
+    
+    const { updateCompromissoRecord } = await import('../services/compromissos')
+    
+    // Prepara updates apenas com campos fornecidos
+    const updates: any = {}
+    if (state.title) {
+      updates.title = state.title
+    }
+    if (state.description !== undefined) {
+      updates.description = state.description
+    }
+    if (state.scheduled_at) {
+      updates.scheduledAt = state.scheduled_at
+    }
+    
+    const compromisso = await updateCompromissoRecord(state.targetId, tenantId, updates)
+    
+    // Remove do histórico após update bem-sucedido
+    const { removeAction } = await import('./action-history')
+    removeAction(tenantId, state.targetId)
+    
+    let responseMessage = `✅ Compromisso atualizado com sucesso!\n\n`
+    if (updates.title) responseMessage += `📋 Título: ${updates.title}\n`
+    if (updates.scheduledAt) {
+      const date = new Date(updates.scheduledAt)
+      responseMessage += `📅 Data/Hora: ${date.toLocaleString('pt-BR')}\n`
+    }
+    
+    return {
+      success: true,
+      message: responseMessage,
+      data: compromisso
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return {
+        success: false,
+        message: error.message
+      }
+    }
+    throw error
   }
 }
 

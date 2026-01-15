@@ -343,6 +343,88 @@ export async function createCompromisso(
   return data
 }
 
+export async function updateFinanceiro(
+  id: string,
+  tenantId: string,
+  updates: {
+    amount?: number
+    description?: string
+    category?: string
+    subcategory?: string | null
+    date?: string
+    receiptImageUrl?: string | null
+    metadata?: Record<string, any> | null
+    tags?: string[] | null
+    transactionType?: 'expense' | 'revenue'
+  }
+): Promise<Financeiro | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado.')
+    return null
+  }
+  
+  const updateData: any = {}
+  if (updates.amount !== undefined) updateData.amount = updates.amount
+  if (updates.description !== undefined) updateData.description = updates.description
+  if (updates.category !== undefined) updateData.category = updates.category
+  if (updates.subcategory !== undefined) updateData.subcategory = updates.subcategory
+  if (updates.date !== undefined) updateData.date = updates.date
+  if (updates.receiptImageUrl !== undefined) updateData.receipt_image_url = updates.receiptImageUrl
+  if (updates.metadata !== undefined) updateData.metadata = updates.metadata
+  if (updates.tags !== undefined) updateData.tags = updates.tags
+  if (updates.transactionType !== undefined) updateData.transaction_type = updates.transactionType
+  
+  const { data, error } = await supabaseAdmin
+    .from('financeiro')
+    .update(updateData)
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating financeiro:', error)
+    return null
+  }
+  
+  return data
+}
+
+export async function updateCompromisso(
+  id: string,
+  tenantId: string,
+  updates: {
+    title?: string
+    description?: string | null
+    scheduled_at?: string
+  }
+): Promise<Compromisso | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado.')
+    return null
+  }
+  
+  const updateData: any = {}
+  if (updates.title !== undefined) updateData.title = updates.title
+  if (updates.description !== undefined) updateData.description = updates.description
+  if (updates.scheduled_at !== undefined) updateData.scheduled_at = updates.scheduled_at
+  
+  const { data, error } = await supabaseAdmin
+    .from('compromissos')
+    .update(updateData)
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating compromisso:', error)
+    return null
+  }
+  
+  return data
+}
+
 export async function getCompromissosByTenant(
   tenantId: string,
   startDate?: string,
