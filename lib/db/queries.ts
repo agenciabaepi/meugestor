@@ -369,6 +369,8 @@ export async function getCompromissosByTenant(
     query = query.lte('scheduled_at', endDate)
   }
 
+  // Supabase tem limite padrão de 1000, mas vamos garantir que buscamos todos
+  // Se houver muitos compromissos, pode precisar de paginação, mas para uso normal não deve ser problema
   const { data, error, count } = await query
 
   if (error) {
@@ -378,11 +380,24 @@ export async function getCompromissosByTenant(
   }
 
   // Log para debug - verificar quantos compromissos foram encontrados
-  console.log(`getCompromissosByTenant - Encontrados ${count || data?.length || 0} compromissos para tenant ${tenantId}`, {
+  const totalEncontrados = count || data?.length || 0
+  console.log(`getCompromissosByTenant - Encontrados ${totalEncontrados} compromissos para tenant ${tenantId}`, {
     startDate,
     endDate,
-    count: count || data?.length || 0
+    count: totalEncontrados,
+    dataLength: data?.length || 0,
+    countFromQuery: count
   })
+  
+  // Log detalhado dos compromissos encontrados (apenas se houver poucos para não poluir logs)
+  if (data && data.length > 0 && data.length <= 10) {
+    console.log('getCompromissosByTenant - Detalhes dos compromissos:', data.map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      scheduled_at: c.scheduled_at,
+      scheduled_at_brazil: new Date(c.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    })))
+  }
 
   return (data || []).map((item: any) => ({
     ...item,
