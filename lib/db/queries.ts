@@ -154,19 +154,24 @@ export async function createFinanceiro(
     .select()
     .single()
   
-  // Se o erro for sobre transaction_type não existir, tenta sem esse campo
-  if (error && (error.message?.includes('transaction_type') || error.message?.includes('column') || error.code === '42703')) {
-    console.warn('Campo transaction_type não existe, tentando inserir sem ele (migration não aplicada)')
-    console.warn('Erro original:', error.message)
-    const insertDataWithoutType = { ...insertData }
-    delete insertDataWithoutType.transaction_type
-    const retryResult = await client
-      .from('financeiro')
-      .insert(insertDataWithoutType)
-      .select()
-      .single()
-    data = retryResult.data
-    error = retryResult.error
+  // Compatibilidade: se user_id/transaction_type não existirem, tenta novamente sem esses campos
+  if (error && (error.message?.includes('column') || error.code === '42703')) {
+    const missingUserId = error.message?.includes('user_id')
+    const missingTransactionType = error.message?.includes('transaction_type')
+    if (missingUserId || missingTransactionType) {
+      console.warn('Campo user_id/transaction_type não existe, tentando inserir sem ele (aplique a migration 011/008)')
+      console.warn('Erro original:', error.message)
+      const retryData = { ...insertData }
+      if (missingUserId) delete retryData.user_id
+      if (missingTransactionType) delete retryData.transaction_type
+      const retryResult = await client
+        .from('financeiro')
+        .insert(retryData)
+        .select()
+        .single()
+      data = retryResult.data
+      error = retryResult.error
+    }
   }
 
   if (error) {
@@ -334,7 +339,7 @@ export async function createCompromisso(
   
   console.log('createCompromisso - Tentando inserir:', { tenantId, title, scheduledAt, description })
   
-  const { data, error } = await client
+  let { data, error } = await client
     .from('compromissos')
     .insert({
       tenant_id: tenantId,
@@ -345,6 +350,23 @@ export async function createCompromisso(
     })
     .select()
     .single()
+
+  // Compatibilidade: se user_id não existir ainda, tenta sem user_id (aplique a migration 011)
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em compromissos, tentando inserir sem ele (aplique a migration 011)')
+    const retry = await client
+      .from('compromissos')
+      .insert({
+        tenant_id: tenantId,
+        title,
+        description: description || null,
+        scheduled_at: scheduledAt,
+      })
+      .select()
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
 
   if (error) {
     console.error('Error creating compromisso:', error)
@@ -546,7 +568,7 @@ export async function createConversation(
   }
   const client = supabaseAdmin
   
-  const { data, error } = await client
+  let { data, error } = await client
     .from('conversations')
     .insert({
       tenant_id: tenantId,
@@ -556,6 +578,22 @@ export async function createConversation(
     })
     .select()
     .single()
+
+  // Compatibilidade: se user_id não existir ainda, tenta sem user_id (aplique a migration 011)
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em conversations, tentando inserir sem ele (aplique a migration 011)')
+    const retry = await client
+      .from('conversations')
+      .insert({
+        tenant_id: tenantId,
+        message,
+        role,
+      })
+      .select()
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
 
   if (error) {
     console.error('Error creating conversation:', error)
