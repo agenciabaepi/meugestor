@@ -152,10 +152,11 @@ export function Sidebar() {
                         viewBox="0 0 24 24" 
                         fill="white"
                       >
-                        {/* Meia lua crescente - forma de crescente usando dois arcos */}
+                        {/* Meia lua crescente - usando path com fill-rule evenodd */}
                         <path 
-                          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.54 0 3-.37 4.29-1.02C15.37 20.5 13.5 20 12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.5 0 2.87.37 4.29 1.02C15.37 2.37 13.54 2 12 2z" 
+                          d="M 18,6 Q 22,10 22,12 Q 22,14 18,18 Q 14,14 14,12 Q 14,10 18,6 M 17,8 Q 15,10 15,12 Q 15,14 17,16 Q 19,14 19,12 Q 19,10 17,8"
                           fill="white"
+                          fillRule="evenodd"
                         />
                       </svg>
                     </div>
