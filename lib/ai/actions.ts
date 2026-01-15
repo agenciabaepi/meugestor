@@ -270,6 +270,14 @@ export async function processAction(
         
         return await handleQuery(message, tenantId, extractedData, recentContext)
 
+      case 'chat':
+        // Mensagens conversacionais simples - retorna false para usar fallback conversacional
+        console.log('processAction - Intenção chat detectada, usando fallback conversacional')
+        return {
+          success: false,
+          message: 'Mensagem conversacional detectada',
+        }
+
       case 'report':
         return await handleReport(tenantId)
 
