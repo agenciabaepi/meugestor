@@ -746,8 +746,10 @@ async function handleQuery(
     
     // PRIORIDADE 0: Verifica se é sobre GASTOS/DESPESAS primeiro (mais comum)
     // Se menciona palavras de gasto, NÃO é sobre compromissos
-    const isAboutExpenses = queryDomain === 'financeiro' ||
+    const isAboutExpenses = shouldForceExpenseQuery ||
+                           queryDomain === 'financeiro' ||
                            extractedData?.queryType === 'gasto' ||
+                           extractedData?.domain === 'financeiro' ||
                            lowerMessage.includes('gastei') || 
                            lowerMessage.includes('gasto') || 
                            lowerMessage.includes('gastar') ||
@@ -761,9 +763,10 @@ async function handleQuery(
     
     // PRIORIDADE 1: Consulta de compromissos (APENAS se NÃO for sobre gastos E domínio é agenda)
     // Verifica se é pergunta sobre compromissos/agenda
-    const isAboutAppointments = queryDomain === 'agenda' ||
-                               extractedData?.queryType === 'compromissos' ||
-                               extractedData?.queryType === 'agenda'
+    const isAboutAppointments = (queryDomain === 'agenda' ||
+                                extractedData?.queryType === 'compromissos' ||
+                                extractedData?.queryType === 'agenda' ||
+                                extractedData?.domain === 'agenda') && !isAboutExpenses
     
     if (!isAboutExpenses && isAboutAppointments && (
         extractedData?.queryType === 'compromissos' || 
