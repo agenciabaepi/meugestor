@@ -129,8 +129,8 @@ export async function processAction(
       }
     }
     
-    // Validação rígida: verifica se estado é válido (exceto chat)
-    if (semanticState.confidence < 0.7 && semanticState.intent !== 'chat') {
+    // Validação rígida: verifica se estado é válido (chat já retornou acima)
+    if (semanticState.confidence < 0.7) {
       return {
         success: false,
         message: 'Não entendi completamente. Pode reformular sua pergunta?',
@@ -219,9 +219,9 @@ async function executeAction(
           tenantId,
           createdAt: new Date(),
           data: {
-            amount: semanticState.amount,
-            description: semanticState.description,
-            category: semanticState.categoria
+            amount: semanticState.amount ?? undefined,
+            description: semanticState.description ?? undefined,
+            category: semanticState.categoria ?? undefined
           }
         })
       }
@@ -237,9 +237,9 @@ async function executeAction(
           tenantId,
           createdAt: new Date(),
           data: {
-            amount: semanticState.amount,
-            description: semanticState.description,
-            category: semanticState.categoria
+            amount: semanticState.amount ?? undefined,
+            description: semanticState.description ?? undefined,
+            category: semanticState.categoria ?? undefined
           }
         })
       }
@@ -295,8 +295,8 @@ async function executeAction(
             tenantId,
             createdAt: new Date(),
             data: {
-              title: semanticState.title,
-              scheduled_at: semanticState.scheduled_at
+              title: semanticState.title ?? undefined,
+              scheduled_at: semanticState.scheduled_at ?? undefined
             }
           })
         }
@@ -359,11 +359,11 @@ async function handleUpdateFinanceiro(
     
     // Prepara updates apenas com campos fornecidos
     const updates: any = {}
-    if (state.amount !== undefined && state.amount > 0) {
+    if (typeof state.amount === 'number' && state.amount > 0) {
       updates.amount = state.amount
     }
-    if (state.description) {
-      updates.description = state.description
+    if (typeof state.description === 'string' && state.description.trim().length > 0) {
+      updates.description = state.description.trim()
     }
     if (state.categoria) {
       updates.category = state.categoria

@@ -7,21 +7,23 @@
 
 export interface SemanticState {
   intent: 'register_expense' | 'register_revenue' | 'create_appointment' | 'update_expense' | 'update_revenue' | 'update_appointment' | 'query' | 'report' | 'chat' | 'confirm' | 'cancel'
-  domain?: 'financeiro' | 'agenda' | 'geral'
-  periodo?: 'hoje' | 'ontem' | 'amanhã' | 'semana' | 'mês' | 'ano'
-  categoria?: string
-  subcategoria?: string
-  queryType?: 'gasto' | 'compromissos' | 'categoria' | 'agenda'
-  amount?: number
-  title?: string
-  scheduled_at?: string
-  description?: string
+  // Campos opcionais podem ser null quando o GPT não conseguiu extrair
+  // (isso permite distinguir "não mencionado" vs "ausente")
+  domain?: 'financeiro' | 'agenda' | 'geral' | null
+  periodo?: 'hoje' | 'ontem' | 'amanhã' | 'semana' | 'mês' | 'ano' | null
+  categoria?: string | null
+  subcategoria?: string | null
+  queryType?: 'gasto' | 'compromissos' | 'categoria' | 'agenda' | null
+  amount?: number | null
+  title?: string | null
+  scheduled_at?: string | null
+  description?: string | null
   confidence: number
   needsClarification?: boolean
-  clarificationMessage?: string
+  clarificationMessage?: string | null
   needsConfirmation?: boolean
-  confirmationMessage?: string
-  targetId?: string // ID do registro a ser atualizado (para updates)
+  confirmationMessage?: string | null
+  targetId?: string | null // ID do registro a ser atualizado (para updates)
 }
 
 /**

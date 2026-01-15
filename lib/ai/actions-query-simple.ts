@@ -88,7 +88,7 @@ async function queryCompromissos(
   state: SemanticState,
   tenantId: string
 ): Promise<ActionResult> {
-  const { periodo } = getDateRangeFromPeriodo(state.periodo || null)
+  const { periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
   
   let compromissos: any[] = []
   
@@ -141,12 +141,12 @@ async function queryCompromissos(
   if (compromissos.length === 0) {
     return {
       success: true,
-      message: `📅 Você não tem compromissos ${periodo}.`,
-      data: { compromissos: [], periodo }
+      message: `📅 Você não tem compromissos ${periodoTexto}.`,
+      data: { compromissos: [], periodo: periodoTexto }
     }
   }
   
-  let response = `📅 Você tem ${compromissos.length} ${compromissos.length === 1 ? 'compromisso' : 'compromissos'} ${periodo}:\n\n`
+  let response = `📅 Você tem ${compromissos.length} ${compromissos.length === 1 ? 'compromisso' : 'compromissos'} ${periodoTexto}:\n\n`
   
   compromissos.forEach((c, index) => {
     const dataHora = new Date(c.scheduled_at)
@@ -173,7 +173,7 @@ async function queryCompromissos(
   return {
     success: true,
     message: response,
-    data: { compromissos, periodo }
+    data: { compromissos, periodo: periodoTexto }
   }
 }
 

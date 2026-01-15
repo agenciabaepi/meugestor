@@ -59,9 +59,9 @@ export function analyzeAppointmentContext(
   // Ex: "me lembre amanhã às 8h do salão" quando existe "salão amanhã às 9h"
   const mentionsExistingByContext = existingAppointments?.some(apt => {
     const aptTitle = apt.title.toLowerCase().trim()
-    if (extractedData?.scheduled_at && aptTitle.length > 2 && lowerMessage.includes(aptTitle)) {
+    if (state?.scheduled_at && aptTitle.length > 2 && lowerMessage.includes(aptTitle)) {
       const aptDate = new Date(apt.scheduled_at)
-      const newDate = new Date(extractedData.scheduled_at)
+      const newDate = new Date(state.scheduled_at)
       const diffDays = Math.abs((newDate.getTime() - aptDate.getTime()) / (1000 * 60 * 60 * 24))
       // Se menciona o título E a data é no mesmo dia ou próximo (dentro de 2 dias)
       return diffDays <= 2

@@ -111,7 +111,7 @@ export function matchesSemanticFilter(
     )
     
     // Verifica subcategoria
-    const subcategoryMatch = record.subcategory && mapping.subcategories.some(sub => 
+    const subcategoryMatch = !!record.subcategory && mapping.subcategories.some(sub => 
       normalizeString(record.subcategory!) === normalizeString(sub)
     )
     
@@ -121,7 +121,7 @@ export function matchesSemanticFilter(
     )
     
     // Verifica tags
-    const tagMatch = record.tags?.some(tag => 
+    const tagMatch = !!record.tags?.some(tag => 
       mapping.keywords.some(keyword => 
         normalizeString(tag).includes(normalizeString(keyword))
       )
@@ -135,8 +135,8 @@ export function matchesSemanticFilter(
   const directMatch = 
     normalizedDescription.includes(normalizedSearch) ||
     normalizeString(record.category).includes(normalizedSearch) ||
-    (record.subcategory && normalizeString(record.subcategory).includes(normalizedSearch)) ||
-    record.tags?.some(tag => normalizeString(tag).includes(normalizedSearch))
+    (!!record.subcategory && normalizeString(record.subcategory).includes(normalizedSearch)) ||
+    !!record.tags?.some(tag => normalizeString(tag).includes(normalizedSearch))
   
   // Verifica também se o termo de busca é sinônimo de categoria/subcategoria
   // Ex: "mercado" pode estar em descrição mesmo que categoria seja "Alimentação"
@@ -173,10 +173,10 @@ function checkSynonymMatch(searchTerm: string, record: FinanceiroRecord): boolea
 /**
  * Filtra registros usando busca semântica
  */
-export function filterBySemanticCategory(
-  records: FinanceiroRecord[],
+export function filterBySemanticCategory<T extends FinanceiroRecord>(
+  records: T[],
   searchTerm: string
-): FinanceiroRecord[] {
+): T[] {
   if (!searchTerm) {
     return records
   }

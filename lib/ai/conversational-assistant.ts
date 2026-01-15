@@ -5,7 +5,7 @@
  * e só então gera ação estruturada para o sistema executar.
  */
 
-import { openai } from '../utils/openai-client'
+import { openai } from './openai'
 import { SemanticState, inheritContext, saveLastValidState } from './semantic-state'
 import { getLastAction, getLastAnyAction } from './action-history'
 

@@ -17,7 +17,7 @@ export interface LembreteConfig {
 }
 
 // Configurações de lembretes
-const LEMBRETES_CONFIG: Record<LembreteType, LembreteConfig> = {
+const LEMBRETES_CONFIG: Partial<Record<LembreteType, LembreteConfig>> = {
   // Desativados por decisão de produto (evitar excesso de mensagens)
   // '1h': { antecedenciaMinutos: 60, tipo: '1h' },
   // '30min': { antecedenciaMinutos: 30, tipo: '30min' },
