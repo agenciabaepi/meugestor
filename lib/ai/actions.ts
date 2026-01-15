@@ -130,7 +130,7 @@ export async function processAction(
     }
     
     // Validação rígida: verifica se estado é válido (exceto chat)
-    if (semanticState.confidence < 0.7 && (semanticState.intent !== 'chat' as any)) {
+    if (semanticState.confidence < 0.7 && semanticState.intent !== 'chat') {
       return {
         success: false,
         message: 'Não entendi completamente. Pode reformular sua pergunta?',
