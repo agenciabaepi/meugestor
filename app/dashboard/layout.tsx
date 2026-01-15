@@ -22,8 +22,10 @@ export default async function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 w-full lg:ml-64 min-h-screen pt-16 lg:pt-0">
-        <div className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6 xl:p-8 w-full overflow-x-hidden">
-          {children}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
+          <div className="w-full">
+            {children}
+          </div>
         </div>
       </main>
     </div>

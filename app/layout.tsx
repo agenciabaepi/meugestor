@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'Meu Gestor - Assistente Inteligente',
@@ -29,8 +36,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
-      <body suppressHydrationWarning className="antialiased">{children}</body>
+    <html lang="pt-BR" className={inter.variable}>
+      <body suppressHydrationWarning className={`${inter.className} antialiased`}>
+        {children}
+      </body>
     </html>
   )
 }

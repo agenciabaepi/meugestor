@@ -311,7 +311,7 @@ export function isFutureInBrazil(scheduledDate: Date, now: Date = new Date()): b
  * IMPORTANTE: A IA pode retornar horários em UTC, mas o usuário quer no horário do Brasil
  * Se a IA retorna "20:00:00.000Z", ela provavelmente quis dizer 20h no Brasil, não 20h UTC
  */
-export function parseScheduledAt(scheduledAt: string | undefined, title?: string): string | null {
+export function parseScheduledAt(scheduledAt: string | undefined, title?: string, originalMessage?: string): string | null {
   if (!scheduledAt) {
     return null
   }
@@ -322,6 +322,19 @@ export function parseScheduledAt(scheduledAt: string | undefined, title?: string
     if (isNaN(date.getTime())) {
       return null
     }
+    
+    // Obtém a data atual no Brasil para comparação
+    const nowBrazil = getNowInBrazil()
+    const nowBrazilParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: BRAZIL_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(nowBrazil)
+    
+    const nowBrazilDay = parseInt(nowBrazilParts.find(p => p.type === 'day')?.value || '0')
+    const nowBrazilMonth = parseInt(nowBrazilParts.find(p => p.type === 'month')?.value || '0')
+    const nowBrazilYear = parseInt(nowBrazilParts.find(p => p.type === 'year')?.value || '0')
     
     // Verifica se a data está em formato ISO com timezone UTC (termina com Z)
     const isUTC = scheduledAt.endsWith('Z') || scheduledAt.includes('+00:00')
@@ -350,11 +363,42 @@ export function parseScheduledAt(scheduledAt: string | undefined, title?: string
       const brazilMonth = parseInt(brazilParts.find(p => p.type === 'month')?.value || '0')
       const brazilYear = parseInt(brazilParts.find(p => p.type === 'year')?.value || '0')
       
+      // Detecta se a mensagem original menciona "amanhã" ou "hoje"
+      const lowerMessage = originalMessage?.toLowerCase() || ''
+      const isAmanha = lowerMessage.includes('amanhã')
+      const isHoje = lowerMessage.includes('hoje')
+      
+      // Calcula o dayOffset baseado na mensagem original e na data da IA
+      let dayOffset = 0
+      
+      if (isAmanha) {
+        // Se mencionou "amanhã", sempre usa dayOffset = 1
+        dayOffset = 1
+        console.log('parseScheduledAt - Mensagem menciona "amanhã", usando dayOffset = 1')
+      } else if (isHoje) {
+        // Se mencionou "hoje", sempre usa dayOffset = 0
+        dayOffset = 0
+        console.log('parseScheduledAt - Mensagem menciona "hoje", usando dayOffset = 0')
+      } else {
+        // Se não mencionou nem "hoje" nem "amanhã", calcula baseado na data original da IA
+        // Compara a data no Brasil com a data atual
+        if (brazilYear > nowBrazilYear || 
+            (brazilYear === nowBrazilYear && brazilMonth > nowBrazilMonth) ||
+            (brazilYear === nowBrazilYear && brazilMonth === nowBrazilMonth && brazilDay > nowBrazilDay)) {
+          // A data no Brasil é no futuro - calcula o offset
+          const targetDate = new Date(brazilYear, brazilMonth - 1, brazilDay)
+          const todayDate = new Date(nowBrazilYear, nowBrazilMonth - 1, nowBrazilDay)
+          const diffTime = targetDate.getTime() - todayDate.getTime()
+          dayOffset = Math.round(diffTime / (1000 * 60 * 60 * 24))
+          console.log('parseScheduledAt - Calculado dayOffset baseado na data:', dayOffset)
+        }
+      }
+      
       // Se a hora no Brasil é diferente da hora UTC, a IA provavelmente quis dizer
       // a hora UTC como se fosse a hora no Brasil
       // Exemplo: IA retorna 20:00 UTC, mas no Brasil isso vira 17:00
       // O usuário pediu 20h, então a IA quis dizer 20h no Brasil, não 20h UTC
-      if (brazilHour !== utcHour || brazilDay !== utcDay) {
+      if (brazilHour !== utcHour || brazilDay !== utcDay || isAmanha) {
         console.log('parseScheduledAt - Detectada diferença de timezone:', {
           original: scheduledAt,
           utcHour,
@@ -363,12 +407,14 @@ export function parseScheduledAt(scheduledAt: string | undefined, title?: string
           brazilHour,
           brazilDay,
           brazilDate: `${brazilDay}/${brazilMonth}/${brazilYear}`,
-          interpretacao: `IA retornou ${utcHour}h UTC (que vira ${brazilHour}h no Brasil), mas usuário provavelmente queria ${utcHour}h no Brasil`
+          nowBrazilDate: `${nowBrazilDay}/${nowBrazilMonth}/${nowBrazilYear}`,
+          isAmanha,
+          dayOffset,
+          interpretacao: `IA retornou ${utcHour}h UTC (que vira ${brazilHour}h no Brasil), mas usuário provavelmente queria ${utcHour}h no Brasil ${isAmanha ? 'AMANHÃ' : ''}`
         })
         
         // Cria uma data que representa utcHour:utcMinute no horário do Brasil
         // Usa createDateInBrazil que já faz essa conversão corretamente
-        const dayOffset = brazilDay - utcDay
         const adjustedDate = createDateInBrazil(utcHour, utcMinute, dayOffset)
         
         // Verifica se a data ajustada está correta
@@ -384,13 +430,15 @@ export function parseScheduledAt(scheduledAt: string | undefined, title?: string
         
         const adjustedBrazilHour = parseInt(adjustedBrazilParts.find(p => p.type === 'hour')?.value || '0')
         const adjustedBrazilDay = parseInt(adjustedBrazilParts.find(p => p.type === 'day')?.value || '0')
+        const adjustedBrazilMonth = parseInt(adjustedBrazilParts.find(p => p.type === 'month')?.value || '0')
+        const adjustedBrazilYear = parseInt(adjustedBrazilParts.find(p => p.type === 'year')?.value || '0')
         
         console.log('parseScheduledAt - Data ajustada:', {
           original: scheduledAt,
           originalBrazil: `${brazilDay}/${brazilMonth}/${brazilYear} ${brazilHour}:${brazilParts.find(p => p.type === 'minute')?.value}`,
           adjusted: adjustedDate.toISOString(),
-          adjustedBrazil: `${adjustedBrazilDay}/${adjustedBrazilParts.find(p => p.type === 'month')?.value}/${adjustedBrazilParts.find(p => p.type === 'year')?.value} ${adjustedBrazilHour}:${adjustedBrazilParts.find(p => p.type === 'minute')?.value}`,
-          correto: adjustedBrazilHour === utcHour && adjustedBrazilDay === brazilDay
+          adjustedBrazil: `${adjustedBrazilDay}/${adjustedBrazilMonth}/${adjustedBrazilYear} ${adjustedBrazilHour}:${adjustedBrazilParts.find(p => p.type === 'minute')?.value}`,
+          correto: adjustedBrazilHour === utcHour
         })
         
         return adjustedDate.toISOString()

@@ -371,7 +371,7 @@ async function handleCreateAppointment(
     console.log('handleCreateAppointment - TenantId:', tenantId)
     
     let title = data?.title
-    let scheduledAt = data?.scheduled_at ? parseScheduledAt(data.scheduled_at) : null
+    let scheduledAt = data?.scheduled_at ? parseScheduledAt(data.scheduled_at, data?.title, originalMessage) : null
 
     console.log('handleCreateAppointment - Dados da IA:', {
       title,
@@ -423,7 +423,7 @@ async function handleCreateAppointment(
 
     // Se ainda não tem data/hora, tenta processar o scheduled_at original
     if (!scheduledAt && data?.scheduled_at) {
-      scheduledAt = parseScheduledAt(data.scheduled_at)
+      scheduledAt = parseScheduledAt(data.scheduled_at, data?.title, originalMessage)
     }
 
     // Se ainda não tem data/hora, retorna erro

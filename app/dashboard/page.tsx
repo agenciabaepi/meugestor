@@ -73,7 +73,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -140,11 +140,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Gastos Recentes */}
-      <div className="bg-white rounded-lg shadow-sm sm:shadow">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Gastos Recentes</h2>
+      <div className="bg-white rounded-lg shadow-sm sm:shadow mb-8">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Gastos Recentes</h2>
         </div>
-        <div className="p-3 sm:p-4 lg:p-6">
+        <div className="p-4 sm:p-6 lg:p-8">
           {data.gastosRecentes.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
               {data.gastosRecentes.map((gasto) => (
@@ -176,10 +176,10 @@ export default async function DashboardPage() {
 
       {/* Próximos Compromissos */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Próximos Compromissos</h2>
+        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Próximos Compromissos</h2>
         </div>
-        <div className="p-3 sm:p-4 lg:p-6">
+        <div className="p-4 sm:p-6 lg:p-8">
           {data.proximos.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
               {data.proximos.map((compromisso) => (
