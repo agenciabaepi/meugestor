@@ -153,9 +153,21 @@ export async function processAction(
       case 'create_appointment':
         // Análise específica para compromissos
         console.log('processAction - Analisando contexto de compromisso...')
+        console.log('processAction - Dados extraídos:', {
+          title: extractedData?.title,
+          scheduled_at: extractedData?.scheduled_at,
+          description: extractedData?.description
+        })
         
-        // Busca compromissos existentes para verificar duplicatas
-        const existingAppointments = await getCompromissosRecords(tenantId)
+        // Busca compromissos existentes para verificar duplicatas e pedidos de lembrete
+        // Busca apenas compromissos futuros para análise de contexto
+        const now = new Date()
+        const existingAppointments = await getCompromissosRecords(
+          tenantId,
+          now.toISOString()
+        )
+        console.log('processAction - Compromissos futuros encontrados:', existingAppointments.length)
+        
         const appointmentAnalysis = analyzeAppointmentContext(
           message,
           extractedData,
@@ -167,12 +179,14 @@ export async function processAction(
         
         if (!appointmentAnalysis.shouldProceed && appointmentAnalysis.message) {
           console.log('processAction - Ação de compromisso bloqueada pela análise de contexto')
+          console.log('processAction - Razão:', appointmentAnalysis.reason)
           return {
             success: true,
             message: appointmentAnalysis.message,
           }
         }
         
+        console.log('processAction - Prosseguindo com criação de compromisso')
         return await handleCreateAppointment(extractedData, tenantId, message)
 
       case 'query':
@@ -621,12 +635,20 @@ async function handleQuery(
       let periodoTexto = ''
       
       if (isAmanha) {
-        // Compromissos de amanhã
-        const amanha = new Date(now)
+        // Compromissos de amanhã - usa getNowInBrazil para garantir timezone correto
+        const nowBrazil = getNowInBrazil()
+        const amanha = new Date(nowBrazil)
         amanha.setDate(amanha.getDate() + 1)
         amanha.setHours(0, 0, 0, 0)
         const amanhaFim = new Date(amanha)
         amanhaFim.setHours(23, 59, 59, 999)
+        
+        console.log('handleQuery - Buscando compromissos de amanhã:', {
+          amanha: amanha.toISOString(),
+          amanhaFim: amanhaFim.toISOString(),
+          amanhaLocal: amanha.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+          amanhaFimLocal: amanhaFim.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        })
         
         compromissos = await getCompromissosRecords(
           tenantId,
@@ -835,15 +857,32 @@ async function handleQuery(
 }
 
 /**
- * Gera relatório
+ * Gera relatório completo (financeiro + compromissos)
  */
 async function handleReport(tenantId: string): Promise<ActionResult> {
   try {
+    const now = new Date()
+    
+    // Busca relatório financeiro mensal
     const relatorio = await gerarResumoMensal(tenantId)
 
-    let message = `📊 Relatório Mensal\n\n`
-    message += `💰 Total: R$ ${relatorio.total.toFixed(2)}\n`
-    message += `📝 Registros: ${relatorio.totalRegistros}\n\n`
+    // Busca TODOS os compromissos futuros (sem limite)
+    const compromissos = await getCompromissosRecords(
+      tenantId,
+      now.toISOString()
+    )
+    
+    // Ordena compromissos por data
+    compromissos.sort((a, b) => 
+      new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+    )
+
+    let message = `📊 Relatório Completo\n\n`
+    
+    // Seção Financeira
+    message += `💰 FINANCEIRO (Mensal)\n`
+    message += `Total: R$ ${relatorio.total.toFixed(2)}\n`
+    message += `Registros: ${relatorio.totalRegistros}\n\n`
 
     if (Object.keys(relatorio.porCategoria).length > 0) {
       message += `Por categoria:\n`
@@ -852,14 +891,50 @@ async function handleReport(tenantId: string): Promise<ActionResult> {
         .forEach(([cat, valor]) => {
           message += `• ${cat}: R$ ${Number(valor).toFixed(2)}\n`
         })
+      message += `\n`
+    }
+
+    // Seção de Compromissos
+    message += `📅 COMPROMISSOS AGENDADOS\n`
+    if (compromissos.length === 0) {
+      message += `Nenhum compromisso futuro agendado.\n`
+    } else {
+      message += `Total: ${compromissos.length} ${compromissos.length === 1 ? 'compromisso' : 'compromissos'}\n\n`
+      
+      compromissos.forEach((c, index) => {
+        const dataHora = new Date(c.scheduled_at)
+        const data = dataHora.toLocaleDateString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        })
+        const hora = dataHora.toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+        
+        message += `${index + 1}. ${c.title}\n`
+        message += `   🕐 ${hora} - ${data}\n`
+        if (c.description) {
+          message += `   📝 ${c.description}\n`
+        }
+        message += `\n`
+      })
     }
 
     return {
       success: true,
       message,
-      data: relatorio,
+      data: { 
+        financeiro: relatorio,
+        compromissos,
+        totalCompromissos: compromissos.length
+      },
     }
   } catch (error) {
+    console.error('Erro ao gerar relatório:', error)
     throw error
   }
 }

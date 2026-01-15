@@ -21,13 +21,6 @@ export function analyzeAppointmentContext(
 ): ContextAnalysis {
   const lowerMessage = message.toLowerCase()
   
-  // PRIORIDADE 1: Se tem título E horário extraídos, é novo compromisso - SEMPRE permite
-  const hasNewAppointmentData = extractedData?.title && extractedData?.scheduled_at
-  if (hasNewAppointmentData) {
-    console.log('analyzeAppointmentContext - Dados de novo compromisso detectados, permitindo criação')
-    // Continua para verificar duplicatas, mas não bloqueia por pedido de lembrete
-  }
-  
   // Palavras-chave que indicam pedido de lembrete/alerta
   const reminderKeywords = [
     'lembre', 'lembrar', 'me avise', 'me avisa', 'avise', 'avisa',
@@ -36,52 +29,117 @@ export function analyzeAppointmentContext(
     'me fale', 'me fala', 'fale', 'fala antes'
   ]
   
-  // Verifica se está pedindo lembrete de um compromisso EXISTENTE
-  // IMPORTANTE: Só bloqueia se mencionar "dessa agenda", "desse compromisso", etc
-  // Se mencionar horário + título novo = é novo compromisso, não pedido de lembrete
-  const hasReminderKeyword = reminderKeywords.some(keyword => 
-    lowerMessage.includes(keyword)
-  )
-  
   // Indicadores de que está se referindo a um compromisso EXISTENTE
   const existingAppointmentIndicators = [
     'dessa agenda', 'desse compromisso', 'deste compromisso',
     'dessa reunião', 'desse evento', 'deste evento',
-    'dela', 'dele', 'disso', 'desse', 'desta'
+    'dela', 'dele', 'disso', 'desse', 'desta', 'do salão', 'da reunião'
   ]
+  
+  // Verifica se tem palavra de lembrete
+  const hasReminderKeyword = reminderKeywords.some(keyword => 
+    lowerMessage.includes(keyword)
+  )
   
   // Verifica se menciona compromisso existente por título
   const mentionsExistingByTitle = existingAppointments?.some(apt => {
-    const aptTitle = apt.title.toLowerCase()
-    // Verifica se a mensagem menciona o título do compromisso existente
-    return lowerMessage.includes(aptTitle) && aptTitle.length > 3
+    const aptTitle = apt.title.toLowerCase().trim()
+    if (aptTitle.length > 2 && lowerMessage.includes(aptTitle)) {
+      return true
+    }
+    // Verifica variações normalizadas (ex: "salão" vs "salao")
+    const normalizedTitle = aptTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const normalizedMessage = lowerMessage.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return normalizedTitle.length > 2 && normalizedMessage.includes(normalizedTitle)
   })
   
-  // Só bloqueia se:
-  // 1. Tem palavra de lembrete E
-  // 2. (Menciona compromisso existente OU tem indicador de referência a algo existente) E
-  // 3. NÃO tem dados de novo compromisso (título + horário)
-  if (hasReminderKeyword && !hasNewAppointmentData) {
-    const hasExistingReference = existingAppointmentIndicators.some(indicator => 
-      lowerMessage.includes(indicator)
-    ) || mentionsExistingByTitle
-    
-    // Se tem referência a existente E não tem dados de novo compromisso
-    if (hasExistingReference) {
-      console.log('analyzeAppointmentContext - Pedido de lembrete detectado, bloqueando criação')
+  // Verifica se menciona compromisso existente por contexto temporal
+  // Ex: "me lembre amanhã às 8h do salão" quando existe "salão amanhã às 9h"
+  const mentionsExistingByContext = existingAppointments?.some(apt => {
+    const aptTitle = apt.title.toLowerCase().trim()
+    if (extractedData?.scheduled_at && aptTitle.length > 2 && lowerMessage.includes(aptTitle)) {
+      const aptDate = new Date(apt.scheduled_at)
+      const newDate = new Date(extractedData.scheduled_at)
+      const diffDays = Math.abs((newDate.getTime() - aptDate.getTime()) / (1000 * 60 * 60 * 24))
+      // Se menciona o título E a data é no mesmo dia ou próximo (dentro de 2 dias)
+      return diffDays <= 2
+    }
+    return false
+  })
+  
+  // Verifica se tem indicador de referência a compromisso existente
+  const hasExistingReference = existingAppointmentIndicators.some(indicator => 
+    lowerMessage.includes(indicator)
+  ) || mentionsExistingByTitle || mentionsExistingByContext
+  
+  // Verifica se o título extraído é "Lembrete" ou similar
+  const extractedTitle = extractedData?.title?.toLowerCase() || ''
+  const isReminderTitle = extractedTitle.includes('lembrete') || 
+                          extractedTitle.includes('aviso') ||
+                          extractedTitle.includes('alerta') ||
+                          extractedTitle === 'lembre' ||
+                          extractedTitle === 'avise'
+  
+  // PRIORIDADE 1: Se tem palavra de lembrete E menciona compromisso existente, é pedido de lembrete
+  if (hasReminderKeyword && hasExistingReference) {
+    // Se título é "Lembrete" OU não tem título válido (só tem horário), é pedido de lembrete
+    if (isReminderTitle || !extractedData?.title || extractedTitle.length < 3) {
+      console.log('analyzeAppointmentContext - Pedido de lembrete de compromisso existente detectado')
+      
+      const mentionedAppointment = existingAppointments?.find(apt => {
+        const aptTitle = apt.title.toLowerCase().trim()
+        if (lowerMessage.includes(aptTitle) && aptTitle.length > 2) {
+          return true
+        }
+        const normalizedTitle = aptTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const normalizedMessage = lowerMessage.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        return normalizedTitle.length > 2 && normalizedMessage.includes(normalizedTitle)
+      })
+      
+      let responseMessage = `😊 Não precisa se preocupar! O sistema já envia lembretes automáticos para todos os seus compromissos! 📅\n\n`
+      
+      if (mentionedAppointment) {
+        const aptDate = new Date(mentionedAppointment.scheduled_at)
+        responseMessage += `Sobre o compromisso *${mentionedAppointment.title}*:\n`
+        responseMessage += `🕐 ${aptDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`
+      }
+      
+      responseMessage += `Você receberá avisos:\n` +
+        `• ⏰ 1 hora antes\n` +
+        `• ⏰ 30 minutos antes\n` +
+        `• ⏰ 10 minutos antes\n\n` +
+        `Assim você nunca perde um compromisso! 😉`
+      
       return {
         shouldProceed: false,
-        message: `😊 Não precisa se preocupar! O sistema já envia lembretes automáticos para todos os seus compromissos! 📅\n\n` +
-          `Você receberá avisos:\n` +
-          `• ⏰ 1 hora antes\n` +
-          `• ⏰ 30 minutos antes\n` +
-          `• ⏰ 10 minutos antes\n\n` +
-          `Assim você nunca perde um compromisso! 😉`,
+        message: responseMessage,
         reason: 'user_asking_for_existing_feature',
         suggestedAction: 'explain_reminder_system'
       }
     }
-    // Se tem palavra de lembrete mas tem dados de novo compromisso, deixa criar
+  }
+  
+  // PRIORIDADE 2: Se título extraído é "Lembrete" (mesmo sem referência explícita), bloqueia
+  if (isReminderTitle && hasReminderKeyword) {
+    console.log('analyzeAppointmentContext - Título "Lembrete" detectado, bloqueando criação')
+    return {
+      shouldProceed: false,
+      message: `😊 Não precisa criar um compromisso de lembrete! O sistema já envia lembretes automáticos para todos os seus compromissos! 📅\n\n` +
+        `Você receberá avisos:\n` +
+        `• ⏰ 1 hora antes\n` +
+        `• ⏰ 30 minutos antes\n` +
+        `• ⏰ 10 minutos antes\n\n` +
+        `Assim você nunca perde um compromisso! 😉`,
+      reason: 'reminder_title_detected',
+      suggestedAction: 'explain_reminder_system'
+    }
+  }
+  
+  // PRIORIDADE 3: Se tem título E horário extraídos E não é pedido de lembrete, é novo compromisso
+  const hasNewAppointmentData = extractedData?.title && extractedData?.scheduled_at
+  if (hasNewAppointmentData && !isReminderTitle) {
+    console.log('analyzeAppointmentContext - Dados de novo compromisso detectados, permitindo criação')
+    // Continua para verificar duplicatas, mas não bloqueia por pedido de lembrete
   }
   
   // Verifica se está tentando criar compromisso duplicado
@@ -107,11 +165,7 @@ export function analyzeAppointmentContext(
       const diffMinutes = Math.abs(newDate.getTime() - aptDate.getTime()) / (1000 * 60)
       
       // Se é mesmo título E mesmo horário (dentro de 30min) = duplicata exata
-      if (diffMinutes < 30) {
-        return true
-      }
-      
-      return false
+      return diffMinutes < 30
     })
     
     if (exactDuplicate) {
@@ -177,7 +231,6 @@ export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
       // Não bloqueia se for criação de compromisso (ex: "tenho salão às 9h")
       // Verifica se tem indicadores de que é pergunta E não é criação de compromisso
       const hasAppointmentKeywords = lowerMessage.includes('tenho') ||
-                                    lowerMessage.includes('tenho') ||
                                     lowerMessage.includes('marcar') ||
                                     lowerMessage.includes('agendar') ||
                                     lowerMessage.includes('reunião') ||

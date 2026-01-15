@@ -136,23 +136,18 @@ export function Sidebar() {
             </div>
           </nav>
 
-          {/* Upgrade Card */}
-          <div className="px-4 pb-4">
+          {/* Upgrade Card - Oculto temporariamente */}
+          {/* <div className="px-4 pb-4">
             <div className="relative bg-gradient-to-b from-[#7A5AF8] to-[#5F2EAE] rounded-3xl p-6 pt-10 overflow-hidden shadow-xl">
-              {/* Ícone circular no topo */}
               <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
                 <div className="relative">
-                  {/* Círculo externo com gradiente e borda branca */}
                   <div className="w-16 h-16 bg-gradient-to-b from-[#8B6DFF] to-[#6B3FD9] rounded-full flex items-center justify-center shadow-lg border-2 border-white">
-                    {/* Círculo interno branco com meia lua crescente */}
                     <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-inner relative">
-                      {/* Meia lua crescente branca - SVG de crescente real */}
                       <svg 
                         className="w-6 h-6" 
                         viewBox="0 0 24 24" 
                         fill="white"
                       >
-                        {/* Meia lua crescente - usando path com fill-rule evenodd */}
                         <path 
                           d="M 18,6 Q 22,10 22,12 Q 22,14 18,18 Q 14,14 14,12 Q 14,10 18,6 M 17,8 Q 15,10 15,12 Q 15,14 17,16 Q 19,14 19,12 Q 19,10 17,8"
                           fill="white"
@@ -163,8 +158,6 @@ export function Sidebar() {
                   </div>
                 </div>
               </div>
-
-              {/* Conteúdo */}
               <div className="pt-6 text-center">
                 <h3 className="text-lg font-bold text-white mb-2">
                   Upgrade to PRO
@@ -177,7 +170,7 @@ export function Sidebar() {
                 </button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Footer */}
           <div className="p-4 border-t border-gray-200 space-y-2">
