@@ -156,7 +156,7 @@ export async function processAction(
     // Verifica se está pedindo funcionalidade que já existe
     // IMPORTANTE: Só aplica se NÃO for criação de compromisso
     // Se for criação de compromisso, pula essa análise
-    if (correctedIntention !== 'create_appointment') {
+    if (semanticState.intent !== 'create_appointment') {
       const featuresAnalysis = analyzeSystemFeaturesRequest(message)
       if (!featuresAnalysis.shouldProceed && featuresAnalysis.message) {
         console.log('processAction - Usuário pedindo funcionalidade que já existe')
