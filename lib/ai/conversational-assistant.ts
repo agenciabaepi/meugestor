@@ -8,6 +8,12 @@
 import { openai } from './openai'
 import { SemanticState, inheritContext, saveLastValidState } from './semantic-state'
 import { getLastAction, getLastAnyAction } from './action-history'
+import { 
+  registerMention, 
+  hasFocusLock, 
+  clearFocus, 
+  findMatchingAppointments 
+} from './focus-lock'
 
 /**
  * Valida se os dados essenciais estão completos para salvar
@@ -79,6 +85,19 @@ Se o usuário estiver corrigindo algo (ex: "não, é amanhã", "não, foi 45"), 
 - periodo: ${lastState.periodo || 'null'}
 ` : ''
     
+    // Verifica se há foco travado (usuário repetiu o mesmo compromisso)
+    const focusLock = hasFocusLock(tenantId, 'appointment')
+    const focusLockContext = focusLock ? `
+FOCO TRAVADO (usuário repetiu o mesmo compromisso ${focusLock.mentions} vezes):
+- targetId: ${focusLock.targetId || 'null'}
+- title: ${focusLock.title || 'null'}
+- location: ${focusLock.location || 'null'}
+- date: ${focusLock.date || 'null'}
+- confidence: ${focusLock.confidence}
+
+Se o usuário está corrigindo este compromisso, use targetId: "${focusLock.targetId}" e NÃO pergunte novamente qual compromisso é.
+` : ''
+    
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-5.2',
       messages: [
@@ -114,6 +133,13 @@ REGRAS CRÍTICAS DE CONFIRMAÇÃO (OBRIGATÓRIAS):
 6. Quando todos os dados essenciais estiverem claros → readyToSave: true
 7. Fazer NO MÁXIMO uma confirmação final resumida antes de salvar
 
+REGRA CRÍTICA - FOCUS LOCK (TRAVA DE FOCO):
+- Se o usuário mencionar o mesmo compromisso 2-3 vezes seguidas (mesmo título/local/data), NÃO perguntar novamente qual compromisso é
+- Use o targetId do foco travado se disponível
+- Se há foco travado e usuário está corrigindo, execute update_appointment diretamente
+- Palavras como "essa", "isso", "a de amanhã", "a reunião da Zion" indicam continuidade da conversa
+- Após certeza suficiente (2+ menções do mesmo alvo), execute ou faça UMA confirmação final curta
+
 FORMATO DE CONFIRMAÇÃO (quando realmente necessário):
 "Vou salvar: [título], [data/hora], [cidade opcional]. Posso salvar assim?"
 
@@ -137,6 +163,7 @@ CONTEXTO DA CONVERSA:
 ${conversationContext}
 ${lastStateContext}
 ${lastActionContext}
+${focusLockContext}
 ` : ''}
 
 Responda APENAS com JSON no formato:
@@ -238,19 +265,88 @@ REGRAS IMPORTANTES:
       semanticState.readyToSave = validateDataCompleteness(semanticState)
     }
     
-    // Para updates, se não tem targetId mas detectou update, busca da última ação
+    // Para updates, tenta definir targetId usando múltiplas estratégias
     if ((semanticState.intent === 'update_expense' || 
          semanticState.intent === 'update_revenue' || 
          semanticState.intent === 'update_appointment') && 
         !semanticState.targetId) {
-      const lastAction = getLastAction(
-        tenantId,
-        semanticState.intent === 'update_expense' ? 'expense' :
-        semanticState.intent === 'update_revenue' ? 'revenue' : 'appointment'
-      )
-      if (lastAction) {
-        semanticState.targetId = lastAction.id
-        console.log('conversational-assistant - TargetId definido da última ação:', semanticState.targetId)
+      
+      // Estratégia 1: Focus Lock (prioridade máxima)
+      if (semanticState.intent === 'update_appointment') {
+        const focusLock = hasFocusLock(tenantId, 'appointment')
+        if (focusLock?.targetId) {
+          semanticState.targetId = focusLock.targetId
+          console.log('conversational-assistant - TargetId definido pelo focus lock:', semanticState.targetId)
+        } else {
+          // Estratégia 2: Buscar compromissos que correspondem aos critérios
+          const criteria: any = {}
+          if (semanticState.title) criteria.title = semanticState.title
+          if (semanticState.description) criteria.location = semanticState.description
+          if (semanticState.scheduled_at) criteria.date = semanticState.scheduled_at
+          
+          if (Object.keys(criteria).length > 0) {
+            const matches = await findMatchingAppointments(tenantId, criteria)
+            if (matches.length === 1) {
+              // Apenas um match, usa esse
+              semanticState.targetId = matches[0].id
+              console.log('conversational-assistant - TargetId definido por busca única:', semanticState.targetId)
+              
+              // Registra menção para focus lock
+              registerMention(tenantId, 'appointment', {
+                targetId: matches[0].id,
+                title: matches[0].title,
+                location: matches[0].description || undefined,
+                date: matches[0].scheduled_at
+              })
+            } else if (matches.length > 1) {
+              // Múltiplos matches, usa o mais recente
+              semanticState.targetId = matches[0].id
+              console.log('conversational-assistant - TargetId definido por busca (mais recente):', semanticState.targetId)
+              
+              // Registra menção para focus lock
+              registerMention(tenantId, 'appointment', {
+                targetId: matches[0].id,
+                title: matches[0].title,
+                location: matches[0].description || undefined,
+                date: matches[0].scheduled_at
+              })
+            }
+          }
+        }
+      }
+      
+      // Estratégia 3: Última ação (fallback)
+      if (!semanticState.targetId) {
+        const lastAction = getLastAction(
+          tenantId,
+          semanticState.intent === 'update_expense' ? 'expense' :
+          semanticState.intent === 'update_revenue' ? 'revenue' : 'appointment'
+        )
+        if (lastAction) {
+          semanticState.targetId = lastAction.id
+          console.log('conversational-assistant - TargetId definido da última ação:', semanticState.targetId)
+        }
+      }
+    }
+    
+    // Registra menção para focus lock (para updates de compromissos)
+    if (semanticState.intent === 'update_appointment' && semanticState.targetId) {
+      registerMention(tenantId, 'appointment', {
+        targetId: semanticState.targetId,
+        title: semanticState.title || undefined,
+        location: semanticState.description || undefined,
+        date: semanticState.scheduled_at || undefined
+      })
+    }
+    
+    // Se há foco travado e dados estão completos, força readyToSave
+    if (semanticState.intent === 'update_appointment') {
+      const focusLock = hasFocusLock(tenantId, 'appointment')
+      if (focusLock && focusLock.confidence >= 0.8 && semanticState.targetId) {
+        // Foco travado com alta confiança, não precisa confirmação
+        semanticState.readyToSave = true
+        semanticState.needsConfirmation = false
+        console.log('conversational-assistant - Foco travado com alta confiança, executando diretamente')
       }
     }
     

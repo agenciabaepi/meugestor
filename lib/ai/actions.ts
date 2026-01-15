@@ -442,6 +442,10 @@ async function handleUpdateAppointment(
     const { removeAction } = await import('./action-history')
     removeAction(tenantId, state.targetId)
     
+    // Limpa o focus lock após update bem-sucedido
+    const { clearFocus } = await import('./focus-lock')
+    clearFocus(tenantId, 'appointment')
+    
     // Usa os dados do compromisso atualizado do banco (já está correto)
     let responseMessage = `✅ Compromisso atualizado com sucesso!\n\n`
     if (compromisso.title) responseMessage += `📋 Título: ${compromisso.title}\n`
