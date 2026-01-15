@@ -4,13 +4,14 @@
 
 import { analyzeIntention } from './conversation'
 import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory } from '../services/financeiro'
-import { createCompromissoRecord } from '../services/compromissos'
+import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
 import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relatorios'
 import { getFinanceiroRecords } from '../services/financeiro'
-import { getCompromissosRecords, getTodayCompromissos } from '../services/compromissos'
+import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil } from '../utils/date-parser'
+import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 
 export interface ActionResult {
   success: boolean
@@ -20,6 +21,7 @@ export interface ActionResult {
 
 /**
  * Processa uma mensagem, identifica a intenção e executa a ação correspondente
+ * Agora com análise de contexto inteligente para evitar ações desnecessárias
  */
 /**
  * Valida e corrige a intenção baseado em palavras-chave da mensagem original
@@ -110,6 +112,27 @@ export async function processAction(
 
     console.log('processAction - Intenção final:', correctedIntention)
 
+    // Análise de contexto inteligente ANTES de executar ações
+    // Verifica se é apenas conversa casual
+    const conversationalAnalysis = analyzeConversationalIntent(message)
+    if (!conversationalAnalysis.shouldProceed && conversationalAnalysis.message) {
+      console.log('processAction - Mensagem identificada como conversa casual')
+      return {
+        success: true,
+        message: conversationalAnalysis.message,
+      }
+    }
+
+    // Verifica se está pedindo funcionalidade que já existe
+    const featuresAnalysis = analyzeSystemFeaturesRequest(message)
+    if (!featuresAnalysis.shouldProceed && featuresAnalysis.message) {
+      console.log('processAction - Usuário pedindo funcionalidade que já existe')
+      return {
+        success: true,
+        message: featuresAnalysis.message,
+      }
+    }
+
     switch (correctedIntention) {
       case 'register_expense':
         console.log('processAction - Chamando handleRegisterExpense')
@@ -124,6 +147,28 @@ export async function processAction(
         return revenueResult
 
       case 'create_appointment':
+        // Análise específica para compromissos
+        console.log('processAction - Analisando contexto de compromisso...')
+        
+        // Busca compromissos existentes para verificar duplicatas
+        const existingAppointments = await getCompromissosRecords(tenantId)
+        const appointmentAnalysis = analyzeAppointmentContext(
+          message,
+          extractedData,
+          existingAppointments.map(apt => ({
+            title: apt.title,
+            scheduled_at: apt.scheduled_at,
+          }))
+        )
+        
+        if (!appointmentAnalysis.shouldProceed && appointmentAnalysis.message) {
+          console.log('processAction - Ação de compromisso bloqueada pela análise de contexto')
+          return {
+            success: true,
+            message: appointmentAnalysis.message,
+          }
+        }
+        
         return await handleCreateAppointment(extractedData, tenantId, message)
 
       case 'query':

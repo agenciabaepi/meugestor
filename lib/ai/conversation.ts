@@ -18,6 +18,7 @@ export interface ConversationContext {
 
 /**
  * Processa uma mensagem do usuário e gera uma resposta usando GPT-5.2
+ * Agora com processamento mais inteligente e conversacional
  */
 export async function processMessage(
   message: string,
@@ -25,9 +26,10 @@ export async function processMessage(
 ): Promise<string> {
   try {
     validateOpenAIConfig()
-    // Carrega contexto recente
+    
+    // Carrega contexto recente (aumenta para 10 para ter mais contexto)
     const recentConversations = context.recentMessages || 
-      await getRecentConversations(context.tenantId, 5)
+      await getRecentConversations(context.tenantId, 10)
 
     // Usa resumos fornecidos ou gera novos
     const financeiroSummary = context.financeiroSummary || 
@@ -36,7 +38,7 @@ export async function processMessage(
     const compromissosSummary = context.compromissosSummary || 
       await getCompromissosSummary(context.tenantId)
 
-    // Monta o prompt com contexto
+    // Monta o prompt com contexto mais rico
     const contextPrompt = getContextPrompt(
       recentConversations.map(c => ({
         role: c.role,
@@ -46,6 +48,16 @@ export async function processMessage(
       compromissosSummary
     )
 
+    // Adiciona instruções específicas sobre lembretes automáticos
+    const reminderInfo = `\n\nINFORMAÇÃO IMPORTANTE SOBRE LEMBRETES:
+O sistema já envia lembretes automáticos para TODOS os compromissos:
+- ⏰ 1 hora antes
+- ⏰ 30 minutos antes  
+- ⏰ 10 minutos antes
+
+Se o usuário pedir para lembrar de um compromisso, EXPLIQUE que o sistema já faz isso automaticamente.
+NÃO crie um novo compromisso só para lembrete.`
+
     // Chama a API do OpenAI
     const model = process.env.OPENAI_MODEL || 'gpt-5.2'
     const completion = await openai.chat.completions.create({
@@ -53,7 +65,7 @@ export async function processMessage(
       messages: [
         {
           role: 'system',
-          content: SYSTEM_PROMPT,
+          content: SYSTEM_PROMPT + reminderInfo,
         },
         {
           role: 'system',
@@ -64,8 +76,8 @@ export async function processMessage(
           content: message,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 500,
+      temperature: 0.8, // Aumenta um pouco para respostas mais naturais
+      max_tokens: 600, // Aumenta para respostas mais completas
     })
 
     const response = completion.choices[0]?.message?.content || 
