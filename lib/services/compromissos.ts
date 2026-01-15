@@ -92,10 +92,22 @@ export async function getTodayCompromissos(
   today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(23, 59, 59, 999) // Garante que inclui compromissos até o final do dia
 
-  return getCompromissosByTenant(
+  const compromissos = await getCompromissosByTenant(
     tenantId,
     today.toISOString(),
     tomorrow.toISOString()
   )
+  
+  // Filtra apenas os compromissos que são realmente de hoje (evita problemas de timezone)
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const fimHoje = new Date(hoje)
+  fimHoje.setHours(23, 59, 59, 999)
+  
+  return compromissos.filter(c => {
+    const dataCompromisso = new Date(c.scheduled_at)
+    return dataCompromisso >= hoje && dataCompromisso <= fimHoje
+  })
 }

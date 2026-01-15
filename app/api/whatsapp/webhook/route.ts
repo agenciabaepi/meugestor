@@ -253,9 +253,23 @@ async function processWhatsAppMessage(
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant')
         } else if (!actionResult.success) {
-          // Se a ação falhou, envia mensagem de erro
-          await sendTextMessage(from, actionResult.message || 'Desculpe, ocorreu um erro ao processar sua mensagem.')
-          await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant')
+          // Se a ação falhou, tenta processar com IA para dar uma resposta mais útil
+          // Isso ajuda com perguntas simples que não foram identificadas como ações
+          try {
+            const recentMessages = await getRecentConversations(tenantId, 5)
+            const aiResponse = await processMessage(message.text.body, {
+              tenantId: tenantId,
+              recentMessages,
+            })
+            
+            await sendTextMessage(from, aiResponse)
+            await createConversation(tenantId, aiResponse, 'assistant')
+          } catch (aiError) {
+            // Se a IA também falhar, envia mensagem de erro
+            console.error('Erro ao processar com IA:', aiError)
+            await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender. Pode reformular sua pergunta?')
+            await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant')
+          }
         } else {
           // Processa com IA para gerar resposta conversacional
           const recentMessages = await getRecentConversations(tenantId, 5)
@@ -294,6 +308,22 @@ async function processWhatsAppMessage(
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant')
+        } else if (!actionResult.success) {
+          // Se a ação falhou, tenta processar com IA
+          try {
+            const recentMessages = await getRecentConversations(tenantId, 5)
+            const aiResponse = await processMessage(audioResult.text, {
+              tenantId: tenantId,
+              recentMessages,
+            })
+            
+            await sendTextMessage(from, aiResponse)
+            await createConversation(tenantId, aiResponse, 'assistant')
+          } catch (aiError) {
+            console.error('Erro ao processar áudio com IA:', aiError)
+            await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender o áudio. Pode repetir?')
+            await createConversation(tenantId, actionResult.message || 'Erro ao processar áudio', 'assistant')
+          }
         } else {
           const recentMessages = await getRecentConversations(tenantId, 5)
           const aiResponse = await processMessage(audioResult.text, {

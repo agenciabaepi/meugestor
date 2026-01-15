@@ -54,13 +54,20 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
     return days
   }, [currentDate])
 
-  // Agrupa compromissos por data (YYYY-MM-DD)
+  // Agrupa compromissos por data (YYYY-MM-DD) usando timezone do Brasil
   const compromissosByDate = useMemo(() => {
     const grouped = new Map<string, Compromisso[]>()
     
     compromissos.forEach((compromisso) => {
       const data = new Date(compromisso.scheduled_at)
-      const dateKey = data.toISOString().split('T')[0] // YYYY-MM-DD
+      // Usa timezone do Brasil para calcular a data correta
+      // Formata a data no timezone do Brasil e extrai YYYY-MM-DD
+      const dateKey = data.toLocaleDateString('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }) // Retorna formato YYYY-MM-DD
       
       if (!grouped.has(dateKey)) {
         grouped.set(dateKey, [])
@@ -124,7 +131,13 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
   const selectedDateCompromissos = useMemo(() => {
     if (!selectedDate) return []
     
-    const dateKey = selectedDate.toISOString().split('T')[0]
+    // Usa timezone do Brasil para calcular a chave da data
+    const dateKey = selectedDate.toLocaleDateString('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
     return compromissosByDate.get(dateKey) || []
   }, [selectedDate, compromissosByDate])
 
@@ -213,7 +226,13 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
               )
             }
 
-            const dateKey = date.toISOString().split('T')[0]
+            // Calcula dateKey no timezone do Brasil para corresponder ao agrupamento
+            const dateKey = date.toLocaleDateString('en-CA', {
+              timeZone: 'America/Sao_Paulo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            })
             const dayCompromissos = compromissosByDate.get(dateKey) || []
             const today = isToday(date)
             const currentMonth = isCurrentMonth(date)

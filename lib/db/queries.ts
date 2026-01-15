@@ -357,7 +357,7 @@ export async function getCompromissosByTenant(
   
   let query = client
     .from('compromissos')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('tenant_id', tenantId)
     .order('scheduled_at', { ascending: true })
 
@@ -369,12 +369,20 @@ export async function getCompromissosByTenant(
     query = query.lte('scheduled_at', endDate)
   }
 
-  const { data, error } = await query
+  const { data, error, count } = await query
 
   if (error) {
     console.error('Error fetching compromissos:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
     return []
   }
+
+  // Log para debug - verificar quantos compromissos foram encontrados
+  console.log(`getCompromissosByTenant - Encontrados ${count || data?.length || 0} compromissos para tenant ${tenantId}`, {
+    startDate,
+    endDate,
+    count: count || data?.length || 0
+  })
 
   return (data || []).map((item: any) => ({
     ...item,

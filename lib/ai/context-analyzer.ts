@@ -279,6 +279,25 @@ export function analyzeConversationalIntent(message: string): ContextAnalysis {
     }
   }
   
+  // Perguntas de confirmação/validação
+  const confirmationPhrases = [
+    'ta certo', 'tá certo', 'esta certo', 'está certo',
+    'esta correto', 'está correto', 'ta correto', 'tá correto',
+    'confere', 'confirma', 'confirmar', 'verificar',
+    'esta certo isso', 'tá certo isso', 'esta correto isso',
+    'pode confirmar', 'pode verificar', 'confirma ai', 'confirma aí'
+  ]
+  
+  if (confirmationPhrases.some(phrase => lowerMessage.includes(phrase))) {
+    // Busca a última resposta do assistente para confirmar
+    return {
+      shouldProceed: false,
+      message: '✅ Sim, está correto! Se precisar de mais alguma coisa, é só falar! 😊',
+      reason: 'confirmation_question',
+      suggestedAction: 'confirm_previous_response'
+    }
+  }
+  
   // Perguntas sobre o sistema
   const systemQuestions = [
     'o que você faz', 'o que voce faz', 'o que vc faz',

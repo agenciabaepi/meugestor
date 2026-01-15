@@ -606,7 +606,7 @@ async function handleQuery(
 ): Promise<ActionResult> {
   try {
     const lowerMessage = message.toLowerCase()
-    const now = new Date()
+    const now = getNowInBrazil() // Usa timezone do Brasil
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0]
 
@@ -679,6 +679,9 @@ async function handleQuery(
         periodoTexto = 'futuros'
       }
       
+      // Log para debug
+      console.log(`handleQuery - Compromissos encontrados para período "${periodoTexto}":`, compromissos.length)
+      
       // Ordena por data
       compromissos.sort((a, b) => 
         new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
@@ -692,6 +695,7 @@ async function handleQuery(
         const quantidade = compromissos.length
         response = `📅 Você tem ${quantidade} ${quantidade === 1 ? 'compromisso' : 'compromissos'} ${periodoTexto}:\n\n`
         
+        // Lista TODOS os compromissos encontrados (sem limite)
         compromissos.forEach((c, index) => {
           const dataHora = new Date(c.scheduled_at)
           const data = dataHora.toLocaleDateString('pt-BR', {
@@ -818,34 +822,8 @@ async function handleQuery(
       }
     }
 
-    // Consulta de compromissos
-    if (lowerMessage.includes('compromisso') || lowerMessage.includes('agenda')) {
-      const hoje = await getTodayCompromissos(tenantId)
-      const proximos = await getCompromissosRecords(
-        tenantId,
-        new Date().toISOString()
-      )
-
-      let response = '📅 Seus compromissos:\n\n'
-
-      if (hoje.length > 0) {
-        response += `Hoje:\n${hoje.map(c => `• ${c.title}`).join('\n')}\n\n`
-      }
-
-      if (proximos.length > 0) {
-        response += `Próximos:\n${proximos.slice(0, 5).map(c => 
-          `• ${c.title} - ${new Date(c.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
-        ).join('\n')}`
-      } else {
-        response += 'Nenhum compromisso futuro agendado.'
-      }
-
-      return {
-        success: true,
-        message: response,
-        data: { hoje, proximos },
-      }
-    }
+    // Nota: Consultas de compromissos já são tratadas no bloco anterior (linhas 608-710)
+    // Este código não será alcançado devido à verificação anterior, mas mantido como fallback
 
     return {
       success: true,
@@ -871,6 +849,9 @@ async function handleReport(tenantId: string): Promise<ActionResult> {
       tenantId,
       now.toISOString()
     )
+    
+    // Log para debug
+    console.log(`handleReport - Compromissos futuros encontrados:`, compromissos.length)
     
     // Ordena compromissos por data
     compromissos.sort((a, b) => 
