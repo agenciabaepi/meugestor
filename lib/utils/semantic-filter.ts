@@ -131,13 +131,43 @@ export function matchesSemanticFilter(
   }
   
   // Fallback: busca direta na descrição, categoria ou subcategoria
+  // Também verifica se o termo de busca está relacionado semanticamente
   const directMatch = 
     normalizedDescription.includes(normalizedSearch) ||
     normalizeString(record.category).includes(normalizedSearch) ||
     (record.subcategory && normalizeString(record.subcategory).includes(normalizedSearch)) ||
     record.tags?.some(tag => normalizeString(tag).includes(normalizedSearch))
   
-  return directMatch
+  // Verifica também se o termo de busca é sinônimo de categoria/subcategoria
+  // Ex: "mercado" pode estar em descrição mesmo que categoria seja "Alimentação"
+  const synonymMatch = checkSynonymMatch(normalizedSearch, record)
+  
+  return directMatch || synonymMatch
+}
+
+/**
+ * Verifica se o termo de busca é sinônimo da categoria/subcategoria do registro
+ */
+function checkSynonymMatch(searchTerm: string, record: FinanceiroRecord): boolean {
+  // Mapeamento inverso: verifica se o termo de busca corresponde à categoria/subcategoria
+  for (const [term, mapping] of Object.entries(SEMANTIC_MAPPINGS)) {
+    if (normalizeString(term) === searchTerm) {
+      // Verifica se o registro pertence a uma das categorias/subcategorias mapeadas
+      const categoryMatch = mapping.categories.some(cat => 
+        normalizeString(record.category) === normalizeString(cat)
+      )
+      
+      const subcategoryMatch = record.subcategory && mapping.subcategories.some(sub => 
+        normalizeString(record.subcategory!) === normalizeString(sub)
+      )
+      
+      if (categoryMatch || subcategoryMatch) {
+        return true
+      }
+    }
+  }
+  
+  return false
 }
 
 /**

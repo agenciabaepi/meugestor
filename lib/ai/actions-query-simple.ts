@@ -186,17 +186,31 @@ async function queryGastos(
   
   // FILTRO SEMÂNTICO: Se tem categoria/subcategoria, usa filtro semântico
   // Isso resolve o problema de "mercado" não encontrar "supermercado"
+  // O GPT pode retornar "mercado" como categoria, mas no banco está "Alimentação" com subcategoria "supermercado"
   let registrosFiltrados = registros
   if (state.categoria || state.subcategoria) {
     // Usa subcategoria se disponível, senão usa categoria
+    // O filtro semântico resolve termos comuns como "mercado" → "Alimentação" + "supermercado"
     const searchTerm = state.subcategoria || state.categoria || ''
     registrosFiltrados = filterBySemanticCategory(registros, searchTerm)
     
     console.log('queryGastos - Filtro semântico aplicado:', {
+      categoria: state.categoria,
+      subcategoria: state.subcategoria,
       searchTerm,
       totalRegistros: registros.length,
-      registrosFiltrados: registrosFiltrados.length
+      registrosFiltrados: registrosFiltrados.length,
+      periodo: state.periodo
     })
+    
+    // Se não encontrou nada com filtro semântico, tenta busca direta por categoria
+    if (registrosFiltrados.length === 0 && state.categoria) {
+      console.log('queryGastos - Filtro semântico não encontrou resultados, tentando busca direta por categoria')
+      registrosFiltrados = registros.filter(r => 
+        r.category.toLowerCase() === state.categoria!.toLowerCase() ||
+        (r.subcategory && r.subcategory.toLowerCase() === state.categoria!.toLowerCase())
+      )
+    }
   }
   
   const total = registrosFiltrados.reduce((sum, r) => sum + Number(r.amount), 0)
