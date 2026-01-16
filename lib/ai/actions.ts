@@ -24,6 +24,37 @@ import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAp
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
 import { getLastTouchedAppointmentId, saveRecentAction, removeAction, setLastTouchedAppointmentId } from './action-history'
+import { clearState as clearSemanticState } from './semantic-state'
+import { clearFocus } from './focus-lock'
+
+const MUTATING_INTENTS = new Set([
+  'register_expense',
+  'register_revenue',
+  'update_expense',
+  'update_revenue',
+  'create_appointment',
+  'update_appointment',
+  'cancel_appointment',
+])
+
+function isMutatingIntent(intent: string): boolean {
+  return MUTATING_INTENTS.has(intent)
+}
+
+async function cleanupAfterMutation(tenantId: string, userId: string, intent: string): Promise<void> {
+  // Limpa qualquer pendência para evitar loop/reabertura
+  clearPendingConfirmation(tenantId, userId)
+  clearActiveTask(tenantId, userId)
+
+  // Marca resolvido para não reabrir pending persistido em invocações futuras
+  await persistResolvedConfirmation(tenantId, userId)
+
+  // Não herdar contexto de update/create/cancel em próximos fluxos
+  if (intent === 'create_appointment' || intent === 'update_appointment' || intent === 'cancel_appointment') {
+    clearFocus(tenantId, 'appointment')
+  }
+  clearSemanticState()
+}
 
 export interface ActionResult {
   success: boolean
@@ -106,16 +137,18 @@ export async function processAction(
         await persistResolvedConfirmation(tenantId, userId)
         clearPendingConfirmation(tenantId, userId)
         const actionResult = await executeAction({ ...activeTask.state }, tenantId, userId, message)
-        clearActiveTask(tenantId, userId)
+        if (actionResult.success && isMutatingIntent(activeTask.state.intent)) {
+          await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
+        } else {
+          clearActiveTask(tenantId, userId)
+        }
         return actionResult.success
           ? { success: true, message: buildCommitFinalMessage(activeTask.state, actionResult), data: actionResult.data }
           : { success: false, message: actionResult.message || 'Não consegui executar a ação. Tente novamente.', data: actionResult.data }
       }
       if (isNegativeConfirm) {
         console.log('processAction - Cancelamento recebido (activeTask), limpando ação ativa')
-        await persistResolvedConfirmation(tenantId, userId)
-        clearPendingConfirmation(tenantId, userId)
-        clearActiveTask(tenantId, userId)
+        await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
         return { success: true, message: 'Entendido, cancelado. Como posso ajudar?' }
       }
     }
@@ -136,7 +169,13 @@ export async function processAction(
 
         // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
         const queued = consumeQueuedMessage(tenantId, userId)
-        clearActiveTask(tenantId, userId)
+
+        // Após ação mutável: limpar estado para não reabrir fluxo nem herdar contexto em queries seguintes
+        if (actionResult.success && isMutatingIntent(semanticState.intent)) {
+          await cleanupAfterMutation(tenantId, userId, semanticState.intent)
+        } else {
+          clearActiveTask(tenantId, userId)
+        }
         if (queued) {
           const followUp = await processAction(queued, tenantId, userId)
           if (followUp?.message) {
@@ -165,9 +204,7 @@ export async function processAction(
         }
       } else if (isNegativeConfirm) {
         console.log('processAction - Cancelamento recebido')
-        clearPendingConfirmation(tenantId, userId)
-        clearActiveTask(tenantId, userId)
-        await persistResolvedConfirmation(tenantId, userId)
+        await cleanupAfterMutation(tenantId, userId, pendingConfirmation.state.intent)
         return {
           success: true,
           message: 'Entendido, cancelado. Como posso ajudar?'
@@ -194,7 +231,11 @@ export async function processAction(
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
       console.log('processAction - Dados completos, executando diretamente sem confirmação')
-      return await executeAction(semanticState, tenantId, userId, message)
+      const result = await executeAction(semanticState, tenantId, userId, message)
+      if (result.success && isMutatingIntent(semanticState.intent)) {
+        await cleanupAfterMutation(tenantId, userId, semanticState.intent)
+      }
+      return result
     }
     
     // Se precisa confirmação (ambiguidade real), salva e retorna mensagem
@@ -296,9 +337,9 @@ export async function processAction(
     }
 
     const result = await executeAction(semanticState, tenantId, userId, message)
-    // Se concluiu uma ação de compromisso com sucesso, limpa foco
-    if (result.success && (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment')) {
-      clearActiveTask(tenantId, userId)
+    // Após qualquer ação mutável, encerra o fluxo e reseta estado
+    if (result.success && isMutatingIntent(semanticState.intent)) {
+      await cleanupAfterMutation(tenantId, userId, semanticState.intent)
     }
     return result
   } catch (error) {
