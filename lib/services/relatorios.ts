@@ -1,7 +1,6 @@
 import {
   calculateTotalSpent,
-  calculateTotalByCategory,
-  getFinanceiroRecords,
+  getDespesasRecords,
 } from './financeiro'
 import { getCompromissosRecords, getTodayCompromissos } from './compromissos'
 
@@ -23,8 +22,10 @@ export async function gerarRelatorioFinanceiro(
   startDate?: string,
   endDate?: string
 ): Promise<RelatorioFinanceiro> {
-  const total = await calculateTotalSpent(tenantId, startDate, endDate)
-  const registros = await getFinanceiroRecords(tenantId, startDate, endDate)
+  // IMPORTANTE: este relatório é de GASTOS (despesas).
+  // Mantém consistência entre `total` e `porCategoria` (ambos filtrados como expense).
+  const despesas = await getDespesasRecords(tenantId, startDate, endDate)
+  const total = despesas.reduce((sum, r) => sum + Number(r.amount), 0)
 
   // Agrupa por categoria
   const porCategoria: Record<string, number> = {}
@@ -46,12 +47,9 @@ export async function gerarRelatorioFinanceiro(
   ]
 
   for (const categoria of categorias) {
-    const totalCategoria = await calculateTotalByCategory(
-      tenantId,
-      categoria,
-      startDate,
-      endDate
-    )
+    const totalCategoria = despesas
+      .filter((d) => d.category === categoria)
+      .reduce((sum, d) => sum + Number(d.amount), 0)
     if (totalCategoria > 0) {
       porCategoria[categoria] = totalCategoria
     }
@@ -60,7 +58,7 @@ export async function gerarRelatorioFinanceiro(
   return {
     total,
     porCategoria,
-    totalRegistros: registros.length,
+    totalRegistros: despesas.length,
     periodo: {
       inicio: startDate || 'início',
       fim: endDate || 'hoje',
@@ -110,7 +108,7 @@ export async function obterMaioresGastos(
   tenantId: string,
   limit: number = 5
 ): Promise<Array<{ description: string; amount: number; category: string }>> {
-  const registros = await getFinanceiroRecords(tenantId)
+  const registros = await getDespesasRecords(tenantId)
   
   return registros
     .sort((a, b) => Number(b.amount) - Number(a.amount))

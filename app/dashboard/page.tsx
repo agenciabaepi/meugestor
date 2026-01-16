@@ -3,6 +3,7 @@ import { getTodayCompromissos, getCompromissosRecords } from '@/lib/services/com
 import { gerarResumoMensal } from '@/lib/services/relatorios'
 import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
+import { DashboardDonutSection } from './components/DashboardDonutSection'
 
 async function getDashboardData() {
   try {
@@ -99,6 +100,26 @@ async function getDashboardData() {
 export default async function DashboardPage() {
   const data = await getDashboardData()
 
+  // Dados do donut (preferência: resumo real; fallback: mock inicial)
+  const categoriasResumo = Object.entries(data.resumo?.porCategoria || {}).map(([nome, valor]) => ({
+    nome,
+    valor: Number(valor),
+  }))
+
+  const donutData =
+    categoriasResumo.length > 0
+      ? { total: Number(data.resumo.total) || 0, categorias: categoriasResumo }
+      : {
+          total: 7232.75,
+          categorias: [
+            { nome: 'Alimentação', valor: 2800 },
+            { nome: 'Transporte', valor: 1200 },
+            { nome: 'Moradia', valor: 1800 },
+            { nome: 'Lazer', valor: 600 },
+            { nome: 'Outros', valor: 832.75 },
+          ],
+        }
+
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
@@ -111,7 +132,7 @@ export default async function DashboardPage() {
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Card Gastos do Mês */}
-        <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -127,7 +148,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Registros */}
-        <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -143,7 +164,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Hoje */}
-        <div className="relative bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -159,7 +180,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Próximos */}
-        <div className="relative bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -175,9 +196,12 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Donut (Gastos do mês por categoria) */}
+      <DashboardDonutSection donutData={donutData} />
+
       {/* Gastos Recentes */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Gastos Recentes</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
@@ -186,7 +210,7 @@ export default async function DashboardPage() {
               {data.gastosRecentes.map((gasto) => (
                 <div
                   key={gasto.id}
-                  className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200"
+                  className="flex items-center justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <p className="font-semibold text-base text-gray-900 truncate mb-1">{gasto.description}</p>
@@ -194,7 +218,7 @@ export default async function DashboardPage() {
                       {gasto.category} • {new Date(gasto.date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right shrink-0">
                     <p className="font-bold text-lg text-gray-900 whitespace-nowrap">
                       R$ {Number(gasto.amount).toFixed(2)}
                     </p>
@@ -214,7 +238,7 @@ export default async function DashboardPage() {
 
       {/* Próximos Compromissos */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">Próximos Compromissos</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
@@ -223,11 +247,11 @@ export default async function DashboardPage() {
               {data.proximos.map((compromisso) => (
                 <div
                   key={compromisso.id}
-                  className="flex items-start justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200"
+                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full shrink-0"></div>
                       <p className="font-semibold text-base text-gray-900 truncate">{compromisso.title}</p>
                     </div>
                     <p className="text-sm text-gray-500 ml-5">

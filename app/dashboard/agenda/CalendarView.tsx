@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Check, XCircle } from 'lucide-react'
 import type { Compromisso } from '@/lib/db/types'
 
 export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) {
@@ -272,6 +272,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                       minute: '2-digit',
                     })
                     const isCancelled = compromisso.is_cancelled === true
+                    const isConcluido = !isCancelled && new Date(compromisso.scheduled_at).getTime() < Date.now()
 
                     return (
                       <div
@@ -279,9 +280,11 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                         className={`text-[10px] px-1 py-0.5 rounded truncate ${
                           isCancelled
                             ? 'bg-red-100 text-red-900 line-through'
-                            : today
-                              ? 'bg-blue-200 text-blue-900'
-                              : 'bg-indigo-100 text-indigo-900'
+                            : isConcluido
+                              ? 'bg-emerald-100 text-emerald-900'
+                              : today
+                                ? 'bg-blue-200 text-blue-900'
+                                : 'bg-indigo-100 text-indigo-900'
                         }`}
                         title={`${hora} - ${compromisso.title}`}
                       >
@@ -369,6 +372,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                     })
 
                     const isCancelled = compromisso.is_cancelled === true
+                    const isConcluido = !isCancelled && new Date(compromisso.scheduled_at).getTime() < Date.now()
 
                     return (
                       <div
@@ -376,6 +380,8 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                         className={`border rounded-lg p-4 hover:shadow-sm transition ${
                           isCancelled
                             ? 'border-red-200 bg-red-50 hover:border-red-300'
+                            : isConcluido
+                              ? 'border-emerald-200 bg-emerald-50 hover:border-emerald-300'
                             : 'border-gray-200 hover:border-indigo-300'
                         }`}
                       >
@@ -383,10 +389,10 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
-                                isCancelled ? 'bg-red-100' : 'bg-indigo-100'
+                                isCancelled ? 'bg-red-100' : isConcluido ? 'bg-emerald-100' : 'bg-indigo-100'
                               }`}>
                                 <svg
-                                  className={`w-6 h-6 ${isCancelled ? 'text-red-600' : 'text-indigo-600'}`}
+                                  className={`w-6 h-6 ${isCancelled ? 'text-red-600' : isConcluido ? 'text-emerald-600' : 'text-indigo-600'}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -407,8 +413,15 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                                     {compromisso.title}
                                   </h4>
                                   {isCancelled && (
-                                    <span className="text-[10px] uppercase tracking-wide bg-red-200 text-red-800 px-2 py-0.5 rounded">
+                                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-red-200 text-red-800 px-2 py-0.5 rounded">
+                                      <XCircle className="w-3 h-3" />
                                       Cancelado
+                                    </span>
+                                  )}
+                                  {isConcluido && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
+                                      <Check className="w-3 h-3" />
+                                      Concluído
                                     </span>
                                   )}
                                 </div>

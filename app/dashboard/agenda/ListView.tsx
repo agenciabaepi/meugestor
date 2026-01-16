@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { Check, XCircle } from 'lucide-react'
 import type { Compromisso } from '@/lib/db/types'
 
 export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
@@ -80,6 +81,7 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                     minute: '2-digit',
                   })
                   const isCancelled = compromisso.is_cancelled === true
+                  const isConcluido = !isCancelled && new Date(compromisso.scheduled_at).getTime() < Date.now()
                   
                   return (
                     <div
@@ -87,13 +89,15 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                       className={`flex items-start gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg border ${
                         isCancelled
                           ? 'bg-red-50 border-red-200'
+                          : isConcluido
+                            ? 'bg-emerald-50 border-emerald-200'
                           : isHoje
                             ? 'bg-blue-50 border-blue-200'
                             : 'bg-gray-50 border-gray-200'
                       }`}
                     >
                       <div className={`text-xs sm:text-sm font-medium shrink-0 ${
-                        isCancelled ? 'text-red-700' : isHoje ? 'text-blue-700' : 'text-gray-700'
+                        isCancelled ? 'text-red-700' : isConcluido ? 'text-emerald-700' : isHoje ? 'text-blue-700' : 'text-gray-700'
                       }`}>
                         {hora}
                       </div>
@@ -105,14 +109,21 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                             {compromisso.title}
                           </h4>
                           {isCancelled && (
-                            <span className="text-[10px] uppercase tracking-wide bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                              <XCircle className="w-3 h-3" />
                               Cancelado
+                            </span>
+                          )}
+                          {isConcluido && (
+                            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                              <Check className="w-3 h-3" />
+                              Concluído
                             </span>
                           )}
                         </div>
                         {compromisso.description && (
                           <p className={`text-xs sm:text-sm mt-1 line-clamp-2 ${
-                            isCancelled ? 'text-red-700' : 'text-gray-600'
+                            isCancelled ? 'text-red-700' : isConcluido ? 'text-emerald-700' : 'text-gray-600'
                           }`}>{compromisso.description}</p>
                         )}
                       </div>

@@ -19,10 +19,47 @@ import {
   getYesterdayStartInBrazil,
   getYesterdayEndInBrazil,
   getNowInBrazil,
+  getBrazilDayStartISO,
+  getBrazilDayEndISO,
   getTomorrowStartISOInBrazil,
   getTomorrowEndISOInBrazil
 } from '../utils/date-parser'
 import { filterBySemanticCategory } from '../utils/semantic-filter'
+
+function formatTimeBR(iso: string): string {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso))
+  const hour = parts.find(p => p.type === 'hour')?.value || '00'
+  const minute = parts.find(p => p.type === 'minute')?.value || '00'
+  return `${hour}:${minute}`
+}
+
+function isCancelled(compromisso: any): boolean {
+  return compromisso?.is_cancelled === true || !!compromisso?.cancelled_at
+}
+
+function formatCompromissoLine(compromisso: any, now: Date): string {
+  const hora = formatTimeBR(compromisso.scheduled_at)
+  const title = (compromisso.title || 'Compromisso').toString()
+  const desc = compromisso.description ? ` — ${compromisso.description}` : ''
+  const base = `${hora} — ${title}${desc}`
+
+  if (isCancelled(compromisso)) {
+    // WhatsApp: ~texto~ = riscado
+    return `❌ ~${base}~`
+  }
+
+  const scheduled = new Date(compromisso.scheduled_at)
+  if (!isNaN(scheduled.getTime()) && scheduled.getTime() < now.getTime()) {
+    return `✅ ${base}`
+  }
+
+  return `⏳ ${base}`
+}
 
 /**
  * Converte período semântico em range de datas
@@ -102,21 +139,26 @@ async function queryCompromissos(
   const { periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
   
   let compromissos: any[] = []
+  const now = getNowInBrazil()
   
   if (state.periodo === 'hoje') {
-    compromissos = await getTodayCompromissos(tenantId, userId)
+    // Para relatório: inclui cancelados para marcar com ❌ riscado
+    const start = getBrazilDayStartISO(0, now)
+    const end = getBrazilDayEndISO(0, now)
+    compromissos = await getCompromissosRecords(tenantId, start, end, userId, true)
   } else if (state.periodo === 'amanhã') {
     // Range correto: amanhã no Brasil (00:00 -> 23:59:59.999)
     const start = getTomorrowStartISOInBrazil()
     const end = getTomorrowEndISOInBrazil()
-    compromissos = await getCompromissosRecords(tenantId, start, end, userId)
+    compromissos = await getCompromissosRecords(tenantId, start, end, userId, true)
   } else {
     const { startDate, endDate } = getDateRangeFromPeriodo(state.periodo || null)
     compromissos = await getCompromissosRecords(
       tenantId,
       startDate,
       endDate || undefined,
-      userId
+      userId,
+      true
     )
   }
   
@@ -132,29 +174,12 @@ async function queryCompromissos(
     }
   }
   
-  let response = `📅 Você tem ${compromissos.length} ${compromissos.length === 1 ? 'compromisso' : 'compromissos'} ${periodoTexto}:\n\n`
-  
-  compromissos.forEach((c, index) => {
-    const dataHora = new Date(c.scheduled_at)
-    const data = dataHora.toLocaleDateString('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
-    const hora = dataHora.toLocaleTimeString('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-    
-    response += `${index + 1}. ${c.title}\n`
-    response += `   🕐 ${hora} - ${data}\n`
-    if (c.description) {
-      response += `   📝 ${c.description}\n`
-    }
-    response += `\n`
-  })
+  const totalCancelados = compromissos.filter(isCancelled).length
+  const responseLines = compromissos.map(c => formatCompromissoLine(c, now))
+
+  let response = `📅 Compromissos ${periodoTexto}:\n`
+  response += `Total: ${compromissos.length}${totalCancelados ? ` (❌ ${totalCancelados} cancelado${totalCancelados === 1 ? '' : 's'})` : ''}\n\n`
+  response += responseLines.join('\n')
   
   return {
     success: true,
