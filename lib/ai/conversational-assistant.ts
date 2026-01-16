@@ -208,7 +208,7 @@ Responda APENAS com JSON no formato:
   "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | null,
   "amount": number | null,
   "title": string | null,
-  "scheduled_at": string (ISO 8601) | null,
+  "scheduled_at": string (apenas horário, ex: "15:00") | null,
   "description": string | null,
   "confidence": 0.0-1.0,
   "needsClarification": boolean,
@@ -225,7 +225,8 @@ REGRAS IMPORTANTES:
 - Se há ambiguidade REAL → needsConfirmation: true, readyToSave: false
 - Se está corrigindo → use update_* com targetId da última ação
 - NUNCA invente dados - se não conseguir extrair, deixe null
-- scheduled_at deve ser ISO 8601 completo (ex: "2024-01-16T10:00:00.000Z")
+- scheduled_at NUNCA deve ser ISO 8601
+- scheduled_at deve ser apenas o horário (ex: "15:00"). O backend converte (periodo + horário -> ISO).
 - PRIORIDADE: Executar diretamente quando possível, confirmar apenas quando necessário
 `
         },

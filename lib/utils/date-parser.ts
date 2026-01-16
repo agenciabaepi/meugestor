@@ -7,6 +7,99 @@
  */
 const BRAZIL_TIMEZONE = 'America/Sao_Paulo'
 
+function parseTimeString(time: string | null | undefined): { hour: number; minute: number } | null {
+  if (!time) return null
+  const t = time.trim().toLowerCase()
+
+  // HH:mm
+  const hhmm = t.match(/^(\d{1,2}):(\d{2})$/)
+  if (hhmm) {
+    const hour = Number(hhmm[1])
+    const minute = Number(hhmm[2])
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) return { hour, minute }
+    return null
+  }
+
+  // "15h" or "15h30"
+  const h = t.match(/^(\d{1,2})h(?:(\d{2}))?$/)
+  if (h) {
+    const hour = Number(h[1])
+    const minute = h[2] ? Number(h[2]) : 0
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) return { hour, minute }
+    return null
+  }
+
+  // "15" (assume hour)
+  const onlyHour = t.match(/^(\d{1,2})$/)
+  if (onlyHour) {
+    const hour = Number(onlyHour[1])
+    if (hour >= 0 && hour <= 23) return { hour, minute: 0 }
+  }
+
+  return null
+}
+
+function getCurrentDayInBrazilFrom(baseDate: Date): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRAZIL_TIMEZONE,
+    weekday: 'long'
+  })
+  const parts = formatter.formatToParts(baseDate)
+  const weekday = parts.find(p => p.type === 'weekday')?.value
+  const weekdayMap: Record<string, number> = {
+    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+    'Thursday': 4, 'Friday': 5, 'Saturday': 6
+  }
+  return weekdayMap[weekday || 'Sunday'] || 0
+}
+
+function resolveDayOffsetFromPeriodo(periodo: string | null | undefined, baseDate: Date): number | null {
+  if (!periodo) return null
+  const p = periodo.trim().toLowerCase()
+  if (p === 'hoje') return 0
+  if (p === 'amanhã' || p === 'amanha') return 1
+  if (p === 'ontem') return -1
+
+  const daysOfWeek = ['domingo', 'segunda', 'terça', 'terca', 'quarta', 'quinta', 'sexta', 'sábado', 'sabado']
+  const idx = daysOfWeek.indexOf(p)
+  if (idx !== -1) {
+    const targetDay = idx <= 6 ? idx : (idx === 7 ? 6 : 6) // 'sábado'/'sabado' -> 6
+    const currentDay = getCurrentDayInBrazilFrom(baseDate)
+    return (targetDay - currentDay + 7) % 7
+  }
+
+  return null
+}
+
+/**
+ * Converte tempo relativo + hora (HH:mm / 15h / 15h30) em ISO (UTC instant).
+ * O backend é o ÚNICO responsável por gerar ISO.
+ *
+ * Exemplo (base 15/01/2026 Brasil):
+ * resolveScheduledAt('amanhã', '15:00') -> 2026-01-16T18:00:00.000Z (equivalente a 15h -03)
+ */
+export function resolveScheduledAt(
+  periodo: string | null | undefined,
+  horario: string | null | undefined,
+  timezone: string = BRAZIL_TIMEZONE,
+  baseDate: Date = new Date()
+): string | null {
+  // Hoje o sistema é Brasil; se vier outro timezone, ainda mantém comportamento estável.
+  if (timezone !== BRAZIL_TIMEZONE) {
+    console.warn('resolveScheduledAt - timezone diferente do Brasil, usando America/Sao_Paulo:', timezone)
+  }
+
+  const hm = parseTimeString(horario)
+  if (!hm) return null
+
+  const dayOffset = resolveDayOffsetFromPeriodo(periodo, baseDate)
+  if (dayOffset === null) return null
+
+  const date = createDateInBrazil(hm.hour, hm.minute, dayOffset, baseDate)
+  if (isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
 /**
  * Obtém a data/hora atual no timezone do Brasil
  * Retorna uma data que representa "agora" no timezone do Brasil
@@ -611,7 +704,8 @@ export function extractAppointmentFromMessage(message: string): {
 
   let title: string | null = null
   let hour: number | null = null
-  let dayOffset = 0
+  let minute: number | null = null
+  let periodo: string | null = null
 
   // Tenta encontrar padrões
   for (let i = 0; i < patterns.length; i++) {
@@ -640,39 +734,33 @@ export function extractAppointmentFromMessage(message: string): {
         hour = parseInt(hourMatch)
         console.log(`extractAppointmentFromMessage - Hora extraída: ${hour}h`)
       }
+
+      // Tenta capturar minutos se vierem como "15:30" no match[0]
+      const minuteMatch = match[0]?.match(/(\d{1,2})[:h](\d{2})/i)
+      if (minuteMatch && minuteMatch[2]) {
+        minute = parseInt(minuteMatch[2])
+      }
       
-      // Verifica se mencionou "hoje" (garante que é hoje mesmo)
-      // IMPORTANTE: Verifica "hoje" ANTES de verificar "amanhã" para evitar conflitos
-      if (lowerMessage.includes('hoje')) {
-        dayOffset = 0
-        console.log('extractAppointmentFromMessage - Detectado "hoje", dayOffset = 0')
-      }
-      // Verifica se mencionou "amanhã" (só se não mencionou "hoje")
-      else if (lowerMessage.includes('amanhã')) {
-        dayOffset = 1
-        console.log('extractAppointmentFromMessage - Detectado "amanhã", dayOffset = 1')
-      }
-      // Se não mencionou nem "hoje" nem "amanhã" nem dia da semana, assume hoje
+      // Resolve período (hoje/amanhã/dia da semana). Default: hoje.
+      if (lowerMessage.includes('hoje')) periodo = 'hoje'
+      else if (lowerMessage.includes('amanhã')) periodo = 'amanhã'
       else {
         const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
-        const hasDayOfWeek = daysOfWeek.some(day => lowerMessage.includes(day))
-        if (!hasDayOfWeek) {
-          console.log('extractAppointmentFromMessage - Nenhum dia mencionado, assumindo hoje (dayOffset = 0)')
-          dayOffset = 0
-        }
+        const found = daysOfWeek.find(d => lowerMessage.includes(d))
+        periodo = found || 'hoje'
       }
       
       // Verifica dia da semana
       const daysOfWeek = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
       for (let i = 0; i < daysOfWeek.length; i++) {
         if (lowerMessage.includes(daysOfWeek[i])) {
+          // Se for "hoje" mas já passou o horário, joga para próxima semana
           const currentDay = getCurrentDayInBrazil()
           const targetDay = i
-          dayOffset = (targetDay - currentDay + 7) % 7
-          // Usa getCurrentHourInBrazil() para verificar se já passou o horário hoje
+          const dayOffset = (targetDay - currentDay + 7) % 7
           const nowBrazilHours = getCurrentHourInBrazil()
           if (dayOffset === 0 && hour !== null && nowBrazilHours >= hour) {
-            dayOffset = 7 // Se já passou o horário hoje, agenda para próxima semana
+            periodo = daysOfWeek[i] // mantém o dia, resolveScheduledAt vira 0; aqui só sinalizamos intenção
           }
           break
         }
@@ -697,58 +785,24 @@ export function extractAppointmentFromMessage(message: string): {
     }
   }
 
-  // Se encontrou hora, cria data no timezone do Brasil
+  // Se encontrou hora, resolve para ISO via função única
   if (hour !== null) {
     console.log('extractAppointmentFromMessage - Dados extraídos:', {
       title,
       hour,
-      dayOffset,
+      minute,
+      periodo,
       lowerMessage
     })
-    // Cria a data no timezone do Brasil
-    console.log('extractAppointmentFromMessage - Criando data com:', { hour, minute: 0, dayOffset })
-    const scheduledDate = createDateInBrazil(hour, 0, dayOffset)
-    
-    // Verifica se a data criada está correta
-    const verifyParts = new Intl.DateTimeFormat('en-US', {
-      timeZone: BRAZIL_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).formatToParts(scheduledDate)
-    
-    const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
-    const verifyDay = parseInt(verifyParts.find(p => p.type === 'day')?.value || '0')
-    
-    console.log('extractAppointmentFromMessage - Data criada e verificada:', {
-      input: { hour, dayOffset },
-      createdDateISO: scheduledDate.toISOString(),
-      createdDateLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-      verified: { hour: verifyHour, day: verifyDay },
-      match: verifyHour === hour
-    })
-    
-    // Se a hora não está correta, tenta ajustar
-    let finalDate = scheduledDate
-    if (verifyHour !== hour) {
-      console.warn('extractAppointmentFromMessage - Hora não corresponde! Tentando ajustar...')
-      // Ajusta a diferença
-      const hourDiff = hour - verifyHour
-      finalDate = new Date(scheduledDate.getTime() + hourDiff * 60 * 60 * 1000)
-      console.log('extractAppointmentFromMessage - Data ajustada:', {
-        adjustedDateISO: finalDate.toISOString(),
-        adjustedDateLocal: finalDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-      })
-    }
-    
-    const scheduledAtISO = finalDate.toISOString()
-    
-    console.log('extractAppointmentFromMessage - Data criada:', {
-      scheduledAt: scheduledAtISO,
-      scheduledDateLocal: scheduledDate.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+
+    const horario = `${String(hour).padStart(2, '0')}:${String(minute ?? 0).padStart(2, '0')}`
+    const scheduledAtISO = resolveScheduledAt(periodo || 'hoje', horario, BRAZIL_TIMEZONE, now)
+
+    console.log('extractAppointmentFromMessage - scheduledAt resolvido:', {
+      periodo,
+      horario,
+      scheduledAtISO,
+      scheduledAtLocal: scheduledAtISO ? new Date(scheduledAtISO).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : null
     })
     
     return {

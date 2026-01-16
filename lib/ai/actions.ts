@@ -21,7 +21,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
-import { parseScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
+import { parseScheduledAt, resolveScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
 
@@ -297,8 +297,12 @@ export async function processAction(
 
 function buildKeepFocusMessage(activeTask: any): string {
   const title = activeTask?.state?.title || 'compromisso'
-  const when = activeTask?.state?.scheduled_at
-    ? new Date(activeTask.state.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  const rawWhen = activeTask?.state?.scheduled_at || null
+  const parsed = rawWhen ? new Date(rawWhen) : null
+  const when = rawWhen
+    ? (parsed && !isNaN(parsed.getTime())
+        ? parsed.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        : rawWhen)
     : null
   const desc = activeTask?.state?.description || null
 
@@ -827,7 +831,41 @@ async function handleCreateAppointment(
     // NÃO pergunte antes de tentar extrair da mensagem original.
     // Isso evita perguntas como "qual a data de amanhã" quando o usuário já disse "amanhã às 15h".
     let title = state.title || null
-    let scheduledAt = state.scheduled_at ? parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage) : null
+    let scheduledAt: string | null = null
+
+    // 1) Se a IA forneceu scheduled_at, pode ser:
+    // - ISO (legado) -> parseScheduledAt
+    // - Hora (HH:mm / 15h / 15h30) + periodo separado -> resolveScheduledAt
+    // - Texto relativo ("amanhã às 15h") -> extrai periodo/hora e resolve
+    if (state.scheduled_at) {
+      scheduledAt = parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage)
+
+      if (!scheduledAt) {
+        const raw = state.scheduled_at.toLowerCase()
+        const periodoFromState = state.periodo || null
+        const periodoFromText =
+          raw.includes('amanhã') ? 'amanhã'
+          : raw.includes('hoje') ? 'hoje'
+          : raw.includes('ontem') ? 'ontem'
+          : null
+        const periodo = periodoFromState || periodoFromText
+
+        // Extrai "HH:mm" ou "15h"/"15h30"
+        const timeMatch = raw.match(/(\d{1,2})(?::|h)(\d{2})/) || raw.match(/(\d{1,2})h\b/) || raw.match(/\b(\d{1,2}):(\d{2})\b/)
+        let horario: string | null = null
+        if (timeMatch) {
+          const h = Number(timeMatch[1])
+          const m = timeMatch[2] ? Number(timeMatch[2]) : 0
+          if (!Number.isNaN(h) && !Number.isNaN(m)) {
+            horario = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+          }
+        }
+
+        if (periodo && horario) {
+          scheduledAt = resolveScheduledAt(periodo, horario, 'America/Sao_Paulo', new Date())
+        }
+      }
+    }
 
     console.log('handleCreateAppointment - Dados da IA:', {
       title,
@@ -855,7 +893,7 @@ async function handleCreateAppointment(
       })
     }
 
-    // Se não tem dados suficientes, tenta extrair da mensagem original
+    // 2) Se não tem dados suficientes, tenta extrair da mensagem original
     if ((!title || !scheduledAt) && originalMessage) {
       console.log('handleCreateAppointment - Tentando extrair da mensagem original:', originalMessage)
       const extracted = extractAppointmentFromMessage(originalMessage)
@@ -879,7 +917,14 @@ async function handleCreateAppointment(
 
     // Se ainda não tem data/hora, tenta processar o scheduled_at original (se existir)
     if (!scheduledAt && state.scheduled_at) {
-      scheduledAt = parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage)
+      // Última chance: tenta como tempo relativo + hora (se tiver periodo)
+      const iso = parseScheduledAt(state.scheduled_at, state.title || undefined, originalMessage)
+      if (iso) scheduledAt = iso
+      else if (state.periodo) {
+        // Se a IA retornou apenas horário (ex: "15:00"), converte aqui
+        const tryIso = resolveScheduledAt(state.periodo, state.scheduled_at, 'America/Sao_Paulo', new Date())
+        if (tryIso) scheduledAt = tryIso
+      }
     }
 
     // Se ainda não tem data/hora, retorna erro
@@ -893,7 +938,7 @@ async function handleCreateAppointment(
       })
       return {
         success: false,
-        message: 'Não consegui entender a data/horário. Pode me dizer assim: "amanhã às 15h" ou "16/01 às 15h"?',
+        message: 'Não consegui entender a data/horário. Pode me dizer assim: "amanhã às 15h" ou "segunda às 15h"?',
       }
     }
 
