@@ -101,6 +101,31 @@ export function resolveScheduledAt(
 }
 
 /**
+ * Aplica um novo horário ao MESMO dia (Brasil) de um ISO existente.
+ * Útil para correções: "na verdade é às 22h" (mantém a data, muda só a hora).
+ */
+export function applyTimeToISOInBrazil(
+  baseIso: string | null | undefined,
+  horario: string | null | undefined,
+  timezone: string = BRAZIL_TIMEZONE
+): string | null {
+  if (!baseIso) return null
+  const baseDate = new Date(baseIso)
+  if (isNaN(baseDate.getTime())) return null
+
+  if (timezone !== BRAZIL_TIMEZONE) {
+    console.warn('applyTimeToISOInBrazil - timezone diferente do Brasil, usando America/Sao_Paulo:', timezone)
+  }
+
+  const hm = parseTimeString(horario)
+  if (!hm) return null
+
+  const date = createDateInBrazil(hm.hour, hm.minute, 0, baseDate)
+  if (isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
+/**
  * Obtém a data/hora atual no timezone do Brasil
  * Retorna uma data que representa "agora" no timezone do Brasil
  */

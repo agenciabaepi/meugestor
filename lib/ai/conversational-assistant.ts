@@ -22,9 +22,14 @@ import type { ActiveTask } from './session-focus'
 function validateDataCompleteness(state: SemanticState): boolean {
   switch (state.intent) {
     case 'create_appointment':
-      // Para UX natural: se o usuário deu "amanhã/hoje/segunda + horário" na mensagem,
-      // o backend consegue inferir a data absoluta. Então basta ter título aqui.
-      return !!state.title
+      // Execução direta: só salva sem conversa se tiver título + período + horário.
+      // scheduled_at aqui é apenas o horário (ex: "23:00", "23h", "23h30")
+      return !!(
+        state.title &&
+        state.periodo &&
+        state.scheduled_at &&
+        /^(?:\d{1,2}:\d{2}|\d{1,2}h(?:\d{2})?)$/i.test(String(state.scheduled_at).trim())
+      )
     
     case 'register_expense':
     case 'register_revenue':
@@ -127,14 +132,15 @@ REGRAS DE SESSION FOCUS:
 SEU PAPEL:
 - Você CONVERSA naturalmente com o usuário
 - Você ENTENDE a intenção, mas não precisa classificar tudo imediatamente
-- Você CONFIRMA antes de executar ações quando há ambiguidade
+- Você executa ações DIRETAMENTE quando a mensagem é clara e completa
+- Você só pergunta quando falta informação essencial (clarificação), sem conversa desnecessária
 - Você DETECTA quando o usuário está corrigindo algo (não criando novo)
 - Você retorna um ESTADO SEMÂNTICO estruturado em JSON
 
 COMPORTAMENTO CONVERSACIONAL:
 1. Se a mensagem é uma pergunta geral ou conversa casual → intent: "chat"
 2. Se a intenção está clara e completa → gere ação (register_expense, create_appointment, etc)
-3. Se há ambiguidade REAL → needsConfirmation: true (veja regras abaixo)
+3. Se há ambiguidade REAL (faltou dado essencial) → needsClarification: true (veja regras abaixo)
 4. Se o usuário está corrigindo algo → use update_expense, update_revenue, update_appointment
 
 DETECÇÃO DE CORREÇÕES:
@@ -143,14 +149,12 @@ DETECÇÃO DE CORREÇÕES:
 - "não, falei errado, é meio-dia" → update_appointment (corrige horário)
 - Use o targetId da última ação do mesmo tipo
 
-REGRAS CRÍTICAS DE CONFIRMAÇÃO (OBRIGATÓRIAS):
-1. NUNCA perguntar se data e hora foram dadas explicitamente (ex: "15/01/2026 às 12:00")
-2. NUNCA perguntar a mesma informação mais de uma vez
-3. Só perguntar quando há AMBIGUIDADE REAL (não quando dados estão claros)
+REGRAS CRÍTICAS (OBRIGATÓRIAS):
+1. Execução direta quando estiver claro e completo → readyToSave: true, needsClarification: false
+2. Só perguntar quando faltar informação ESSENCIAL (data/período e/ou horário, valor, descrição etc.)
+3. NUNCA perguntar a mesma informação mais de uma vez
 4. Local (cidade/endereço) é OPCIONAL - nunca bloquear salvamento por falta de local
-5. Não perguntar fuso horário se cidade/UF já indicar claramente
-6. Quando todos os dados essenciais estiverem claros → readyToSave: true
-7. Fazer NO MÁXIMO uma confirmação final resumida antes de salvar
+5. PROIBIDO: pedir formato técnico de data, ISO 8601 ou fuso horário
 
 PROIBIDO:
 - Perguntar "qual a data exata" / "dd/mm/aaaa"
@@ -160,9 +164,7 @@ PROIBIDO:
 
 REGRA CRÍTICA DE TEMPO RELATIVO:
 - "amanhã", "hoje", "segunda", etc. + horário explícito = DADO COMPLETO.
-- Nesses casos: needsConfirmation=false e readyToSave=true.
-- Se precisar confirmar, a única frase permitida é:
-  "Vou marcar [título] amanhã às 15h. Posso salvar assim?"
+- Nesses casos: readyToSave=true e executar diretamente (sem confirmação).
 
 REGRA CRÍTICA - FOCUS LOCK (TRAVA DE FOCO):
 - Se o usuário mencionar o mesmo compromisso 2-3 vezes seguidas (mesmo título/local/data), NÃO perguntar novamente qual compromisso é
@@ -171,8 +173,8 @@ REGRA CRÍTICA - FOCUS LOCK (TRAVA DE FOCO):
 - Palavras como "essa", "isso", "a de amanhã", "a reunião da Zion" indicam continuidade da conversa
 - Após certeza suficiente (2+ menções do mesmo alvo), execute ou faça UMA confirmação final curta
 
-FORMATO DE CONFIRMAÇÃO (quando realmente necessário):
-"Vou salvar: [título], [data/hora], [cidade opcional]. Posso salvar assim?"
+CONFIRMAÇÃO:
+- Só use needsConfirmation=true se o USUÁRIO pedir confirmação explicitamente (ex: "confirma?" / "posso salvar assim?").
 
 DADOS ESSENCIAIS POR INTENÇÃO:
 - create_appointment: título + (tempo relativo + horário) → readyToSave: true (scheduled_at pode ser null; backend converte)
@@ -185,9 +187,9 @@ EXEMPLOS DE QUANDO NÃO PERGUNTAR:
 - "15/01/2026 às 12:00" → Data/hora explícita! readyToSave: true, executar diretamente
 
 EXEMPLOS DE QUANDO PERGUNTAR (apenas ambiguidade real):
-- "tenho reunião" → Falta data/hora → needsConfirmation: true
-- "gastei no mercado" → Falta valor → needsConfirmation: true
-- "reunião às 10" → Pode ser hoje ou amanhã? → needsConfirmation: true (só se realmente ambíguo)
+- "tenho reunião" → Falta data/hora → needsClarification: true
+- "gastei no mercado" → Falta valor → needsClarification: true
+- "reunião às 10" → Falta período → needsClarification: true (pergunte "hoje ou amanhã?")
 
 ${conversationContext ? `
 CONTEXTO DA CONVERSA:
@@ -222,7 +224,7 @@ Responda APENAS com JSON no formato:
 REGRAS IMPORTANTES:
 - Se é conversa casual → intent: "chat", confidence: 0.8
 - Se dados estão completos e claros → readyToSave: true, execute ação diretamente (SEM confirmação)
-- Se há ambiguidade REAL → needsConfirmation: true, readyToSave: false
+- Se há ambiguidade REAL → needsClarification: true, readyToSave: false
 - Se está corrigindo → use update_* com targetId da última ação
 - NUNCA invente dados - se não conseguir extrair, deixe null
 - scheduled_at NUNCA deve ser ISO 8601
@@ -296,6 +298,42 @@ REGRAS IMPORTANTES:
     // Validação inteligente: se dados estão completos, marca como readyToSave
     if (!semanticState.readyToSave) {
       semanticState.readyToSave = validateDataCompleteness(semanticState)
+    }
+
+    // EXECUÇÃO DIRETA (regra do produto):
+    // - Se está pronto para salvar, nunca pedir confirmação.
+    // - Conversa só quando falta dado essencial (needsClarification).
+    if (semanticState.readyToSave) {
+      semanticState.needsConfirmation = false
+      semanticState.confirmationMessage = null
+      semanticState.needsClarification = false
+      semanticState.clarificationMessage = null
+    } else {
+      // Se faltou algo essencial, pergunta diretamente (humano, sem formato técnico).
+      if (semanticState.intent === 'create_appointment') {
+        const missingPeriodo = !semanticState.periodo
+        const missingHora = !semanticState.scheduled_at
+        semanticState.needsClarification = true
+        semanticState.clarificationMessage =
+          missingPeriodo && missingHora
+            ? 'Pra quando e que horas? (ex: "amanhã às 15h")'
+            : missingPeriodo
+              ? 'Pra quando? (ex: "hoje" ou "amanhã")'
+              : 'Que horas? (ex: "às 15h")'
+      }
+      if ((semanticState.intent === 'register_expense' || semanticState.intent === 'register_revenue')) {
+        const missingAmount = !(semanticState.amount && semanticState.amount > 0)
+        const missingDesc = !semanticState.description
+        if (missingAmount || missingDesc) {
+          semanticState.needsClarification = true
+          semanticState.clarificationMessage =
+            missingAmount && missingDesc
+              ? 'Quanto foi e com o que foi? (ex: "gastei 50 no mercado")'
+              : missingAmount
+                ? 'Quanto foi?'
+                : 'Com o que foi?'
+        }
+      }
     }
     
     // Para updates, tenta definir targetId usando múltiplas estratégias

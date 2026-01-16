@@ -1,5 +1,6 @@
 import {
   createCompromisso,
+  getCompromissoById,
   getCompromissosByTenant,
 } from '../db/queries'
 import { isValidDate } from '../utils/validation'
@@ -104,6 +105,17 @@ export async function updateCompromissoRecord(
   }
   
   return compromisso
+}
+
+/**
+ * Obtém um compromisso por ID (para correções que preservam a data e mudam só o horário)
+ */
+export async function getCompromissoRecordById(
+  id: string,
+  tenantId: string,
+  userId?: string | null
+): Promise<Compromisso | null> {
+  return getCompromissoById(id, tenantId, userId || null)
 }
 
 /**

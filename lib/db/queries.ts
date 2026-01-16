@@ -460,6 +460,51 @@ export async function updateCompromisso(
   return data
 }
 
+export async function getCompromissoById(
+  id: string,
+  tenantId: string,
+  userId?: string | null
+): Promise<Compromisso | null> {
+  // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  let query = client
+    .from('compromissos')
+    .select('*')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  let { data, error } = await query.single()
+
+  // Compatibilidade: se user_id não existe ainda, tenta novamente sem filtro
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em compromissos, buscando sem filtro (aplique a migration 011)')
+    const retry = await client
+      .from('compromissos')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
+
+  if (error) {
+    console.error('Error fetching compromisso by id:', error)
+    return null
+  }
+
+  return data
+}
+
 export async function getCompromissosByTenant(
   tenantId: string,
   startDate?: string,

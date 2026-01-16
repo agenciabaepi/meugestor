@@ -21,7 +21,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
-import { parseScheduledAt, resolveScheduledAt, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
+import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
 
@@ -439,8 +439,9 @@ async function executeAction(
             userId,
             createdAt: new Date(),
             data: {
-              title: semanticState.title ?? undefined,
-              scheduled_at: semanticState.scheduled_at ?? undefined
+              title: appointmentResult.data.title ?? semanticState.title ?? undefined,
+              // IMPORTANTE: guarda ISO real do banco (para correções "muda só a hora" sem perder a data)
+              scheduled_at: appointmentResult.data.scheduled_at ?? undefined
             }
           })
         }
@@ -560,7 +561,7 @@ async function handleUpdateAppointment(
       }
     }
     
-    const { updateCompromissoRecord } = await import('../services/compromissos')
+    const { updateCompromissoRecord, getCompromissoRecordById } = await import('../services/compromissos')
     
     // Prepara updates apenas com campos fornecidos
     const updates: any = {}
@@ -571,7 +572,21 @@ async function handleUpdateAppointment(
       updates.description = state.description
     }
     if (state.scheduled_at) {
-      updates.scheduledAt = state.scheduled_at
+      // scheduled_at pode ser ISO (legado) ou apenas horário (novo).
+      const raw = String(state.scheduled_at).trim()
+      const looksIso = raw.includes('T') && !isNaN(new Date(raw).getTime())
+
+      if (looksIso) {
+        updates.scheduledAt = raw
+      } else if (state.periodo) {
+        const iso = resolveScheduledAt(state.periodo, raw, 'America/Sao_Paulo', new Date())
+        if (iso) updates.scheduledAt = iso
+      } else {
+        // Correção de horário: mantém a data atual do compromisso e altera só a hora.
+        const current = await getCompromissoRecordById(state.targetId, tenantId, userId)
+        const iso = applyTimeToISOInBrazil(current?.scheduled_at || null, raw, 'America/Sao_Paulo')
+        if (iso) updates.scheduledAt = iso
+      }
     }
     
     const compromisso = await updateCompromissoRecord(state.targetId, tenantId, updates)
@@ -912,7 +927,7 @@ async function handleCreateAppointment(
 
     // Se ainda não tem título, usa padrão
     if (!title) {
-      title = state.title || 'Compromisso'
+      title = state.title || 'Reunião'
     }
 
     // Se ainda não tem data/hora, tenta processar o scheduled_at original (se existir)
