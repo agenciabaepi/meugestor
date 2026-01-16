@@ -20,7 +20,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
-import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
+import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil, getBrazilDayStartISO, getBrazilDayEndISO } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
 import { getLastTouchedAppointmentId, saveRecentAction, removeAction, setLastTouchedAppointmentId } from './action-history'
@@ -713,33 +713,137 @@ async function handleCancelAppointment(
   tenantId: string,
   userId: string
 ): Promise<ActionResult> {
-  const targetId = state.targetId || getLastTouchedAppointmentId(tenantId, userId)
-  if (!targetId) {
+  const { cancelCompromissoRecord, getCompromissoRecordById, getCompromissosRecords } = await import('../services/compromissos')
+
+  function normalizeString(str: string): string {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  }
+
+  function parseHourMinute(input: string | null | undefined): { hour: number; minute: number } | null {
+    if (!input) return null
+    const t = String(input).trim().toLowerCase()
+    const hhmm = t.match(/^(\d{1,2}):(\d{2})$/)
+    if (hhmm) return { hour: Number(hhmm[1]), minute: Number(hhmm[2]) }
+    const h30 = t.match(/^(\d{1,2})h(\d{2})$/)
+    if (h30) return { hour: Number(h30[1]), minute: Number(h30[2]) }
+    const h = t.match(/^(\d{1,2})h$/)
+    if (h) return { hour: Number(h[1]), minute: 0 }
+    return null
+  }
+
+  function formatTimeBR(iso: string): string {
+    const parts = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date(iso))
+    const hour = parts.find(p => p.type === 'hour')?.value || '00'
+    const minute = parts.find(p => p.type === 'minute')?.value || '00'
+    return `${hour}:${minute}`
+  }
+
+  function formatDayLabel(periodo: string | null | undefined): string {
+    if (!periodo) return ''
+    if (periodo === 'hoje') return 'hoje'
+    if (periodo === 'amanhã') return 'amanhã'
+    if (periodo === 'ontem') return 'ontem'
+    return periodo
+  }
+
+  function getDayRangeFromPeriodo(periodo: string | null | undefined): { start: string; end: string } | null {
+    if (!periodo) return null
+    const base = new Date()
+    const p = periodo.toLowerCase()
+    const offset = p === 'hoje' ? 0 : p === 'amanhã' ? 1 : p === 'ontem' ? -1 : null
+    if (offset === null) return null
     return {
-      success: false,
-      message: 'Qual compromisso você quer cancelar?',
+      start: getBrazilDayStartISO(offset, base),
+      end: getBrazilDayEndISO(offset, base),
     }
   }
 
-  const { cancelCompromissoRecord, getCompromissoRecordById } = await import('../services/compromissos')
-  const current = await getCompromissoRecordById(targetId, tenantId, userId)
-  const ok = await cancelCompromissoRecord(targetId, tenantId, userId)
-  if (!ok) {
-    return { success: false, message: 'Não consegui cancelar o compromisso. Tente novamente.' }
+  async function cancelById(id: string): Promise<ActionResult> {
+    const current = await getCompromissoRecordById(id, tenantId, userId)
+    const ok = await cancelCompromissoRecord(id, tenantId, userId)
+    if (!ok) return { success: false, message: 'Não consegui cancelar o compromisso. Tente novamente.' }
+
+    removeAction(tenantId, userId, id)
+    const title = current?.title || 'compromisso'
+    const when = current?.scheduled_at
+      ? new Date(current.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      : null
+    return { success: true, message: `Pronto! ${title}${when ? ` (${when})` : ''} cancelado.`, data: { id } }
   }
 
-  // Remove do histórico e limpa o foco lógico
-  removeAction(tenantId, userId, targetId)
+  // 1) Referencial / ID direto
+  const touchedId = getLastTouchedAppointmentId(tenantId, userId)
+  const targetId = state.targetId || touchedId
+  if (state.targetId || (!state.title && !state.periodo && !state.scheduled_at && targetId)) {
+    return await cancelById(targetId as string)
+  }
 
-  const title = current?.title || 'compromisso'
-  const when = current?.scheduled_at
-    ? new Date(current.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-    : null
+  // 2) Resolver por critérios (título + período + horário)
+  const range = getDayRangeFromPeriodo(state.periodo || null)
+  if (!range) {
+    return {
+      success: true,
+      message: 'Qual dia é esse compromisso? (ex: "hoje" ou "amanhã")',
+    }
+  }
+
+  const time = parseHourMinute(state.scheduled_at || null)
+  const titleNorm = state.title ? normalizeString(state.title) : null
+  const isGenericTitle = titleNorm ? ['reuniao', 'reunião', 'compromisso', 'consulta', 'evento'].includes(titleNorm) : true
+
+  // Busca compromissos do dia (não inclui cancelados)
+  let candidates = await getCompromissosRecords(tenantId, range.start, range.end, userId, false)
+
+  // Filtra por título quando for específico
+  if (titleNorm && !isGenericTitle) {
+    candidates = candidates.filter(c => normalizeString(c.title).includes(titleNorm))
+  }
+
+  // Filtra por horário se fornecido
+  if (time) {
+    candidates = candidates.filter(c => {
+      const hhmm = formatTimeBR(c.scheduled_at)
+      const [hh, mm] = hhmm.split(':').map(Number)
+      return hh === time.hour && mm === time.minute
+    })
+  }
+
+  if (candidates.length === 0) {
+    const label = formatDayLabel(state.periodo)
+    const when = time ? `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}` : null
+    return {
+      success: true,
+      message: `Não encontrei nenhum compromisso${label ? ` ${label}` : ''}${when ? ` às ${when}` : ''} para cancelar.`,
+    }
+  }
+
+  if (candidates.length === 1) {
+    return await cancelById(candidates[0].id)
+  }
+
+  // Ambíguo: lista apenas opções válidas
+  const label = formatDayLabel(state.periodo)
+  const options = candidates
+    .slice(0, 5)
+    .map(c => {
+      const hhmm = formatTimeBR(c.scheduled_at)
+      const title = c.title || 'Compromisso'
+      return `- ${hhmm} — ${title}`
+    })
+    .join('\n')
 
   return {
     success: true,
-    message: `Pronto! Cancelei ${title}${when ? ` (${when})` : ''}.`,
-    data: { id: targetId },
+    message: `Encontrei ${candidates.length} compromissos${label ? ` ${label}` : ''}.\nQual você quer cancelar?\n\n${options}`,
   }
 }
 

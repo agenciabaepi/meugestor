@@ -85,7 +85,7 @@ export function inheritContext(newState: SemanticState): SemanticState {
   // Se GPT retornou um valor, usa esse valor (não sobrescreve)
   if (inherited.periodo === null || inherited.periodo === undefined) {
     if (lastValidState.periodo && 
-        (inherited.intent === 'query' || inherited.intent === 'report')) {
+        (inherited.intent === 'query' || inherited.intent === 'report' || inherited.intent === 'cancel_appointment')) {
       inherited.periodo = lastValidState.periodo
       console.log('semantic-state - Herdou período (era null):', inherited.periodo)
     }
