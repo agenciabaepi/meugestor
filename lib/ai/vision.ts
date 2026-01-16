@@ -95,7 +95,8 @@ Se não conseguir identificar alguma informação, use null. Seja conservador co
           ],
         },
       ],
-      max_tokens: 300,
+      // gpt-5.x não aceita `max_tokens` (usa `max_completion_tokens`)
+      max_completion_tokens: 300,
       response_format: { type: 'json_object' },
     })
 

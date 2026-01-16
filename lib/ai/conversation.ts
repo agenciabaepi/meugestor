@@ -76,7 +76,8 @@ NÃO crie um novo compromisso só para lembrete.`
         },
       ],
       temperature: 0.8, // Aumenta um pouco para respostas mais naturais
-      max_tokens: 600, // Aumenta para respostas mais completas
+      // gpt-5.x não aceita `max_tokens` (usa `max_completion_tokens`)
+      max_completion_tokens: 600,
     })
 
     const response = completion.choices[0]?.message?.content || 

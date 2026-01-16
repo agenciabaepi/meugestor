@@ -4,6 +4,7 @@ import {
 } from '../db/queries'
 import { isValidDate } from '../utils/validation'
 import { ValidationError } from '../utils/errors'
+import { isFutureInBrazil } from '../utils/date-parser'
 import type { Compromisso } from '../db/types'
 
 export interface CreateCompromissoInput {
@@ -34,6 +35,15 @@ export async function createCompromissoRecord(
   if (!isValidDate(input.scheduledAt)) {
     console.error('Erro: Data inválida:', input.scheduledAt)
     throw new ValidationError(`Data/hora agendada inválida: ${input.scheduledAt}`)
+  }
+
+  // Defesa em profundidade: nunca insere compromisso no passado
+  // (mesmo que algum fluxo acabe chamando createCompromisso direto)
+  const scheduledDate = new Date(input.scheduledAt)
+  if (!isFutureInBrazil(scheduledDate, new Date())) {
+    throw new ValidationError(
+      'Não é possível agendar compromissos no passado. Por favor, informe uma data/hora futura.'
+    )
   }
 
   console.log('Criando compromisso com dados:', {
