@@ -1,5 +1,6 @@
 import {
   createCompromisso,
+  deleteCompromisso,
   getCompromissoById,
   getCompromissosByTenant,
 } from '../db/queries'
@@ -116,6 +117,17 @@ export async function getCompromissoRecordById(
   userId?: string | null
 ): Promise<Compromisso | null> {
   return getCompromissoById(id, tenantId, userId || null)
+}
+
+/**
+ * Cancela (remove) um compromisso
+ */
+export async function cancelCompromissoRecord(
+  id: string,
+  tenantId: string,
+  userId?: string | null
+): Promise<boolean> {
+  return deleteCompromisso(id, tenantId, userId || null)
 }
 
 /**

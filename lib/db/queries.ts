@@ -596,6 +596,48 @@ export async function getCompromissosByTenant(
   }))
 }
 
+export async function deleteCompromisso(
+  id: string,
+  tenantId: string,
+  userId?: string | null
+): Promise<boolean> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return false
+  }
+  const client = supabaseAdmin
+
+  let query = client
+    .from('compromissos')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  let { error } = await query
+
+  // Compatibilidade: se user_id não existe ainda, tenta novamente sem filtro
+  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
+    console.warn('Campo user_id não existe em compromissos, deletando sem filtro (aplique a migration 011)')
+    const retry = await client
+      .from('compromissos')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+    error = retry.error as any
+  }
+
+  if (error) {
+    console.error('Error deleting compromisso:', error)
+    return false
+  }
+
+  return true
+}
+
 // ============================================
 // CONVERSATIONS
 // ============================================

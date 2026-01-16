@@ -24,6 +24,7 @@ export interface RecentAction {
 
 // Armazena histórico por (tenant+user) (em memória, pode ser migrado para banco depois)
 const actionHistory: Map<string, RecentAction[]> = new Map()
+const lastTouchedAppointmentId: Map<string, string> = new Map()
 
 function key(tenantId: string, userId: string): string {
   return `${tenantId}:${userId}`
@@ -35,15 +36,21 @@ function key(tenantId: string, userId: string): string {
 export function saveRecentAction(action: RecentAction): void {
   const tenantActions = actionHistory.get(key(action.tenantId, action.userId)) || []
   
-  // Adiciona no início
-  tenantActions.unshift(action)
+  // UPDATE substitui a versão anterior (nunca duplica por ID)
+  const filtered = tenantActions.filter(a => a.id !== action.id)
+  filtered.unshift(action)
   
   // Mantém apenas as últimas 10 ações por tenant
-  if (tenantActions.length > 10) {
-    tenantActions.pop()
+  if (filtered.length > 10) {
+    filtered.pop()
   }
   
-  actionHistory.set(key(action.tenantId, action.userId), tenantActions)
+  actionHistory.set(key(action.tenantId, action.userId), filtered)
+
+  // lastTouchedAppointmentId: sempre aponta para o compromisso mais recente tocado
+  if (action.type === 'appointment') {
+    lastTouchedAppointmentId.set(key(action.tenantId, action.userId), action.id)
+  }
   console.log('action-history - Ação salva:', {
     tenantId: action.tenantId,
     userId: action.userId,
@@ -89,6 +96,7 @@ export function getLastAnyAction(tenantId: string, userId: string): RecentAction
  */
 export function clearHistory(tenantId: string, userId: string): void {
   actionHistory.delete(key(tenantId, userId))
+  lastTouchedAppointmentId.delete(key(tenantId, userId))
   console.log('action-history - Histórico limpo:', { tenantId, userId })
 }
 
@@ -99,5 +107,20 @@ export function removeAction(tenantId: string, userId: string, actionId: string)
   const tenantActions = actionHistory.get(key(tenantId, userId)) || []
   const filtered = tenantActions.filter(a => a.id !== actionId)
   actionHistory.set(key(tenantId, userId), filtered)
+  // Se removemos o lastTouched, tenta apontar para o próximo compromisso recente
+  const currentTouched = lastTouchedAppointmentId.get(key(tenantId, userId))
+  if (currentTouched === actionId) {
+    const next = filtered.find(a => a.type === 'appointment')?.id
+    if (next) lastTouchedAppointmentId.set(key(tenantId, userId), next)
+    else lastTouchedAppointmentId.delete(key(tenantId, userId))
+  }
   console.log('action-history - Ação removida:', { tenantId, userId, actionId })
+}
+
+export function getLastTouchedAppointmentId(tenantId: string, userId: string): string | null {
+  return lastTouchedAppointmentId.get(key(tenantId, userId)) || null
+}
+
+export function setLastTouchedAppointmentId(tenantId: string, userId: string, appointmentId: string): void {
+  lastTouchedAppointmentId.set(key(tenantId, userId), appointmentId)
 }

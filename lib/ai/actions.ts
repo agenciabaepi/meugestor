@@ -12,7 +12,6 @@ import {
   persistPendingConfirmation,
   persistResolvedConfirmation,
 } from './confirmation-manager'
-import { saveRecentAction } from './action-history'
 import { getActiveTask, setActiveTask, clearActiveTask, queueMessageForTask, consumeQueuedMessage } from './session-focus'
 import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
 import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
@@ -24,6 +23,7 @@ import { categorizeExpense, categorizeRevenue, extractTags } from '../services/c
 import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
+import { getLastTouchedAppointmentId, saveRecentAction, removeAction, setLastTouchedAppointmentId } from './action-history'
 
 export interface ActionResult {
   success: boolean
@@ -393,6 +393,9 @@ async function executeAction(
     case 'update_appointment':
       return await handleUpdateAppointment(semanticState, tenantId, userId)
 
+    case 'cancel_appointment':
+      return await handleCancelAppointment(semanticState, tenantId, userId)
+
     case 'create_appointment':
         // Análise específica para compromissos
         console.log('processAction - Analisando contexto de compromisso...')
@@ -444,6 +447,7 @@ async function executeAction(
               scheduled_at: appointmentResult.data.scheduled_at ?? undefined
             }
           })
+          setLastTouchedAppointmentId(tenantId, userId, appointmentResult.data.id)
         }
         return appointmentResult
 
@@ -590,10 +594,20 @@ async function handleUpdateAppointment(
     }
     
     const compromisso = await updateCompromissoRecord(state.targetId, tenantId, updates)
-    
-    // Remove do histórico após update bem-sucedido
-    const { removeAction } = await import('./action-history')
-    removeAction(tenantId, userId, state.targetId)
+
+    // UPDATE substitui o compromisso anterior no histórico (não duplica)
+    saveRecentAction({
+      id: compromisso.id,
+      type: 'appointment',
+      tenantId,
+      userId,
+      createdAt: new Date(),
+      data: {
+        title: compromisso.title ?? undefined,
+        scheduled_at: compromisso.scheduled_at ?? undefined,
+      },
+    })
+    setLastTouchedAppointmentId(tenantId, userId, compromisso.id)
     
     // Limpa o focus lock após update bem-sucedido
     const { clearFocus } = await import('./focus-lock')
@@ -624,6 +638,44 @@ async function handleUpdateAppointment(
       }
     }
     throw error
+  }
+}
+
+/**
+ * Cancela (remove) um compromisso
+ */
+async function handleCancelAppointment(
+  state: SemanticState,
+  tenantId: string,
+  userId: string
+): Promise<ActionResult> {
+  const targetId = state.targetId || getLastTouchedAppointmentId(tenantId, userId)
+  if (!targetId) {
+    return {
+      success: false,
+      message: 'Qual compromisso você quer cancelar?',
+    }
+  }
+
+  const { cancelCompromissoRecord, getCompromissoRecordById } = await import('../services/compromissos')
+  const current = await getCompromissoRecordById(targetId, tenantId, userId)
+  const ok = await cancelCompromissoRecord(targetId, tenantId, userId)
+  if (!ok) {
+    return { success: false, message: 'Não consegui cancelar o compromisso. Tente novamente.' }
+  }
+
+  // Remove do histórico e limpa o foco lógico
+  removeAction(tenantId, userId, targetId)
+
+  const title = current?.title || 'compromisso'
+  const when = current?.scheduled_at
+    ? new Date(current.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    : null
+
+  return {
+    success: true,
+    message: `Pronto! Cancelei ${title}${when ? ` (${when})` : ''}.`,
+    data: { id: targetId },
   }
 }
 

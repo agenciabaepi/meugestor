@@ -6,7 +6,7 @@
  */
 
 export interface SemanticState {
-  intent: 'register_expense' | 'register_revenue' | 'create_appointment' | 'update_expense' | 'update_revenue' | 'update_appointment' | 'query' | 'report' | 'chat' | 'confirm' | 'cancel'
+  intent: 'register_expense' | 'register_revenue' | 'create_appointment' | 'update_expense' | 'update_revenue' | 'update_appointment' | 'cancel_appointment' | 'query' | 'report' | 'chat' | 'confirm' | 'cancel'
   // Campos opcionais podem ser null quando o GPT não conseguiu extrair
   // (isso permite distinguir "não mencionado" vs "ausente")
   domain?: 'financeiro' | 'agenda' | 'geral' | null

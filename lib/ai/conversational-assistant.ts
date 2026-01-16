@@ -7,7 +7,7 @@
 
 import { openai } from './openai'
 import { SemanticState, inheritContext, saveLastValidState } from './semantic-state'
-import { getLastAction, getLastAnyAction } from './action-history'
+import { getLastAction, getLastAnyAction, getLastTouchedAppointmentId } from './action-history'
 import { 
   registerMention, 
   hasFocusLock, 
@@ -30,6 +30,9 @@ function validateDataCompleteness(state: SemanticState): boolean {
         state.scheduled_at &&
         /^(?:\d{1,2}:\d{2}|\d{1,2}h(?:\d{2})?)$/i.test(String(state.scheduled_at).trim())
       )
+
+    case 'cancel_appointment':
+      return !!state.targetId
     
     case 'register_expense':
     case 'register_revenue':
@@ -202,7 +205,7 @@ ${activeTaskContext}
 
 Responda APENAS com JSON no formato:
 {
-  "intent": "register_expense" | "register_revenue" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "query" | "report" | "chat" | "confirm" | "cancel",
+  "intent": "register_expense" | "register_revenue" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "query" | "report" | "chat" | "confirm" | "cancel",
   "domain": "financeiro" | "agenda" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
@@ -293,6 +296,30 @@ REGRAS IMPORTANTES:
       confirmationMessage: parsed.confirmationMessage ?? null,
       targetId: parsed.targetId ?? null,
       readyToSave: parsed.readyToSave ?? false
+    }
+
+    // REFERÊNCIA DETERMINÍSTICA: "essa", "essa reunião", etc.
+    // Mantém um único compromisso lógico (lastTouchedAppointmentId).
+    const touchedId = getLastTouchedAppointmentId(tenantId, userId)
+    if (touchedId) {
+      // Se é update e não veio targetId, usa o lastTouched
+      if (semanticState.intent === 'update_appointment' && !semanticState.targetId) {
+        semanticState.targetId = touchedId
+      }
+      // Cancelamento por linguagem referencial
+      const lower = message.toLowerCase()
+      const isCancelVerb = /\b(cancela|cancelar|desmarca|desmarcar)\b/.test(lower)
+      const isReferential = /\b(essa|esse|este|a\s+reuni[aã]o|o\s+compromisso)\b/.test(lower)
+      if ((semanticState.intent === 'cancel_appointment' || semanticState.intent === 'cancel') && isCancelVerb) {
+        semanticState.intent = 'cancel_appointment'
+        semanticState.targetId = semanticState.targetId || touchedId
+        semanticState.domain = 'agenda'
+      } else if (isCancelVerb && isReferential && semanticState.intent === 'chat') {
+        // Se o modelo caiu em chat mas a frase é operacional e referencial, executa cancelamento.
+        semanticState.intent = 'cancel_appointment'
+        semanticState.targetId = touchedId
+        semanticState.domain = 'agenda'
+      }
     }
     
     // Validação inteligente: se dados estão completos, marca como readyToSave
