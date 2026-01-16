@@ -96,6 +96,29 @@ export async function processAction(
 
     // Session focus: ação ativa (create/update compromisso)
     const activeTask = getActiveTask(tenantId, userId)
+
+    // COMMIT POINT (SESSION FOCUS):
+    // Mesmo sem pendingConfirmation (ex: execução direta), se houver uma ação ativa e o usuário disser
+    // "sim/isso/pode/ok", isso deve EXECUTAR (não reanalisar intenção e não perguntar de novo).
+    if (!pendingConfirmation && activeTask) {
+      if (isPositiveConfirm) {
+        console.log('processAction - Confirmação recebida (activeTask), executando ação ativa')
+        await persistResolvedConfirmation(tenantId, userId)
+        clearPendingConfirmation(tenantId, userId)
+        const actionResult = await executeAction({ ...activeTask.state }, tenantId, userId, message)
+        clearActiveTask(tenantId, userId)
+        return actionResult.success
+          ? { success: true, message: buildCommitFinalMessage(activeTask.state, actionResult), data: actionResult.data }
+          : { success: false, message: actionResult.message || 'Não consegui executar a ação. Tente novamente.', data: actionResult.data }
+      }
+      if (isNegativeConfirm) {
+        console.log('processAction - Cancelamento recebido (activeTask), limpando ação ativa')
+        await persistResolvedConfirmation(tenantId, userId)
+        clearPendingConfirmation(tenantId, userId)
+        clearActiveTask(tenantId, userId)
+        return { success: true, message: 'Entendido, cancelado. Como posso ajudar?' }
+      }
+    }
     
     // COMMIT POINT: Se há confirmação pendente e usuário confirmou/cancelou, executa imediatamente.
     if (pendingConfirmation) {

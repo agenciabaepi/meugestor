@@ -152,6 +152,14 @@ DETECÇÃO DE CORREÇÕES:
 - "não, falei errado, é meio-dia" → update_appointment (corrige horário)
 - Use o targetId da última ação do mesmo tipo
 
+REGRA CRÍTICA PARA UPDATE DE COMPROMISSO (OBRIGATÓRIA):
+- Se intent = update_appointment e a mudança é clara (ex: horário) e existe um compromisso recente (lastTouched),
+  execute diretamente (readyToSave=true).
+- NUNCA preencha/atualize campos que o usuário não pediu:
+  - NÃO invente title (ex: "Reunião") em updates
+  - NÃO invente description/local em updates
+  - Se o usuário só mudou horário, retorne apenas scheduled_at e deixe title/description como null.
+
 REGRAS CRÍTICAS (OBRIGATÓRIAS):
 1. Execução direta quando estiver claro e completo → readyToSave: true, needsClarification: false
 2. Só perguntar quando faltar informação ESSENCIAL (data/período e/ou horário, valor, descrição etc.)
