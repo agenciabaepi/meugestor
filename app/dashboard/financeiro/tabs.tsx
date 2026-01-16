@@ -10,9 +10,6 @@ interface FinanceiroTabsProps {
   todasTransacoes: Financeiro[]
   dadosGraficoDespesas: Array<{ date: string; total: number }>
   dadosGraficoReceitas: Array<{ date: string; total: number }>
-  dadosPorCategoriaDespesas: Array<{ name: string; value: number }>
-  dadosPorCategoriaReceitas: Array<{ name: string; value: number }>
-  cores: string[]
 }
 
 export function FinanceiroTabs({
@@ -21,9 +18,6 @@ export function FinanceiroTabs({
   todasTransacoes,
   dadosGraficoDespesas,
   dadosGraficoReceitas,
-  dadosPorCategoriaDespesas,
-  dadosPorCategoriaReceitas,
-  cores,
 }: FinanceiroTabsProps) {
   const [activeTab, setActiveTab] = useState<'todos' | 'despesas' | 'receitas'>('todos')
 
@@ -43,12 +37,10 @@ export function FinanceiroTabs({
       case 'despesas':
         return {
           dadosGrafico: dadosGraficoDespesas,
-          dadosPorCategoria: dadosPorCategoriaDespesas,
         }
       case 'receitas':
         return {
           dadosGrafico: dadosGraficoReceitas,
-          dadosPorCategoria: dadosPorCategoriaReceitas,
         }
       default:
         // Para "todos", combina os dados
@@ -56,16 +48,8 @@ export function FinanceiroTabs({
           date: item.date,
           total: item.total + (dadosGraficoReceitas[index]?.total || 0),
         }))
-        const dadosPorCategoriaCombinados = dadosPorCategoriaDespesas.map((item) => {
-          const receita = dadosPorCategoriaReceitas.find(r => r.name === item.name)
-          return {
-            name: item.name,
-            value: item.value + (receita?.value || 0),
-          }
-        })
         return {
           dadosGrafico: dadosGraficoCombinados,
-          dadosPorCategoria: dadosPorCategoriaCombinados.filter(d => d.value > 0),
         }
     }
   }
@@ -85,7 +69,7 @@ export function FinanceiroTabs({
               className={`
                 flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                 ${activeTab === 'todos'
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-emerald-600 text-emerald-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }
               `}
@@ -129,8 +113,6 @@ export function FinanceiroTabs({
       {/* Gráficos */}
       <Charts 
         dadosGrafico={currentCharts.dadosGrafico}
-        dadosPorCategoria={currentCharts.dadosPorCategoria}
-        cores={cores}
         tituloGrafico={
           activeTab === 'despesas' 
             ? 'Despesas dos Últimos 7 Dias'
@@ -138,17 +120,10 @@ export function FinanceiroTabs({
             ? 'Receitas dos Últimos 7 Dias'
             : 'Transações dos Últimos 7 Dias'
         }
-        tituloCategoria={
-          activeTab === 'despesas'
-            ? 'Despesas por Categoria'
-            : activeTab === 'receitas'
-            ? 'Receitas por Categoria'
-            : 'Transações por Categoria'
-        }
       />
 
       {/* Lista de Transações */}
-      <div className="bg-white rounded-lg shadow-sm sm:shadow">
+      <div id="financeiro-transacoes" className="bg-white rounded-lg shadow-sm sm:shadow">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900">
             {title} do Mês
@@ -194,7 +169,7 @@ export function FinanceiroTabs({
                         </p>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-right shrink-0">
                       <p className={`font-semibold text-sm sm:text-base lg:text-lg whitespace-nowrap ${
                         isReceita ? 'text-green-600' : 'text-red-600'
                       }`}>

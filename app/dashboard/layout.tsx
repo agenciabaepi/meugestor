@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { Sidebar } from './Sidebar'
+import { BottomNav } from './BottomNav'
 import { getSession } from '@/lib/utils/auth'
 
 export default async function DashboardLayout({
@@ -16,18 +17,21 @@ export default async function DashboardLayout({
   // }
   
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar - Fixo */}
+    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100">
+      {/* Sidebar - Fixo (Desktop) */}
       <Sidebar />
 
       {/* Main Content - Sem gap, com margin para o sidebar fixo */}
-      <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+      <main className="lg:ml-64 min-h-screen pb-20 lg:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
           <div className="w-full">
             {children}
           </div>
         </div>
       </main>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <BottomNav />
     </div>
   )
 }

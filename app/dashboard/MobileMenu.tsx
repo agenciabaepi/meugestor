@@ -22,7 +22,7 @@ export function MobileMenu() {
       {/* Mobile menu button */}
       <button
         onClick={toggleMenu}
-        className="lg:hidden p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors"
+        className="lg:hidden p-2 rounded-md text-gray-700 hover:text-emerald-700 hover:bg-gray-100 transition-colors"
         aria-label="Toggle menu"
       >
         {isOpen ? (
@@ -46,7 +46,7 @@ export function MobileMenu() {
                 <Link
                   href="/dashboard"
                   onClick={closeMenu}
-                  className="text-xl font-bold text-blue-600"
+                  className="text-xl font-bold text-emerald-700"
                 >
                   Meu Gestor
                 </Link>
@@ -67,7 +67,7 @@ export function MobileMenu() {
                       key={item.href}
                       href={item.href}
                       onClick={closeMenu}
-                      className="block px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
+                      className="block px-4 py-3 rounded-lg text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors font-medium"
                     >
                       {item.label}
                     </Link>

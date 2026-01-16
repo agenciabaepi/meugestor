@@ -191,7 +191,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
           </div>
           <button
             onClick={goToToday}
-            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition touch-manipulation self-start sm:self-auto"
+            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition touch-manipulation self-start sm:self-auto"
             style={{ minHeight: '44px' }}
           >
             Hoje
@@ -243,7 +243,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 onClick={() => handleDateClick(date)}
                 className={`aspect-square rounded-lg border-2 p-1 transition text-left touch-manipulation ${
                   today
-                    ? 'bg-blue-50 border-blue-500 active:bg-blue-100'
+                    ? 'bg-emerald-50 border-emerald-500 active:bg-emerald-100'
                     : currentMonth
                     ? 'bg-white border-gray-200 active:border-gray-300 active:bg-gray-50'
                     : 'bg-gray-50 border-gray-100'
@@ -254,7 +254,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 <div
                   className={`text-xs font-semibold mb-0.5 ${
                     today
-                      ? 'text-blue-700'
+                      ? 'text-emerald-700'
                       : currentMonth
                       ? 'text-gray-900'
                       : 'text-gray-400'
@@ -283,8 +283,8 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                             : isConcluido
                               ? 'bg-emerald-100 text-emerald-900'
                               : today
-                                ? 'bg-blue-200 text-blue-900'
-                                : 'bg-indigo-100 text-indigo-900'
+                                ? 'bg-emerald-200 text-emerald-900'
+                                : 'bg-emerald-100 text-emerald-900'
                         }`}
                         title={`${hora} - ${compromisso.title}`}
                       >
@@ -296,7 +296,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                   {dayCompromissos.length > 2 && (
                     <div
                       className={`text-[10px] px-1 py-0.5 rounded ${
-                        today ? 'text-blue-700' : 'text-gray-600'
+                        today ? 'text-emerald-700' : 'text-gray-600'
                       }`}
                     >
                       +{dayCompromissos.length - 2}
@@ -382,17 +382,17 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                             ? 'border-red-200 bg-red-50 hover:border-red-300'
                             : isConcluido
                               ? 'border-emerald-200 bg-emerald-50 hover:border-emerald-300'
-                            : 'border-gray-200 hover:border-indigo-300'
+                            : 'border-gray-200 hover:border-emerald-300'
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
-                                isCancelled ? 'bg-red-100' : isConcluido ? 'bg-emerald-100' : 'bg-indigo-100'
+                                isCancelled ? 'bg-red-100' : isConcluido ? 'bg-emerald-100' : 'bg-emerald-100'
                               }`}>
                                 <svg
-                                  className={`w-6 h-6 ${isCancelled ? 'text-red-600' : isConcluido ? 'text-emerald-600' : 'text-indigo-600'}`}
+                                  className={`w-6 h-6 ${isCancelled ? 'text-red-600' : isConcluido ? 'text-emerald-600' : 'text-emerald-700'}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -479,7 +479,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
             <div className="p-4 sm:p-6 border-t border-gray-200">
               <button
                 onClick={closeModal}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                className="w-full px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition font-medium"
               >
                 Fechar
               </button>

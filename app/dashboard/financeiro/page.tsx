@@ -4,11 +4,10 @@ import {
   getReceitasRecords,
   calculateTotalSpent, 
   calculateTotalRevenue,
-  calculateBalance,
-  calculateTotalByCategory 
 } from '@/lib/services/financeiro'
 import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { FinanceiroTabs } from './tabs'
+import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
 
 async function getFinanceiroData() {
   const tenantId = await getAuthenticatedTenantId()
@@ -27,7 +26,6 @@ async function getFinanceiroData() {
       dadosPorCategoriaReceitas: [],
       dadosGraficoDespesas: [],
       dadosGraficoReceitas: [],
-      cores: [],
     }
   }
   
@@ -78,49 +76,27 @@ async function getFinanceiroData() {
     endOfLastMonth.toISOString().split('T')[0]
   )
 
-  // Dados por categoria (despesas)
-  const categorias = [
-    'Alimentação',
-    'Moradia',
-    'Saúde',
-    'Transporte',
-    'Educação',
-    'Lazer e Entretenimento',
-    'Compras Pessoais',
-    'Assinaturas e Serviços',
-    'Financeiro e Obrigações',
-    'Impostos e Taxas',
-    'Pets',
-    'Doações e Presentes',
-    'Trabalho e Negócios',
-    'Outros',
-  ]
-  
-  const dadosPorCategoriaDespesas = await Promise.all(
-    categorias.map(async (cat) => {
-      const despesas = await getDespesasRecords(
-        tenantId,
-        startOfMonth.toISOString().split('T')[0]
-      )
-      const total = despesas
-        .filter(d => d.category === cat)
-        .reduce((sum, d) => sum + Number(d.amount), 0)
-      return { name: cat, value: Number(total) }
-    })
-  )
-  
-  const dadosPorCategoriaReceitas = await Promise.all(
-    categorias.map(async (cat) => {
-      const receitas = await getReceitasRecords(
-        tenantId,
-        startOfMonth.toISOString().split('T')[0]
-      )
-      const total = receitas
-        .filter(r => r.category === cat)
-        .reduce((sum, r) => sum + Number(r.amount), 0)
-      return { name: cat, value: Number(total) }
-    })
-  )
+  // Dados por categoria (somente despesas) para o donut.
+  // (Sem o gráfico “por categoria” antigo, não precisamos calcular receitas por categoria.)
+  const totalsByCategory = new Map<string, number>()
+  for (const d of despesasMes) {
+    const key = String(d.category || 'Outros')
+    totalsByCategory.set(key, (totalsByCategory.get(key) || 0) + Number(d.amount))
+  }
+  const dadosPorCategoriaDespesas = Array.from(totalsByCategory.entries())
+    .map(([name, value]) => ({ name, value: Number(value) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+
+  const totalsByCategoryReceitas = new Map<string, number>()
+  for (const r of receitasMes) {
+    const key = String(r.category || 'Outros')
+    totalsByCategoryReceitas.set(key, (totalsByCategoryReceitas.get(key) || 0) + Number(r.amount))
+  }
+  const dadosPorCategoriaReceitas = Array.from(totalsByCategoryReceitas.entries())
+    .map(([name, value]) => ({ name, value: Number(value) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
 
   // Dados para gráfico de barras (últimos 7 dias)
   const ultimos7Dias = Array.from({ length: 7 }, (_, i) => {
@@ -151,8 +127,6 @@ async function getFinanceiroData() {
     })
   )
 
-  const cores = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280']
-
   return {
     despesasMes,
     receitasMes,
@@ -162,11 +136,10 @@ async function getFinanceiroData() {
     saldo,
     totalDespesasAnterior,
     totalReceitasAnterior,
-    dadosPorCategoriaDespesas: dadosPorCategoriaDespesas.filter(d => d.value > 0),
-    dadosPorCategoriaReceitas: dadosPorCategoriaReceitas.filter(d => d.value > 0),
+    dadosPorCategoriaDespesas,
+    dadosPorCategoriaReceitas,
     dadosGraficoDespesas,
     dadosGraficoReceitas,
-    cores,
   }
 }
 
@@ -189,6 +162,24 @@ export default async function FinanceiroPage() {
           Controle suas despesas e receitas
         </p>
       </div>
+
+      {/* Donuts (Despesas/Receitas) */}
+      <FinanceiroDonutTabs
+        donutDespesas={{
+          total: Number(data.totalDespesas) || 0,
+          categorias: (data.dadosPorCategoriaDespesas || []).map((c: any) => ({
+            nome: String(c.name),
+            valor: Number(c.value),
+          })),
+        }}
+        donutReceitas={{
+          total: Number(data.totalReceitas) || 0,
+          categorias: (data.dadosPorCategoriaReceitas || []).map((c: any) => ({
+            nome: String(c.name),
+            valor: Number(c.value),
+          })),
+        }}
+      />
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -244,9 +235,6 @@ export default async function FinanceiroPage() {
         todasTransacoes={data.todasTransacoes}
         dadosGraficoDespesas={data.dadosGraficoDespesas}
         dadosGraficoReceitas={data.dadosGraficoReceitas}
-        dadosPorCategoriaDespesas={data.dadosPorCategoriaDespesas}
-        dadosPorCategoriaReceitas={data.dadosPorCategoriaReceitas}
-        cores={data.cores}
       />
     </div>
   )

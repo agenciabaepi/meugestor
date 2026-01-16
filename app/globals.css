@@ -75,6 +75,11 @@ button {
   overflow-x: hidden;
 }
 
+/* Safe area bottom for mobile bottom navigation */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Smooth transitions for cards */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

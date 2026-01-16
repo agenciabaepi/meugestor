@@ -3,7 +3,6 @@ import { getTodayCompromissos, getCompromissosRecords } from '@/lib/services/com
 import { gerarResumoMensal } from '@/lib/services/relatorios'
 import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
-import { DashboardDonutSection } from './components/DashboardDonutSection'
 
 async function getDashboardData() {
   try {
@@ -100,26 +99,6 @@ async function getDashboardData() {
 export default async function DashboardPage() {
   const data = await getDashboardData()
 
-  // Dados do donut (preferência: resumo real; fallback: mock inicial)
-  const categoriasResumo = Object.entries(data.resumo?.porCategoria || {}).map(([nome, valor]) => ({
-    nome,
-    valor: Number(valor),
-  }))
-
-  const donutData =
-    categoriasResumo.length > 0
-      ? { total: Number(data.resumo.total) || 0, categorias: categoriasResumo }
-      : {
-          total: 7232.75,
-          categorias: [
-            { nome: 'Alimentação', valor: 2800 },
-            { nome: 'Transporte', valor: 1200 },
-            { nome: 'Moradia', valor: 1800 },
-            { nome: 'Lazer', valor: 600 },
-            { nome: 'Outros', valor: 832.75 },
-          ],
-        }
-
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
@@ -132,7 +111,7 @@ export default async function DashboardPage() {
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Card Gastos do Mês */}
-        <div className="relative bg-linear-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-emerald-600 to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -140,7 +119,7 @@ export default async function DashboardPage() {
                 <Wallet className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-blue-100 text-sm font-medium mb-1">Gastos do Mês</p>
+            <p className="text-emerald-100 text-sm font-medium mb-1">Gastos do Mês</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
               R$ {data.totalMes.toFixed(2)}
             </p>
@@ -195,9 +174,6 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Donut (Gastos do mês por categoria) */}
-      <DashboardDonutSection donutData={donutData} />
 
       {/* Gastos Recentes */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">

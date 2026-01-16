@@ -67,8 +67,8 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
           
           return (
             <div key={dateKey} className="p-3 sm:p-4 lg:p-6">
-              <div className={`mb-3 ${isHoje ? 'bg-blue-50 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 py-2' : ''}`}>
-                <h3 className={`text-sm sm:text-base font-semibold ${isHoje ? 'text-blue-900' : 'text-gray-900'}`}>
+              <div className={`mb-3 ${isHoje ? 'bg-emerald-50 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 py-2' : ''}`}>
+                <h3 className={`text-sm sm:text-base font-semibold ${isHoje ? 'text-emerald-900' : 'text-gray-900'}`}>
                   {formatDateLabel(dateKey)}
                 </h3>
               </div>
@@ -92,12 +92,12 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                           : isConcluido
                             ? 'bg-emerald-50 border-emerald-200'
                           : isHoje
-                            ? 'bg-blue-50 border-blue-200'
+                            ? 'bg-emerald-50 border-emerald-200'
                             : 'bg-gray-50 border-gray-200'
                       }`}
                     >
                       <div className={`text-xs sm:text-sm font-medium shrink-0 ${
-                        isCancelled ? 'text-red-700' : isConcluido ? 'text-emerald-700' : isHoje ? 'text-blue-700' : 'text-gray-700'
+                        isCancelled ? 'text-red-700' : isConcluido ? 'text-emerald-700' : isHoje ? 'text-emerald-700' : 'text-gray-700'
                       }`}>
                         {hora}
                       </div>

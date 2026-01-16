@@ -147,8 +147,8 @@ export default async function RelatoriosPage() {
                   className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center flex-1 min-w-0 pr-2">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
-                      <span className="text-blue-600 font-semibold text-xs sm:text-sm">#{index + 1}</span>
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-100 rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
+                      <span className="text-emerald-700 font-semibold text-xs sm:text-sm">#{index + 1}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{gasto.description}</p>

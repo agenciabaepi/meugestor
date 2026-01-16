@@ -43,6 +43,11 @@ type Props = {
   variant?: 'dark' | 'light'
   centerTitle?: string
   viewTransactionsLabel?: string
+  /**
+   * Exibe o botão central (ex: "Ver transações").
+   * Default: true (para compatibilidade), mas pode ser desligado por tela.
+   */
+  showCenterButton?: boolean
 }
 
 function formatBRL(value: number) {
@@ -110,6 +115,7 @@ export function DonutGastosChart({
   variant = 'dark',
   centerTitle = 'Gasto total',
   viewTransactionsLabel = 'Ver transações',
+  showCenterButton = true,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
@@ -332,27 +338,28 @@ export function DonutGastosChart({
           <p className={`${centerText} text-3xl sm:text-4xl font-bold tracking-tight mt-1`}>
             {formatBRL(centerValue ?? normalized.total)}
           </p>
-          <button
-            type="button"
-            className={[
-              'mt-4 inline-flex items-center justify-center',
-              'px-5 py-2.5 rounded-full',
-              'font-semibold text-sm',
-              'shadow-md transition',
-              variant === 'dark'
-                ? 'bg-white/15 hover:bg-white/20 text-white ring-1 ring-white/25'
-                : 'bg-gray-900 hover:bg-gray-800 text-white',
-              'focus:outline-none',
-            ].join(' ')}
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewTransactions?.()
-            }}
-            disabled={!onViewTransactions}
-            style={{ minHeight: 44 }}
-          >
-            {viewTransactionsLabel}
-          </button>
+          {showCenterButton && onViewTransactions ? (
+            <button
+              type="button"
+              className={[
+                'mt-4 inline-flex items-center justify-center',
+                'px-5 py-2.5 rounded-full',
+                'font-semibold text-sm',
+                'shadow-md transition',
+                variant === 'dark'
+                  ? 'bg-white/15 hover:bg-white/20 text-white ring-1 ring-white/25'
+                  : 'bg-gray-900 hover:bg-gray-800 text-white',
+                'focus:outline-none',
+              ].join(' ')}
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewTransactions?.()
+              }}
+              style={{ minHeight: 44 }}
+            >
+              {viewTransactionsLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

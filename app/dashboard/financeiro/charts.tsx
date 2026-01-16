@@ -1,22 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface ChartsProps {
   dadosGrafico: Array<{ date: string; total: number }>
-  dadosPorCategoria: Array<{ name: string; value: number }>
-  cores: string[]
   tituloGrafico?: string
-  tituloCategoria?: string
 }
 
 export function Charts({ 
   dadosGrafico, 
-  dadosPorCategoria, 
-  cores,
   tituloGrafico = 'Gastos dos Últimos 7 Dias',
-  tituloCategoria = 'Gastos por Categoria'
 }: ChartsProps) {
   const [isMobile, setIsMobile] = useState(false)
 
@@ -32,7 +26,7 @@ export function Charts({
   }, [])
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:gap-6">
       {/* Gráfico de Barras - Últimos 7 dias */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
@@ -61,47 +55,6 @@ export function Charts({
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Gráfico de Pizza - Por Categoria */}
-      <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-          {tituloCategoria}
-        </h2>
-        {dadosPorCategoria.length > 0 ? (
-          <div className="w-full" style={{ height: isMobile ? '220px' : '250px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={dadosPorCategoria}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => {
-                    return isMobile 
-                      ? `${(percent * 100).toFixed(0)}%`
-                      : `${name} ${(percent * 100).toFixed(0)}%`
-                  }}
-                  outerRadius={isMobile ? 60 : 80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {dadosPorCategoria.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={cores[index % cores.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => `R$ ${value.toFixed(2)}`}
-                  contentStyle={{ fontSize: isMobile ? '11px' : '12px', padding: isMobile ? '6px' : '8px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-12 sm:py-16 text-sm sm:text-base">
-            Nenhum dado para exibir
-          </p>
-        )}
       </div>
     </div>
   )
