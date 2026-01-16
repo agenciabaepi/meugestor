@@ -636,12 +636,9 @@ export async function cancelCompromisso(
 
   let { data, error } = await query.select().single()
 
-  // Compatibilidade: se user_id/is_cancelled não existe, tenta apenas "deletar" como fallback (último recurso)
+  // IMPORTANTE: Não deletar como fallback. Se as colunas não existem, precisamos da migration 012.
   if (error && (error.message?.includes('user_id') || error.message?.includes('is_cancelled') || error.code === '42703')) {
-    console.warn('Campo user_id/is_cancelled não existe em compromissos, cancelando via delete como fallback (aplique migrations 011/012)')
-    const ok = await deleteCompromisso(id, tenantId, userId || null)
-    if (!ok) return null
-    // Sem coluna, não tem como retornar registro atualizado
+    console.warn('Campo user_id/is_cancelled não existe em compromissos. Não foi possível marcar como cancelado (aplique migrations 011/012).')
     return null
   }
 

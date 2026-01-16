@@ -29,7 +29,8 @@ async function getAgendaData() {
     tenantId,
     rangeStart.toISOString(),
     rangeEnd.toISOString(),
-    userId
+    userId,
+    true // inclui cancelados para exibir no calendário
   )
   
   // Ordena por data/hora

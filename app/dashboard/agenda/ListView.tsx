@@ -10,7 +10,12 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
     
     compromissos.forEach((compromisso) => {
       const data = new Date(compromisso.scheduled_at)
-      const dateKey = data.toISOString().split('T')[0]
+      const dateKey = data.toLocaleDateString('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
       
       if (!map.has(dateKey)) {
         map.set(dateKey, [])
@@ -70,26 +75,45 @@ export function ListView({ compromissos }: { compromissos: Compromisso[] }) {
                 {compromissos.map((compromisso) => {
                   const dataHora = new Date(compromisso.scheduled_at)
                   const hora = dataHora.toLocaleTimeString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
                     hour: '2-digit',
                     minute: '2-digit',
                   })
+                  const isCancelled = compromisso.is_cancelled === true
                   
                   return (
                     <div
                       key={compromisso.id}
                       className={`flex items-start gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg border ${
-                        isHoje
-                          ? 'bg-blue-50 border-blue-200'
-                          : 'bg-gray-50 border-gray-200'
+                        isCancelled
+                          ? 'bg-red-50 border-red-200'
+                          : isHoje
+                            ? 'bg-blue-50 border-blue-200'
+                            : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      <div className={`text-xs sm:text-sm font-medium flex-shrink-0 ${isHoje ? 'text-blue-700' : 'text-gray-700'}`}>
+                      <div className={`text-xs sm:text-sm font-medium shrink-0 ${
+                        isCancelled ? 'text-red-700' : isHoje ? 'text-blue-700' : 'text-gray-700'
+                      }`}>
                         {hora}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm sm:text-base font-semibold text-gray-900 truncate">{compromisso.title}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className={`text-sm sm:text-base font-semibold truncate ${
+                            isCancelled ? 'text-red-900 line-through' : 'text-gray-900'
+                          }`}>
+                            {compromisso.title}
+                          </h4>
+                          {isCancelled && (
+                            <span className="text-[10px] uppercase tracking-wide bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                              Cancelado
+                            </span>
+                          )}
+                        </div>
                         {compromisso.description && (
-                          <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">{compromisso.description}</p>
+                          <p className={`text-xs sm:text-sm mt-1 line-clamp-2 ${
+                            isCancelled ? 'text-red-700' : 'text-gray-600'
+                          }`}>{compromisso.description}</p>
                         )}
                       </div>
                     </div>

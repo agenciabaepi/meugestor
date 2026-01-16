@@ -128,9 +128,8 @@ export async function cancelCompromissoRecord(
   userId?: string | null
 ): Promise<boolean> {
   const updated = await cancelCompromisso(id, tenantId, userId || null)
-  // Se a tabela ainda não tem as colunas, o cancel pode cair em fallback (delete) e retornar null.
-  // Considera sucesso nesse cenário (o compromisso não estará mais ativo).
-  return true
+  // Se a migration 012 não estiver aplicada, retorna null e tratamos como falha (não deletar).
+  return updated !== null
 }
 
 /**

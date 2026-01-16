@@ -267,17 +267,21 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 <div className="space-y-0.5 overflow-hidden">
                   {dayCompromissos.slice(0, 2).map((compromisso) => {
                     const hora = new Date(compromisso.scheduled_at).toLocaleTimeString('pt-BR', {
+                      timeZone: 'America/Sao_Paulo',
                       hour: '2-digit',
                       minute: '2-digit',
                     })
+                    const isCancelled = compromisso.is_cancelled === true
 
                     return (
                       <div
                         key={compromisso.id}
                         className={`text-[10px] px-1 py-0.5 rounded truncate ${
-                          today
-                            ? 'bg-blue-200 text-blue-900'
-                            : 'bg-indigo-100 text-indigo-900'
+                          isCancelled
+                            ? 'bg-red-100 text-red-900 line-through'
+                            : today
+                              ? 'bg-blue-200 text-blue-900'
+                              : 'bg-indigo-100 text-indigo-900'
                         }`}
                         title={`${hora} - ${compromisso.title}`}
                       >
@@ -364,17 +368,25 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                       year: 'numeric',
                     })
 
+                    const isCancelled = compromisso.is_cancelled === true
+
                     return (
                       <div
                         key={compromisso.id}
-                        className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-sm transition"
+                        className={`border rounded-lg p-4 hover:shadow-sm transition ${
+                          isCancelled
+                            ? 'border-red-200 bg-red-50 hover:border-red-300'
+                            : 'border-gray-200 hover:border-indigo-300'
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                              <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
+                                isCancelled ? 'bg-red-100' : 'bg-indigo-100'
+                              }`}>
                                 <svg
-                                  className="w-6 h-6 text-indigo-600"
+                                  className={`w-6 h-6 ${isCancelled ? 'text-red-600' : 'text-indigo-600'}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -388,10 +400,19 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                                 </svg>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">
-                                  {compromisso.title}
-                                </h4>
-                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className={`text-base sm:text-lg font-semibold ${
+                                    isCancelled ? 'text-red-900 line-through' : 'text-gray-900'
+                                  }`}>
+                                    {compromisso.title}
+                                  </h4>
+                                  {isCancelled && (
+                                    <span className="text-[10px] uppercase tracking-wide bg-red-200 text-red-800 px-2 py-0.5 rounded">
+                                      Cancelado
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`flex items-center gap-4 text-sm ${isCancelled ? 'text-red-700' : 'text-gray-600'}`}>
                                   <span className="flex items-center gap-1">
                                     <svg
                                       className="w-4 h-4"
@@ -428,7 +449,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                               </div>
                             </div>
                             {compromisso.description && (
-                              <p className="text-sm text-gray-600 mt-2 pl-15">
+                              <p className={`text-sm mt-2 pl-15 ${isCancelled ? 'text-red-700' : 'text-gray-600'}`}>
                                 {compromisso.description}
                               </p>
                             )}
