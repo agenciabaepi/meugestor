@@ -1,9 +1,12 @@
 import { getCompromissosRecords } from '@/lib/services/compromissos'
-import { getAuthenticatedTenantId } from '@/lib/utils/auth'
+import { getAuthenticatedTenantId, getCurrentUser } from '@/lib/utils/auth'
+import { getNowInBrazil } from '@/lib/utils/date-parser'
 import { AgendaClient } from './AgendaClient'
 
 async function getAgendaData() {
   const tenantId = await getAuthenticatedTenantId()
+  const user = await getCurrentUser()
+  const userId = user?.id ?? null
   
   if (!tenantId) {
     return {
@@ -11,13 +14,22 @@ async function getAgendaData() {
     }
   }
   
-  // Busca compromissos a partir de hoje
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  
+  // Busca também compromissos passados para manter o calendário completo.
+  // Carrega uma janela ampla (6 meses para trás e 6 meses para frente) para
+  // suportar navegação por mês no calendário sem "sumir" eventos.
+  const nowBrazil = getNowInBrazil()
+
+  const rangeStart = new Date(nowBrazil.getFullYear(), nowBrazil.getMonth() - 6, 1)
+  rangeStart.setHours(0, 0, 0, 0)
+
+  const rangeEnd = new Date(nowBrazil.getFullYear(), nowBrazil.getMonth() + 7, 0)
+  rangeEnd.setHours(23, 59, 59, 999)
+
   const compromissos = await getCompromissosRecords(
     tenantId,
-    hoje.toISOString()
+    rangeStart.toISOString(),
+    rangeEnd.toISOString(),
+    userId
   )
   
   // Ordena por data/hora
