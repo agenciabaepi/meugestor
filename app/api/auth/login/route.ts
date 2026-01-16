@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
 
       // Mensagens de erro mais amigáveis
       let errorMessage = 'Email ou senha incorretos'
+      let httpStatus = (typeof error.status === 'number' ? error.status : 401) as number
       
       // Verifica tipos específicos de erro
       if (error.status === 429 || 
@@ -114,23 +115,29 @@ export async function POST(request: NextRequest) {
           error.message?.includes('too many requests') ||
           error.message?.includes('Request rate limit reached')) {
         errorMessage = 'Muitas tentativas de login. Por favor, aguarde alguns minutos antes de tentar novamente.'
+        httpStatus = 429
       } else if (error.message?.includes('Invalid login credentials') || 
                  error.message?.includes('invalid_credentials') ||
                  error.status === 400) {
         errorMessage = 'Email ou senha incorretos. Verifique suas credenciais ou crie uma conta se ainda não tiver.'
+        httpStatus = 401
       } else if (error.message?.includes('Email not confirmed') || 
                  error.message?.includes('email_not_confirmed')) {
         errorMessage = 'Email não confirmado. Verifique sua caixa de entrada e confirme seu email antes de fazer login.'
+        httpStatus = 401
       } else if (error.message?.includes('User not found')) {
         errorMessage = 'Usuário não encontrado. Verifique seu email ou crie uma conta.'
+        httpStatus = 401
       } else if (error.message) {
         // Para outros erros, usa a mensagem do Supabase mas de forma genérica
         errorMessage = `Erro ao fazer login: ${error.message}. Verifique suas credenciais.`
+        // Mantém o status se vier do Supabase, mas evita retornar 400 genérico como auth.
+        if (![400, 401, 403, 429].includes(httpStatus)) httpStatus = 500
       }
 
       return NextResponse.json(
-        { error: errorMessage },
-        { status: 401 }
+        { error: errorMessage, code: (error as any).code ?? null },
+        { status: httpStatus }
       )
     }
 

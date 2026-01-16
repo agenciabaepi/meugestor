@@ -56,6 +56,8 @@ export default function LoginPage() {
           } else {
             errorMessage = 'Erro ao fazer login. Verifique suas credenciais e tente novamente. Se não tem conta, clique em "Registre-se".'
           }
+        } else if (response.status === 429) {
+          errorMessage = data?.error || 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
         } else if (response.status === 500) {
           errorMessage = 'Erro no servidor. Verifique se as variáveis de ambiente estão configuradas corretamente.'
         }
@@ -63,7 +65,7 @@ export default function LoginPage() {
         console.error('Erro no login:', {
           status: response.status,
           error: errorMessage,
-          data: data
+          data
         })
         
         setError(errorMessage)
