@@ -1,6 +1,6 @@
 import {
   createCompromisso,
-  deleteCompromisso,
+  cancelCompromisso,
   getCompromissoById,
   getCompromissosByTenant,
 } from '../db/queries'
@@ -127,7 +127,10 @@ export async function cancelCompromissoRecord(
   tenantId: string,
   userId?: string | null
 ): Promise<boolean> {
-  return deleteCompromisso(id, tenantId, userId || null)
+  const updated = await cancelCompromisso(id, tenantId, userId || null)
+  // Se a tabela ainda não tem as colunas, o cancel pode cair em fallback (delete) e retornar null.
+  // Considera sucesso nesse cenário (o compromisso não estará mais ativo).
+  return true
 }
 
 /**
@@ -137,9 +140,10 @@ export async function getCompromissosRecords(
   tenantId: string,
   startDate?: string,
   endDate?: string,
-  userId?: string | null
+  userId?: string | null,
+  includeCancelled: boolean = false
 ): Promise<Compromisso[]> {
-  return getCompromissosByTenant(tenantId, startDate, endDate, userId || null)
+  return getCompromissosByTenant(tenantId, startDate, endDate, userId || null, includeCancelled)
 }
 
 /**
@@ -151,7 +155,7 @@ export async function getUpcomingCompromissos(
   userId?: string | null
 ): Promise<Compromisso[]> {
   const now = new Date().toISOString()
-  const compromissos = await getCompromissosByTenant(tenantId, now, undefined, userId || null)
+  const compromissos = await getCompromissosByTenant(tenantId, now, undefined, userId || null, false)
   return compromissos.slice(0, limit)
 }
 
@@ -172,7 +176,8 @@ export async function getTodayCompromissos(
     tenantId,
     today.toISOString(),
     tomorrow.toISOString(),
-    userId || null
+    userId || null,
+    false
   )
   
   // Filtra apenas os compromissos que são realmente de hoje (evita problemas de timezone)

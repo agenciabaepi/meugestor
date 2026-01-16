@@ -41,6 +41,9 @@ export interface Compromisso {
   description: string | null
   scheduled_at: string
   created_at: string
+  is_cancelled?: boolean
+  cancelled_at?: string | null
+  cancelled_by?: string | null
   reminder_1h_sent?: boolean
   reminder_30min_sent?: boolean
   reminder_10min_sent?: boolean

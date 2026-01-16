@@ -509,7 +509,8 @@ export async function getCompromissosByTenant(
   tenantId: string,
   startDate?: string,
   endDate?: string,
-  userId?: string | null
+  userId?: string | null,
+  includeCancelled: boolean = false
 ): Promise<Compromisso[]> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -528,6 +529,11 @@ export async function getCompromissosByTenant(
     query = query.eq('user_id', userId)
   }
 
+  if (!includeCancelled) {
+    // Por padrão, não retorna compromissos cancelados
+    query = query.eq('is_cancelled', false as any)
+  }
+
   if (startDate) {
     query = query.gte('scheduled_at', startDate)
   }
@@ -541,9 +547,13 @@ export async function getCompromissosByTenant(
   // Mas para uso normal (poucos compromissos), não deve ser problema
   let { data, error, count } = await query
 
-  // Compatibilidade: se user_id não existe ainda, tenta novamente sem filtro
-  if (error && (error.message?.includes('user_id') || error.code === '42703')) {
-    console.warn('Campo user_id não existe em compromissos, buscando sem filtro (aplique a migration 011)')
+  // Compatibilidade: se user_id / is_cancelled não existe ainda, tenta novamente sem filtro desses campos
+  if (error && (
+    error.message?.includes('user_id') ||
+    error.message?.includes('is_cancelled') ||
+    error.code === '42703'
+  )) {
+    console.warn('Campo user_id/is_cancelled não existe em compromissos, buscando sem filtro (aplique migrations 011/012)')
     let retryQuery = client
       .from('compromissos')
       .select('*', { count: 'exact' })
@@ -594,6 +604,53 @@ export async function getCompromissosByTenant(
     ...item,
     reminder_sent: item.reminder_sent || false,
   }))
+}
+
+export async function cancelCompromisso(
+  id: string,
+  tenantId: string,
+  userId?: string | null
+): Promise<Compromisso | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+
+  const client = supabaseAdmin
+
+  const updateData: any = {
+    is_cancelled: true,
+    cancelled_at: new Date().toISOString(),
+    cancelled_by: userId || null,
+  }
+
+  let query = client
+    .from('compromissos')
+    .update(updateData)
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  let { data, error } = await query.select().single()
+
+  // Compatibilidade: se user_id/is_cancelled não existe, tenta apenas "deletar" como fallback (último recurso)
+  if (error && (error.message?.includes('user_id') || error.message?.includes('is_cancelled') || error.code === '42703')) {
+    console.warn('Campo user_id/is_cancelled não existe em compromissos, cancelando via delete como fallback (aplique migrations 011/012)')
+    const ok = await deleteCompromisso(id, tenantId, userId || null)
+    if (!ok) return null
+    // Sem coluna, não tem como retornar registro atualizado
+    return null
+  }
+
+  if (error) {
+    console.error('Error cancelling compromisso:', error)
+    return null
+  }
+
+  return data as any
 }
 
 export async function deleteCompromisso(
