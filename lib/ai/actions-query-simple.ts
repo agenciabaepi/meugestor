@@ -27,6 +27,7 @@ import {
 import { filterBySemanticCategory } from '../utils/semantic-filter'
 import { getListasByTenant } from '../db/queries'
 import { normalizeText } from '../utils/normalize-text'
+import { getListView, formatListRawResponse } from '../services/listas'
 
 function formatTimeBR(iso: string): string {
   const parts = new Intl.DateTimeFormat('pt-BR', {
@@ -328,6 +329,31 @@ async function queryListas(
   }
 }
 
+async function queryListaItens(
+  state: SemanticState,
+  tenantId: string
+): Promise<ActionResult> {
+  const listName = state.list_name ? String(state.list_name).trim() : ''
+  if (!listName) {
+    return { success: false, message: 'Qual lista?' }
+  }
+
+  const view = await getListView({ tenantId, listName })
+  const total = (view.pendentes?.length || 0) + (view.comprados?.length || 0)
+
+  const message = formatListRawResponse({
+    listName: (view.lista as any).nome_original || view.lista.nome,
+    pendentes: view.pendentes,
+    comprados: view.comprados,
+  })
+
+  return {
+    success: true,
+    message,
+    data: { total, view },
+  }
+}
+
 /**
  * Função principal simplificada
  */
@@ -362,6 +388,10 @@ export async function handleQuerySimple(
 
   if (state.queryType === 'listas' && state.domain === 'listas') {
     return await queryListas(state, tenantId)
+  }
+
+  if (state.queryType === 'lista_itens' && state.domain === 'listas') {
+    return await queryListaItens(state, tenantId)
   }
   
   return {

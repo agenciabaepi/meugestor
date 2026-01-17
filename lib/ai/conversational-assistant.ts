@@ -196,6 +196,9 @@ REGRA CRÍTICA - NOVO DOMÍNIO "listas":
  - Perguntas SOBRE AS LISTAS (contagem/nomes) devem ser query (NÃO chat):
    - "quantas listas de compras eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: "compras"
    - "quais listas eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: null (todas)
+ - Perguntas SOBRE ITENS DE UMA LISTA devem virar query (NÃO query de listas):
+   - "quais itens tem na lista do mercado?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "mercado"
+   - "quantos itens tenho na lista de películas de iphone?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "películas de iphone"
 
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
@@ -253,7 +256,7 @@ Responda APENAS com JSON no formato:
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
-  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | null,
+  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | null,
   "amount": number | null,
   "title": string | null,
   "scheduled_at": string (apenas horário, ex: "15:00") | null,
