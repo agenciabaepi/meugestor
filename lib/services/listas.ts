@@ -242,6 +242,40 @@ export function formatListResponse(params: {
   return `${base}${boughtNames.length ? ` Comprados: ${boughtNames.join(', ')}.` : ''}`
 }
 
+export function formatListRawResponse(params: {
+  listName: string
+  pendentes: ListaItem[]
+  comprados?: ListaItem[]
+}): string {
+  const listName = normalizeName(params.listName)
+  const pendentes = params.pendentes || []
+  const comprados = params.comprados || []
+
+  // Formato UX: título + itens em linhas, sem texto interpretativo
+  const title = `🛒 ${listName.toUpperCase()}`
+
+  const lines: string[] = []
+  const formatItem = (statusEmoji: string, item: ListaItem) => {
+    const qty = parseQuantidadeUnidadeForReply(item)
+    const suffix = qty ? ` (${qty})` : ''
+    return `${statusEmoji} ${formatItemNameForReply(item.nome)}${suffix}`
+  }
+
+  for (const it of pendentes) {
+    lines.push(formatItem('⬜', it))
+  }
+  for (const it of comprados) {
+    lines.push(formatItem('✅', it))
+  }
+
+  if (lines.length === 0) {
+    // Sem frase interpretativa, apenas um placeholder visual
+    return `${title}\n\n—`
+  }
+
+  return `${title}\n\n${lines.join('\n')}`
+}
+
 export function formatItemNameForReply(name: string): string {
   const v = normalizeName(name)
   if (!v) return v

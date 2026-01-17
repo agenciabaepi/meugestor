@@ -24,7 +24,7 @@ import {
   addItemToList,
   ensureListaByName,
   formatItemNameForReply,
-  formatListResponse,
+  formatListRawResponse,
   getListView,
   markItemDoneInList,
   removeItemFromList,
@@ -715,7 +715,7 @@ async function handleShowList(state: SemanticState, tenantId: string): Promise<A
     const view = await getListView({ tenantId, listName })
     await touchLastActiveList(tenantId, view.lista.nome)
 
-    const message = formatListResponse({
+    const message = formatListRawResponse({
       listName: view.lista.nome,
       pendentes: view.pendentes,
       comprados: view.comprados,
