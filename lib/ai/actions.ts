@@ -28,6 +28,8 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { getListasByTenant, getTenantContext } from '../db/queries'
+import { supabaseAdmin } from '../db/client'
+import { getSessionContextFromUserId } from '../db/user-profile'
 import {
   addItemToList,
   ensureListaByName,
@@ -139,6 +141,12 @@ export async function processAction(
     console.log('processAction - Mensagem:', message)
     console.log('processAction - TenantId:', tenantId)
     
+    // Garante SessionContext (não depender só do webhook)
+    // Isso evita o caso "sou empresa mas o bot não reconhece" quando mode/empresa_id ainda não está persistido no perfil.
+    const effectiveSessionContext: SessionContext | null =
+      sessionContext ||
+      (supabaseAdmin ? await getSessionContextFromUserId(supabaseAdmin as any, userId) : null)
+
     // Busca contexto recente para o GPT entender a conversa completa
     const { getRecentConversations } = await import('../db/queries')
     const recentConversations = await getRecentConversations(tenantId, 10, userId)
@@ -173,7 +181,7 @@ export async function processAction(
           tenantId,
           userId,
           message,
-          sessionContext || null
+          effectiveSessionContext
         )
         if (actionResult.success && isMutatingIntent(activeTask.state.intent)) {
           await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
@@ -203,7 +211,7 @@ export async function processAction(
         await persistResolvedConfirmation(tenantId, userId)
 
         // Executa imediatamente (gatilho de execução)
-        const actionResult = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
+        const actionResult = await executeAction(semanticState, tenantId, userId, message, effectiveSessionContext)
 
         // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
         const queued = consumeQueuedMessage(tenantId, userId)
@@ -215,7 +223,7 @@ export async function processAction(
           clearActiveTask(tenantId, userId)
         }
         if (queued) {
-          const followUp = await processAction(queued, tenantId, userId, sessionContext || null)
+        const followUp = await processAction(queued, tenantId, userId, effectiveSessionContext)
           if (followUp?.message) {
             return {
               success: true,
@@ -265,7 +273,7 @@ export async function processAction(
         readyToSave: true,
       }
 
-      const result = await executeAction(forced, tenantId, userId, message, sessionContext || null)
+      const result = await executeAction(forced, tenantId, userId, message, effectiveSessionContext)
       if (result.success && isMutatingIntent(forced.intent)) {
         await cleanupAfterMutation(tenantId, userId, forced.intent)
       }
@@ -291,7 +299,7 @@ export async function processAction(
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
       console.log('processAction - Dados completos, executando diretamente sem confirmação')
-      const result = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
+      const result = await executeAction(semanticState, tenantId, userId, message, effectiveSessionContext)
       if (result.success && isMutatingIntent(semanticState.intent)) {
         await cleanupAfterMutation(tenantId, userId, semanticState.intent)
       }
@@ -396,7 +404,7 @@ export async function processAction(
       setActiveTask(tenantId, userId, semanticState.intent, semanticState)
     }
 
-    const result = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
+    const result = await executeAction(semanticState, tenantId, userId, message, effectiveSessionContext)
     // Após qualquer ação mutável, encerra o fluxo e reseta estado
     if (result.success && isMutatingIntent(semanticState.intent)) {
       await cleanupAfterMutation(tenantId, userId, semanticState.intent)
@@ -1454,10 +1462,21 @@ async function handleCreateSupplier(
       return { success: true, message: 'Qual o nome do fornecedor?' }
     }
 
-    if (!sessionContext || sessionContext.mode !== 'empresa') {
+    if (!sessionContext) {
       return {
         success: true,
-        message: 'Fornecedores só existem no modo empresa. Para cadastrar fornecedor, ative o modo empresa na sua conta.',
+        message:
+          'Não consegui identificar seu contexto (pessoal/empresa). ' +
+          'Abra seu perfil no painel e selecione o modo *Empresa* para habilitar fornecedores.',
+      }
+    }
+
+    if (sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+      return {
+        success: true,
+        message:
+          'Fornecedores só existem no modo empresa. ' +
+          'No painel, vá em *Perfil* e selecione o modo *Empresa* e uma empresa para vincular ao seu usuário.',
       }
     }
 
