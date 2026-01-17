@@ -46,27 +46,23 @@ export async function POST(request: NextRequest) {
     const normalizedWhatsApp = whatsappNumber.replace(/\D/g, '')
 
     // Verifica se o WhatsApp já está vinculado a outro usuário
+    // Importante: NÃO usar .single() aqui, porque pode mascarar casos com múltiplas linhas / erros de schema.
     if (supabaseAdmin) {
       const tryTables = ['users_meugestor', 'users'] as const
-      let existingUser: any = null
       for (const table of tryTables) {
         const { data, error } = await supabaseAdmin
           .from(table)
           .select('id')
           .eq('whatsapp_number', normalizedWhatsApp)
-          .single()
-        if (!error && data) {
-          existingUser = data
-          break
-        }
-        // se tabela não existir, tenta a próxima
-      }
+          .limit(1)
 
-      if (existingUser) {
-        return NextResponse.json(
-          { error: 'Este número do WhatsApp já está vinculado a outra conta' },
-          { status: 400 }
-        )
+        if (error) continue // tabela não existe ou sem permissão; tenta próxima
+        if (Array.isArray(data) && data.length > 0) {
+          return NextResponse.json(
+            { error: 'Este número do WhatsApp já está vinculado a outra conta. Faça login.' },
+            { status: 409 }
+          )
+        }
       }
     }
 
@@ -84,13 +80,19 @@ export async function POST(request: NextRequest) {
         data: {
           name: name || email,
           whatsapp_number: normalizedWhatsApp,
-          mode: mode === 'empresa' ? 'empresa' : 'pessoal',
         },
       },
     })
 
     if (error) {
       console.error('Erro no signUp:', error)
+      // O Supabase Auth devolve essa mensagem genérica quando um trigger/constraint falha (ex.: whatsapp duplicado em public.users)
+      if (typeof error.message === 'string' && error.message.includes('Database error saving new user')) {
+        return NextResponse.json(
+          { error: 'Não foi possível criar a conta. Esse WhatsApp já está cadastrado ou houve um erro no perfil. Tente fazer login.' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest) {
       // Verifica se o registro existe
       const tryTables = ['users_meugestor', 'users'] as const
       let existingUser: any = null
+      let existingUserTable: (typeof tryTables)[number] | null = null
       let checkError: any = null
       for (const table of tryTables) {
         const res = await supabaseAdmin
@@ -116,7 +119,10 @@ export async function POST(request: NextRequest) {
           .single()
         existingUser = res.data
         checkError = res.error
-        if (!res.error && res.data) break
+        if (!res.error && res.data) {
+          existingUserTable = table
+          break
+        }
       }
 
       if (checkError || !existingUser) {
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
         // Tenta criar manualmente se o trigger falhou
         // (Mas isso não deveria acontecer se o trigger estiver funcionando)
       } else {
-        console.log('Registro encontrado (perfil):', existingUser)
+        console.log('Registro encontrado (perfil):', existingUser, { table: existingUserTable })
         // Atualiza o whatsapp_number se necessário (o trigger deveria ter criado com o número correto)
         if (existingUser.whatsapp_number !== normalizedWhatsApp) {
           console.log('Atualizando whatsapp_number no registro:', { old: existingUser.whatsapp_number, new: normalizedWhatsApp })
@@ -177,20 +183,71 @@ export async function POST(request: NextRequest) {
 
           console.log('Empresa criada com sucesso. ID:', empresa.id)
 
-          const ok = await updateUserModeAndEmpresa(supabaseAdmin as any, data.user.id, {
-            mode: 'empresa',
-            empresaId: empresa.id,
-          })
-          if (!ok) {
-            console.error('Falha ao vincular empresa ao usuário (mode/empresa_id).', {
-              userId: data.user.id,
-              tenantId: existingUser.tenant_id,
-              empresaId: empresa.id,
-            })
+          // Vinculação determinística: atualiza a mesma tabela onde o perfil foi encontrado.
+          // Se não conseguir (colunas ausentes), falha com mensagem clara (e tenta desfazer a empresa criada).
+          const profileTable = existingUserTable || 'users'
+          let linked = false
+          try {
+            const upd = await supabaseAdmin
+              .from(profileTable)
+              .update({ mode: 'empresa', empresa_id: empresa.id })
+              .eq('id', data.user.id)
+              .select('id, mode, empresa_id')
+              .single()
+            if (!upd.error && upd.data?.mode === 'empresa' && upd.data?.empresa_id) linked = true
+            if (upd.error) console.error('Erro ao atualizar perfil com contexto empresa:', upd.error, { profileTable })
+          } catch (e) {
+            console.error('Exceção ao atualizar perfil com contexto empresa:', e, { profileTable })
+          }
+
+          if (!linked) {
+            // Mantém fallback em metadata (para não perder a vinculação), mas não trata como "sucesso silencioso":
+            // se o banco não persistiu, retornamos erro para forçar correção de ambiente/migration.
+            try {
+              const admin = (supabaseAdmin as any).auth?.admin
+              if (admin?.updateUserById) {
+                await admin.updateUserById(data.user.id, {
+                  user_metadata: {
+                    ...(data.user.user_metadata || {}),
+                    mode: 'empresa',
+                    empresa_id: empresa.id,
+                  },
+                })
+              }
+            } catch (e) {
+              console.error('Falha ao salvar fallback em auth.user_metadata:', e)
+            }
+
+            // best-effort cleanup para não deixar empresa órfã
+            try {
+              await supabaseAdmin.from('empresas').delete().eq('id', empresa.id)
+            } catch {
+              // ignore
+            }
+
             return NextResponse.json(
-              { error: 'Erro ao vincular empresa ao usuário' },
+              {
+                error:
+                  'Não foi possível vincular a empresa ao usuário (mode/empresa_id). Verifique se as migrations 018/019 foram aplicadas no Supabase e se a tabela de perfil possui as colunas.',
+              },
               { status: 500 }
             )
+          }
+
+          // Mesmo quando vinculou com sucesso, grava também em auth.user_metadata (fallback canônico para outros componentes)
+          try {
+            const admin = (supabaseAdmin as any).auth?.admin
+            if (admin?.updateUserById) {
+              await admin.updateUserById(data.user.id, {
+                user_metadata: {
+                  ...(data.user.user_metadata || {}),
+                  mode: 'empresa',
+                  empresa_id: empresa.id,
+                },
+              })
+            }
+          } catch {
+            // ignore
           }
         } else {
           // garante modo pessoal explícito (idempotente)

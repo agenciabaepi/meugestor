@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/db/client'
 import type { SessionContext } from '@/lib/db/types'
 import { getSessionContextFromUserId } from '@/lib/db/user-profile'
+import { supabaseAdmin } from '@/lib/db/client'
 
 /**
  * Contexto global de sessão:
@@ -19,6 +20,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   if (error || !session?.user?.id) return null
 
-  return getSessionContextFromUserId(supabase as any, session.user.id)
+  // Preferir admin para conseguir fallback via auth.user_metadata quando necessário.
+  return getSessionContextFromUserId((supabaseAdmin as any) || (supabase as any), session.user.id)
 }
 
