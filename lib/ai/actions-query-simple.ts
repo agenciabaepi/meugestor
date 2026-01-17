@@ -25,6 +25,7 @@ import {
   getTomorrowEndISOInBrazil
 } from '../utils/date-parser'
 import { filterBySemanticCategory } from '../utils/semantic-filter'
+import { getListasByTenant } from '../db/queries'
 
 function formatTimeBR(iso: string): string {
   const parts = new Intl.DateTimeFormat('pt-BR', {
@@ -288,6 +289,37 @@ async function queryGastos(
 }
 
 /**
+ * Consulta listas (contagem + nomes) baseado no estado semântico
+ */
+async function queryListas(
+  state: SemanticState,
+  tenantId: string
+): Promise<ActionResult> {
+  const tipoRaw = state.list_type ? String(state.list_type).trim() : ''
+  const tipo = tipoRaw ? tipoRaw : null
+
+  const listas = await getListasByTenant(tenantId, tipo, 200)
+  const total = listas.length
+
+  if (total === 0) {
+    return {
+      success: true,
+      message: tipo ? `📋 Você não tem nenhuma lista de ${tipo}.` : '📋 Você não tem nenhuma lista.',
+      data: { total, listas: [] },
+    }
+  }
+
+  const title = tipo ? `📋 Você tem ${total} lista${total === 1 ? '' : 's'} de ${tipo}:` : `📋 Você tem ${total} lista${total === 1 ? '' : 's'}:`
+  const names = listas.map((l) => `- ${String(l.nome).trim()}`).join('\n')
+
+  return {
+    success: true,
+    message: `${title}\n\n${names}`,
+    data: { total, listas },
+  }
+}
+
+/**
  * Função principal simplificada
  */
 export async function handleQuerySimple(
@@ -317,6 +349,10 @@ export async function handleQuerySimple(
   
   if (state.queryType === 'gasto' && state.domain === 'financeiro') {
     return await queryGastos(state, tenantId, userId)
+  }
+
+  if (state.queryType === 'listas' && state.domain === 'listas') {
+    return await queryListas(state, tenantId)
   }
   
   return {

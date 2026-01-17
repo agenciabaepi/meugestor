@@ -193,6 +193,9 @@ REGRA CRÍTICA - NOVO DOMÍNIO "listas":
   - remove_list_item: remover item (ex: "remove leite")
   - mark_item_done: marcar como comprado (ex: "já comprei o arroz"; "leite comprado")
   - show_list: mostrar itens (ex: "o que tem na lista do mercado?"; "o que falta comprar?")
+ - Perguntas SOBRE AS LISTAS (contagem/nomes) devem ser query (NÃO chat):
+   - "quantas listas de compras eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: "compras"
+   - "quais listas eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: null (todas)
 
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
@@ -250,7 +253,7 @@ Responda APENAS com JSON no formato:
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
-  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | null,
+  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | null,
   "amount": number | null,
   "title": string | null,
   "scheduled_at": string (apenas horário, ex: "15:00") | null,
