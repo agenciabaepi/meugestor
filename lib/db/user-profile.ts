@@ -236,8 +236,57 @@ export async function getSessionContextFromUserId(
     }
   }
 
-  const finalMode: AppMode = (row.user as any).mode === 'empresa' ? 'empresa' : 'pessoal'
-  const finalEmpresaId = ((row.user as any).empresa_id ?? null) as string | null
+  let finalMode: AppMode = (row.user as any).mode === 'empresa' ? 'empresa' : 'pessoal'
+  let finalEmpresaId = ((row.user as any).empresa_id ?? null) as string | null
+
+  // Fallback adicional: se o usuário já tem empresa(s) no tenant mas não está vinculado,
+  // tenta inferir automaticamente quando houver exatamente 1 empresa.
+  // Isso evita o caso "sou empresa mas o bot não reconhece".
+  if (!finalEmpresaId) {
+    try {
+      const { data: empresas, error } = await client
+        .from('empresas')
+        .select('id, nome_fantasia')
+        .eq('tenant_id', row.user.tenant_id)
+        .limit(2)
+
+      if (!error && Array.isArray(empresas) && empresas.length === 1) {
+        finalMode = 'empresa'
+        finalEmpresaId = empresas[0].id
+        ;(row.user as any).mode = 'empresa'
+        ;(row.user as any).empresa_id = finalEmpresaId
+
+        // Best-effort: persiste no perfil (se colunas existirem)
+        try {
+          await client.from(row.table).update({ mode: 'empresa', empresa_id: finalEmpresaId }).eq('id', userId)
+        } catch {
+          // ignore
+        }
+
+        // Best-effort: persiste no user_session_context (se existir)
+        try {
+          const up = await client
+            .from('user_session_context')
+            .upsert(
+              {
+                user_id: userId,
+                tenant_id: row.user.tenant_id,
+                mode: 'empresa',
+                empresa_id: finalEmpresaId,
+              },
+              { onConflict: 'user_id' }
+            )
+          if (up?.error && isMissingRelationError(up.error)) {
+            // ignore
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // tolera ambientes sem a tabela ainda
+    }
+  }
 
   const ctx: SessionContext = {
     tenant_id: row.user.tenant_id,
