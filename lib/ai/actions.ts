@@ -693,13 +693,11 @@ async function handleMarkItemDone(state: SemanticState, tenantId: string): Promi
     await touchLastActiveList(tenantId, result.lista.nome)
 
     const itemLabel = formatItemNameForReply(itemName)
-    if (!result.item) {
-      return { success: true, message: `Não achei ${itemLabel} na lista ${result.lista.nome}.` }
+    // UX estilo Alexa: sempre resolve (cria se não existir, marca comprado, ou informa que já estava)
+    if (result.alreadyBought) {
+      return { success: true, message: `${itemLabel} já estava marcado como comprado na lista ${result.lista.nome}.`, data: result }
     }
-    if (!result.updated) {
-      return { success: true, message: `${itemLabel} já está como comprado.` }
-    }
-    return { success: true, message: `${itemLabel} marcado como comprado.`, data: result }
+    return { success: true, message: `${itemLabel} marcado como comprado na lista ${result.lista.nome}.`, data: result }
   } catch (error) {
     if (error instanceof ValidationError) {
       return { success: false, message: error.message }

@@ -22,6 +22,26 @@ function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, ' ')
 }
 
+function normalizeForCompare(input: string): string {
+  const s = normalizeName(input)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  // plural simples: remove "s" final (ex: leite/leites)
+  if (s.length > 3 && s.endsWith('s') && !s.endsWith('ss')) {
+    return s.slice(0, -1)
+  }
+  return s
+}
+
+function canonicalItemName(input: string): string {
+  const trimmed = normalizeName(input)
+  if (!trimmed) return trimmed
+  // Usa a forma normalizada para evitar duplicação por plural/case
+  const base = normalizeForCompare(trimmed)
+  return base.charAt(0).toUpperCase() + base.slice(1)
+}
+
 export async function ensureListaByName(
   tenantId: string,
   listName: string,
@@ -68,7 +88,7 @@ export async function addItemToList(params: {
   unidade?: string | null
 }): Promise<{ lista: Lista; item: ListaItem; created: boolean; wasAlreadyPending: boolean }> {
   const listName = normalizeName(params.listName)
-  const itemName = normalizeName(params.itemName)
+  const itemName = canonicalItemName(params.itemName)
   if (!itemName) throw new ValidationError('Item é obrigatório')
 
   const lista = await ensureListaByName(params.tenantId, listName, 'compras')
@@ -108,7 +128,7 @@ export async function removeItemFromList(params: {
   itemName: string
 }): Promise<{ lista: Lista; removed: boolean }> {
   const listName = normalizeName(params.listName)
-  const itemName = normalizeName(params.itemName)
+  const itemName = canonicalItemName(params.itemName)
   if (!itemName) throw new ValidationError('Item é obrigatório')
 
   const resolved = await resolveListaByName(params.tenantId, listName)
@@ -133,29 +153,36 @@ export async function markItemDoneInList(params: {
   tenantId: string
   listName: string
   itemName: string
-}): Promise<{ lista: Lista; item: ListaItem | null; updated: boolean }> {
+}): Promise<{ lista: Lista; item: ListaItem; created: boolean; alreadyBought: boolean }> {
   const listName = normalizeName(params.listName)
-  const itemName = normalizeName(params.itemName)
-  if (!itemName) throw new ValidationError('Item é obrigatório')
+  const itemNameRaw = normalizeName(params.itemName)
+  if (!itemNameRaw) throw new ValidationError('Item é obrigatório')
+  const itemCanonical = canonicalItemName(itemNameRaw)
 
-  const resolved = await resolveListaByName(params.tenantId, listName)
-  if (!resolved.ok) {
-    if (resolved.reason === 'ambiguous') {
-      throw new ValidationError(
-        `Qual lista? ${resolved.candidates.map(l => l.nome).slice(0, 5).join(', ')}.`
-      )
-    }
-    throw new ValidationError(`Não achei a lista "${listName}".`)
+  // UX estilo Alexa: se a lista não existir, cria (não pergunta, não bloqueia)
+  const lista = await ensureListaByName(params.tenantId, listName, 'compras')
+
+  // Comparação case-insensitive + trim + plural simples
+  const wantedKey = normalizeForCompare(itemCanonical)
+  const itens = await getListaItens(lista.id)
+  const existing = itens.find((it) => normalizeForCompare(it.nome) === wantedKey) || null
+
+  // CASO A — item não existe: cria já como comprado
+  if (!existing) {
+    const createdItem = await createListaItem(lista.id, itemCanonical, null, null, 'comprado')
+    if (!createdItem) throw new ValidationError('Erro ao marcar item como comprado')
+    return { lista, item: createdItem, created: true, alreadyBought: false }
   }
-  const lista = resolved.lista
 
-  const existing = await getListaItemByName(lista.id, itemName)
-  if (!existing) return { lista, item: null, updated: false }
-  if (existing.status === 'comprado') return { lista, item: existing, updated: false }
+  // CASO C — item já comprado
+  if (existing.status === 'comprado') {
+    return { lista, item: existing, created: false, alreadyBought: true }
+  }
 
   const updated = await updateListaItemStatus(existing.id, lista.id, 'comprado')
   if (!updated) throw new ValidationError('Erro ao marcar item como comprado')
-  return { lista, item: updated, updated: true }
+  // CASO B — existia pendente e foi marcado como comprado
+  return { lista, item: updated, created: false, alreadyBought: false }
 }
 
 export async function getListView(params: {
