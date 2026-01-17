@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { LOGO_URL } from '@/lib/constants'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
   description: 'SaaS Multitenant - Assistente Inteligente via WhatsApp',
   applicationName: 'ORGANIZAPAY',
   icons: {
-    icon: [{ url: '/logo-OrganizaPay.png', type: 'image/png' }],
-    apple: [{ url: '/logo-OrganizaPay.png' }],
+    icon: [{ url: LOGO_URL, type: 'image/png' }],
+    apple: [{ url: LOGO_URL }],
   },
   appleWebApp: {
     capable: true,

@@ -1,214 +1,243 @@
-OBJETIVO GERAL:
-Adicionar ao sistema a opção de USO EMPRESARIAL, sem remover ou quebrar
-nenhuma funcionalidade existente de USO PESSOAL.
+OBJETIVO:
+Implementar no MODO EMPRESA um sistema completo de:
+- categorias e subcategorias empresariais
+- gastos fixos e variáveis
+- compra de produtos
+- cadastro e uso de fornecedores
+- relatórios por fornecedor e categoria
 
-O sistema deve suportar:
-- organização pessoal (como já funciona hoje)
-- organização de empresas (novo modo)
-
-Ambos devem coexistir.
-
----
-
-CONCEITO-CHAVE (REGRA DE OURO):
-O sistema terá DOIS MODOS DE OPERAÇÃO:
-
-1) MODO PESSOAL
-2) MODO EMPRESA
-
-O modo é definido no CADASTRO e controla:
-- quais tabelas usar
-- quais categorias usar
-- quais opções aparecem na interface
+SEM alterar o funcionamento do modo pessoal.
 
 ---
 
-### 1️⃣ FLUXO DE CADASTRO (ALTERAÇÃO)
+## 1️⃣ CONCEITO-CHAVE
 
-No cadastro inicial, o usuário deve escolher:
+No modo EMPRESA, o financeiro precisa ser:
+- estruturado
+- categorizado
+- auditável
+- preparado para relatórios
 
-🔘 Uso pessoal  
-🔘 Uso empresarial  
-
-#### Caso escolha USO PESSOAL:
-- Comportamento atual permanece IGUAL
-- Usa tabelas pessoais já existentes
-- Usa categorias pessoais
-- Nenhuma mudança no fluxo atual
-
-#### Caso escolha USO EMPRESARIAL:
-- Usuário deve cadastrar uma EMPRESA
-- Dados mínimos da empresa:
-  - id
-  - tenant_id
-  - nome_fantasia
-  - razao_social (opcional)
-  - cnpj (opcional)
-  - created_at
-
-- O usuário passa a operar no CONTEXTO DA EMPRESA
-- Ao logar, ele NÃO vê mais opções pessoais
-- Interface muda para modo empresa
+Diferente do modo pessoal, aqui teremos:
+- categorias fixas padrão
+- produtos
+- fornecedores
+- custos recorrentes (fixos)
+- custos variáveis (compras, serviços, materiais)
 
 ---
 
-### 2️⃣ MODELAGEM DE BANCO DE DADOS
+## 2️⃣ CATEGORIAS EMPRESARIAIS (PADRÃO DO SISTEMA)
 
-⚠️ REGRA CRÍTICA:
-NÃO reutilizar tabelas pessoais para empresa.
-Criar tabelas PARALELAS.
+Criar uma tabela:
+### categorias_empresa
 
----
-
-#### Tabelas EXISTENTES (PESSOAL — NÃO MEXER):
-- gastos
-- receitas
-- compromissos
-- listas
-- lista_itens
-
-Essas continuam funcionando para uso pessoal.
-
----
-
-#### NOVAS TABELAS (EMPRESA):
-
-Criar versões empresariais com sufixo `_empresa`:
-
-- empresas
-- gastos_empresa
-- receitas_empresa
-- compromissos_empresa
-- listas_empresa
-- lista_itens_empresa
-
-Todas DEVEM conter:
+Campos:
 - id
 - tenant_id
 - empresa_id
-- dados específicos
+- nome
+- tipo: "fixo" | "variavel"
+- is_default (boolean)
+- created_at
+
+⚠️ Categorias default NÃO podem ser apagadas.
+⚠️ Podem ser editadas apenas no nome (opcional).
+
+---
+
+### 🔹 CATEGORIAS FIXAS (DEFAULT)
+
+Criar automaticamente para toda empresa:
+
+- Aluguel
+- Água
+- Energia elétrica
+- Internet / Telefonia
+- Funcionários
+- Pró-labore
+- Contabilidade
+- Impostos e taxas
+- Sistemas / Software
+- Marketing
+- Manutenção
+- Limpeza
+- Seguro
+- Transporte / Logística
+
+tipo = "fixo"
+is_default = true
+
+---
+
+### 🔹 CATEGORIAS VARIÁVEIS (DEFAULT)
+
+- Materiais
+- Produtos
+- Fornecedores
+- Compras operacionais
+- Serviços terceirizados
+- Equipamentos
+- Ferramentas
+- Estoque
+
+tipo = "variavel"
+is_default = true
+
+---
+
+### 🔹 CATEGORIAS CUSTOMIZADAS
+
+Usuário pode criar novas categorias:
+- tipo definido pelo usuário
+- is_default = false
+- sempre vinculada a empresa_id
+
+---
+
+## 3️⃣ SUBCATEGORIAS (EMPRESA)
+
+Criar tabela:
+### subcategorias_empresa
+
+Campos:
+- id
+- tenant_id
+- empresa_id
+- categoria_id
+- nome
+- created_at
+
+Exemplos:
+Categoria: Materiais
+- tinta
+- rolo
+- pincel
+- massa corrida
+
+Categoria: Serviços terceirizados
+- eletricista
+- encanador
+- frete
+
+---
+
+## 4️⃣ FORNECEDORES (NOVO MÓDULO)
+
+Criar tabela:
+### fornecedores
+
+Campos:
+- id
+- tenant_id
+- empresa_id
+- nome
+- telefone (opcional)
+- email (opcional)
+- observacao (opcional)
 - created_at
 
 ---
 
-### 3️⃣ CONTEXTO DE EXECUÇÃO (LÓGICA DO SISTEMA)
+### REGRAS IMPORTANTES DE FORNECEDOR:
 
-Criar um CONTEXTO GLOBAL de sessão com:
+- Fornecedor pode ser criado automaticamente via IA
+- Ex: “comprei tinta no fornecedor X”
+- Se fornecedor não existir → criar
+- Se existir → reutilizar
+
+---
+
+## 5️⃣ GASTOS COM PRODUTOS (EMPRESA)
+
+Criar tabela:
+### gastos_empresa
+
+Campos obrigatórios:
+- id
 - tenant_id
-- mode: "pessoal" | "empresa"
-- empresa_id (apenas se mode === empresa)
-
-Todas as operações devem respeitar esse contexto.
-
-Exemplo:
-- Se mode === "pessoal" → usar tabelas pessoais
-- Se mode === "empresa" → usar tabelas *_empresa
-
-⚠️ PROIBIDO misturar dados.
-
----
-
-### 4️⃣ FINANCEIRO — DIFERENÇA DE CATEGORIAS
-
-#### Uso pessoal:
-Manter categorias atuais (alimentação, mercado, lazer etc).
-
-#### Uso empresarial:
-Criar categorias específicas, por exemplo:
-- Receita
-  - vendas
-  - serviços
-  - contratos
-- Despesas
-  - fornecedores
-  - impostos
-  - folha de pagamento
-  - aluguel
-  - marketing
-  - sistemas
-  - logística
-
-O sistema deve carregar as categorias de acordo com o mode.
+- empresa_id
+- categoria_id
+- subcategoria_id (opcional)
+- fornecedor_id (opcional)
+- descricao
+- quantidade (opcional)
+- valor_unitario (opcional)
+- valor_total
+- data
+- created_at
 
 ---
 
-### 5️⃣ LISTAS (EMPRESA)
+### EXEMPLOS QUE O SISTEMA DEVE ENTENDER:
 
-Listas empresariais funcionam IGUAL às pessoais, mas em tabelas separadas:
-- listas_empresa
-- lista_itens_empresa
+🗣️ "Comprei 3 latas de tinta por 30 reais no fornecedor Casa das Tintas"
 
-Exemplos:
-- lista de compras do escritório
-- lista de tarefas internas
-- lista de materiais
+Resultado:
+- categoria: Materiais
+- subcategoria: tinta
+- fornecedor: Casa das Tintas
+- quantidade: 3
+- valor_total: 30
 
-Mesmas regras de normalização semântica já implementadas.
+🗣️ "Gastei 120 reais com eletricista no fornecedor João"
 
----
-
-### 6️⃣ COMPROMISSOS (EMPRESA)
-
-Compromissos empresariais:
-- reuniões
-- prazos
-- entregas
-- calls
-
-Usar:
-- compromissos_empresa
-
-Mesmo comportamento:
-- criar
-- atualizar
-- cancelar
-- consultar
+Resultado:
+- categoria: Serviços terceirizados
+- fornecedor: João
+- valor_total: 120
 
 ---
 
-### 7️⃣ INTERFACE / UX
+## 6️⃣ RELATÓRIOS (BASE PARA FUTURO DASHBOARD)
 
-Após login:
+O sistema deve permitir consultas como:
 
-Se mode === pessoal:
-- mostrar dashboard pessoal (como hoje)
+- quanto gastei por categoria
+- quanto gastei por subcategoria
+- quanto gastei por fornecedor
+- ranking de fornecedores
+- gastos fixos x variáveis
 
-Se mode === empresa:
-- mostrar dashboard empresarial
-- esconder opções pessoais
-- mostrar nome da empresa no topo
-- ações sempre vinculadas à empresa
-
----
-
-### 8️⃣ MIGRAÇÃO E COMPATIBILIDADE
-
-⚠️ MUITO IMPORTANTE:
-- NÃO alterar estrutura atual das tabelas pessoais
-- NÃO migrar dados existentes
-- NÃO quebrar fluxos atuais
-
-Tudo novo deve ser ADITIVO.
+Essas consultas devem usar:
+- gastos_empresa
+- JOIN com fornecedores
+- JOIN com categorias
 
 ---
 
-### 9️⃣ TESTES OBRIGATÓRIOS
+## 7️⃣ IA — COMPORTAMENTO OBRIGATÓRIO
 
-- Usuário pessoal continua funcionando normalmente
-- Usuário empresarial:
-  - cria empresa
-  - registra gasto empresarial
-  - cria lista empresarial
-  - não vê dados pessoais
-- Mesmo tenant pode ter:
-  - dados pessoais
-  - dados empresariais
-  (em contextos separados)
+### REGRA DE OURO:
+Se o usuário falar algo que claramente é um gasto empresarial:
+→ REGISTRAR DIRETO
+→ SEM perguntas
+→ SEM confirmação
+
+Perguntar SOMENTE se faltar algo crítico:
+- valor
+- categoria impossível de inferir
+
+---
+
+### EXEMPLOS SEM PERGUNTAS:
+
+🗣️ "Paguei 300 reais de aluguel"
+🗣️ "Comprei tinta no fornecedor X"
+🗣️ "Gastei 80 reais em ferramentas"
+
+---
+
+## 8️⃣ COMPATIBILIDADE
+
+- Nada disso afeta o modo pessoal
+- Tabelas são separadas
+- IA deve respeitar o contexto: mode === empresa
 
 ---
 
 RESULTADO FINAL ESPERADO:
-- Sistema híbrido (pessoal + empresa)
-- Arquitetura limpa
-- Zero impacto no que já funciona
-- Base sólida para escalar (multi-empresa no futuro)
+- Financeiro empresarial completo
+- Categorias profissionais
+- Controle por fornecedor
+- Base sólida para relatórios e dashboard

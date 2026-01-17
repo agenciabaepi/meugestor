@@ -4,14 +4,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 
 const DEFAULT_PALETTE = Object.freeze([
   '#10B981', // emerald (verde principal)
-  '#f97316', // orange
-  '#a855f7', // purple
+  '#059669', // emerald-600
+  '#047857', // emerald-700
   '#22c55e', // green
-  '#ef4444', // red
   '#14b8a6', // teal
-  '#eab308', // yellow
-  '#ec4899', // pink
-  '#64748b', // slate
+  '#0d9488', // teal-600
+  '#2dd4bf', // teal-300
+  '#34d399', // emerald-400
+  '#6ee7b7', // emerald-300
 ])
 
 export type DonutCategoria = {
@@ -77,19 +77,19 @@ function defaultIconForCategory(nome: string) {
 
 function defaultColorForCategory(nome: string) {
   const key = (nome || '').toLowerCase()
-  if (key.includes('aliment')) return '#f97316' // laranja
-  if (key.includes('transp')) return '#10B981' // emerald
-  if (key.includes('morad') || key.includes('casa')) return '#a855f7' // roxo
-  if (key.includes('saúd')) return '#ef4444' // vermelho
-  if (key.includes('educ')) return '#eab308' // amarelo
-  if (key.includes('lazer') || key.includes('entreten')) return '#22c55e' // verde
-  if (key.includes('compr')) return '#ec4899' // rosa
-  if (key.includes('assin') || key.includes('servi')) return '#14b8a6' // teal
-  if (key.includes('impost') || key.includes('tax')) return '#64748b' // slate
-  if (key.includes('pets')) return '#8b5cf6'
-  if (key.includes('doa') || key.includes('pres')) return '#f59e0b'
-  if (key.includes('trabal') || key.includes('negó')) return '#0ea5e9'
-  return '#10b981'
+  if (key.includes('aliment')) return '#34d399' // emerald-400
+  if (key.includes('transp')) return '#10B981' // emerald-500
+  if (key.includes('morad') || key.includes('casa')) return '#059669' // emerald-600
+  if (key.includes('saúd')) return '#14b8a6' // teal-500
+  if (key.includes('educ')) return '#0d9488' // teal-600
+  if (key.includes('lazer') || key.includes('entreten')) return '#22c55e' // green-500
+  if (key.includes('compr')) return '#2dd4bf' // teal-300
+  if (key.includes('assin') || key.includes('servi')) return '#047857' // emerald-700
+  if (key.includes('impost') || key.includes('tax')) return '#6ee7b7' // emerald-300
+  if (key.includes('pets')) return '#10b981' // emerald-500
+  if (key.includes('doa') || key.includes('pres')) return '#14b8a6' // teal-500
+  if (key.includes('trabal') || key.includes('negó')) return '#0d9488' // teal-600
+  return '#10b981' // emerald-500
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -311,7 +311,7 @@ export function DonutGastosChart({
               'w-11 h-11 sm:w-12 sm:h-12',
               'rounded-full',
               // Blur é bonito, mas pode pesar em mobile. Mantemos leve/condicional.
-              'supports-[backdrop-filter]:backdrop-blur-sm',
+              'supports-backdrop-filter:backdrop-blur-sm',
               'transition-all duration-200',
               'focus:outline-none',
               isSelected ? 'bg-white shadow-lg ring-1 ring-black/10' : 'bg-white/85 shadow-md',

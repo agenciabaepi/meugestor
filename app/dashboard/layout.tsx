@@ -1,6 +1,7 @@
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
 import { getSessionContext } from '@/lib/utils/session-context'
+import { AnimatedTopoBackground } from '@/app/components/AnimatedTopoBackground'
 
 export default async function DashboardLayout({
   children,
@@ -18,12 +19,13 @@ export default async function DashboardLayout({
   const sessionContext = await getSessionContext()
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100">
+    <div className="relative isolate min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100">
+      <AnimatedTopoBackground src="/bg.svg" opacity={0.14} linesOnly motionScale={1.05} speedScale={0.9} />
       {/* Sidebar - Fixo (Desktop) */}
       <Sidebar sessionContext={sessionContext} />
 
       {/* Main Content - Sem gap, com margin para o sidebar fixo */}
-      <main className="lg:ml-64 min-h-screen pb-20 lg:pb-0">
+      <main className="relative z-10 lg:ml-64 min-h-screen pb-20 lg:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
           <div className="w-full">
             {children}
@@ -32,7 +34,9 @@ export default async function DashboardLayout({
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
-      <BottomNav sessionContext={sessionContext} />
+      <div className="relative z-10">
+        <BottomNav sessionContext={sessionContext} />
+      </div>
     </div>
   )
 }

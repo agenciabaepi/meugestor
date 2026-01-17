@@ -8,6 +8,13 @@ const nextConfig = {
   // Transpilar recharts para compatibilidade com React 19
   transpilePackages: ['recharts'],
   
+  // Configuração de imagens
+  images: {
+    remotePatterns: [],
+    // Permite imagens locais sem restrições (incluindo query strings para cache-busting)
+    unoptimized: false,
+  },
+  
   // Configurações do Turbopack para evitar problemas de leitura de diretórios
   turbopack: {
     // Limitar o escopo do Turbopack ao diretório do projeto

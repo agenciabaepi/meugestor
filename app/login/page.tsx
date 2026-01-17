@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import Image from 'next/image'
+import { AnimatedTopoBackground } from '@/app/components/AnimatedTopoBackground'
+import { LOGO_URL } from '@/lib/constants'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -118,18 +119,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-emerald-50 via-white to-emerald-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen relative isolate flex items-center justify-center bg-transparent">
+      <AnimatedTopoBackground src="/bg.svg" opacity={1} motionScale={1.7} speedScale={1.2} />
+      <div className="relative z-20 max-w-md w-full space-y-8 p-8 bg-white/90 backdrop-blur-sm rounded-lg shadow-xl ring-1 ring-black/5">
         <div>
           <div className="mt-2 flex justify-center">
-            <div className="relative h-10 w-[220px]">
-              <Image
-                src="/logo-OrganizaPay.png"
+            <div className="relative h-10 w-[220px] flex items-center justify-center">
+              <img
+                src={LOGO_URL}
                 alt="ORGANIZAPAY"
-                fill
-                priority
-                sizes="220px"
-                className="object-contain"
+                className="h-full w-auto object-contain"
               />
             </div>
             <h2 className="sr-only">ORGANIZAPAY</h2>

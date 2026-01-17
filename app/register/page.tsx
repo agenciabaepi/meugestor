@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { LOGO_URL } from '@/lib/constants'
 
 function formatWhatsAppMask(input: string): string {
   const digits = input.replace(/\D/g, '').slice(0, 13) // 55 + DDD + 9 dígitos
@@ -131,14 +131,11 @@ export default function RegisterPage() {
       <div className="w-full max-w-md lg:max-w-4xl p-6 sm:p-8 lg:p-10 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl ring-1 ring-gray-200">
         <div>
           <div className="flex justify-center">
-            <div className="relative h-10 w-[220px]">
-              <Image
-                src="/logo-OrganizaPay.png"
+            <div className="relative h-10 w-[220px] flex items-center justify-center">
+              <img
+                src={LOGO_URL}
                 alt="ORGANIZAPAY"
-                fill
-                priority
-                sizes="220px"
-                className="object-contain"
+                className="h-full w-auto object-contain"
               />
             </div>
             <p className="sr-only">ORGANIZAPAY</p>
@@ -148,13 +145,11 @@ export default function RegisterPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             <span>Registre-se para começar a usar o</span>
-            <span className="inline-flex align-middle mx-2 relative h-5 w-[120px]">
-              <Image
-                src="/logo-OrganizaPay.png"
+            <span className="inline-flex align-middle mx-2 relative h-5 w-[120px] flex items-center justify-center">
+              <img
+                src={LOGO_URL}
                 alt="ORGANIZAPAY"
-                fill
-                sizes="120px"
-                className="object-contain"
+                className="h-full w-auto object-contain"
               />
             </span>
           </p>

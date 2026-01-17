@@ -143,7 +143,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Hoje */}
-        <div className="relative bg-linear-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-emerald-400 to-emerald-500 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
                 <Calendar className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-purple-100 text-sm font-medium mb-1">Hoje</p>
+            <p className="text-emerald-50 text-sm font-medium mb-1">Hoje</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
               {data.hoje} compromissos
             </p>
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Próximos */}
-        <div className="relative bg-linear-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-linear-to-br from-emerald-300 to-emerald-400 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
                 <Clock className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-amber-100 text-sm font-medium mb-1">Próximos</p>
+            <p className="text-emerald-50 text-sm font-medium mb-1">Próximos</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
               {data.proximos.length}
             </p>
@@ -223,11 +223,11 @@ export default async function DashboardPage() {
               {data.proximos.map((compromisso) => (
                 <div
                   key={compromisso.id}
-                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-purple-200 hover:shadow-md transition-all duration-200"
+                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full shrink-0"></div>
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div>
                       <p className="font-semibold text-base text-gray-900 truncate">{compromisso.title}</p>
                     </div>
                     <p className="text-sm text-gray-500 ml-5">

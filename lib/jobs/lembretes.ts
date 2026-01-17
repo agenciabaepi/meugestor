@@ -1,7 +1,7 @@
 /**
  * Sistema de Lembretes Automáticos
  * Envia lembretes de compromissos via WhatsApp
- * Suporta lembrete único: 10min antes
+ * Suporta lembrete único: 5min antes
  */
 
 import { getCompromissosRecords } from '../services/compromissos'
@@ -21,7 +21,9 @@ const LEMBRETES_CONFIG: Partial<Record<LembreteType, LembreteConfig>> = {
   // Desativados por decisão de produto (evitar excesso de mensagens)
   // '1h': { antecedenciaMinutos: 60, tipo: '1h' },
   // '30min': { antecedenciaMinutos: 30, tipo: '30min' },
-  '10min': { antecedenciaMinutos: 10, tipo: '10min' },
+  // Mantemos o tipo "10min" por compatibilidade com a coluna reminder_10min_sent,
+  // mas a antecedência efetiva é 5 minutos.
+  '10min': { antecedenciaMinutos: 5, tipo: '10min' },
 }
 
 /**

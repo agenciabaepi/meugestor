@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { LOGO_URL } from '@/lib/constants'
 import {
   LayoutDashboard,
   Wallet,
@@ -63,14 +63,11 @@ export function Sidebar({
               href="/dashboard"
               className="flex items-center justify-center w-full group"
             >
-              <div className="relative h-8 w-[180px] group-hover:opacity-95 transition-opacity">
-                <Image
-                  src="/logo-OrganizaPay.png"
+              <div className="relative h-8 w-[180px] group-hover:opacity-95 transition-opacity flex items-center justify-center">
+                <img
+                  src={LOGO_URL}
                   alt="ORGANIZAPAY"
-                  fill
-                  sizes="180px"
-                  className="object-contain"
-                  priority
+                  className="h-full w-auto object-contain"
                 />
               </div>
               <span className="sr-only">ORGANIZAPAY</span>

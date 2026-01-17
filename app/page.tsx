@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { Smartphone, Bot, Wallet, Calendar, CheckCircle, ArrowRight, Zap, Shield, BarChart } from 'lucide-react'
+import { LOGO_URL } from '@/lib/constants'
 
 export default function Home() {
   return (
@@ -10,14 +10,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 sm:pt-24 sm:pb-20">
           <div className="text-center">
             <div className="flex justify-center mb-6">
-              <div className="relative h-12 w-[260px] sm:h-14 sm:w-[320px] lg:h-16 lg:w-[420px]">
-                <Image
-                  src="/logo-OrganizaPay.png"
+              <div className="relative h-12 w-[260px] sm:h-14 sm:w-[320px] lg:h-16 lg:w-[420px] flex items-center justify-center">
+                <img
+                  src={LOGO_URL}
                   alt="ORGANIZAPAY"
-                  fill
-                  priority
-                  sizes="(max-width: 640px) 260px, (max-width: 1024px) 320px, 420px"
-                  className="object-contain"
+                  className="h-full w-auto object-contain"
                 />
               </div>
               <h1 className="sr-only">ORGANIZAPAY</h1>
@@ -111,13 +108,11 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               <span>Por que escolher o</span>{' '}
-              <span className="inline-flex align-middle relative h-7 w-[170px]">
-                <Image
-                  src="/logo-OrganizaPay.png"
+              <span className="inline-flex align-middle relative h-7 w-[170px] flex items-center justify-center">
+                <img
+                  src={LOGO_URL}
                   alt="ORGANIZAPAY"
-                  fill
-                  sizes="170px"
-                  className="object-contain"
+                  className="h-full w-auto object-contain"
                 />
               </span>
             </h2>
@@ -187,13 +182,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex justify-center mb-3">
-              <div className="relative h-7 w-[180px]">
-                <Image
-                  src="/logo-OrganizaPay.png"
+              <div className="relative h-7 w-[180px] flex items-center justify-center">
+                <img
+                  src={LOGO_URL}
                   alt="ORGANIZAPAY"
-                  fill
-                  sizes="180px"
-                  className="object-contain brightness-0 invert"
+                  className="h-full w-auto object-contain brightness-0 invert"
                 />
               </div>
               <p className="sr-only">ORGANIZAPAY</p>

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Menu, X } from 'lucide-react'
+import { LOGO_URL } from '@/lib/constants'
 
 export function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false)
@@ -49,14 +49,11 @@ export function MobileMenu() {
                   onClick={closeMenu}
                   className="flex items-center"
                 >
-                  <div className="relative h-7 w-[160px]">
-                    <Image
-                      src="/logo-OrganizaPay.png"
+                  <div className="relative h-7 w-[160px] flex items-center justify-center">
+                    <img
+                      src={LOGO_URL}
                       alt="ORGANIZAPAY"
-                      fill
-                      sizes="160px"
-                      className="object-contain"
-                      priority
+                      className="h-full w-auto object-contain"
                     />
                   </div>
                   <span className="sr-only">ORGANIZAPAY</span>
