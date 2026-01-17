@@ -14,7 +14,7 @@ O cron é criado no **Dashboard da Vercel**, não no código. O código já est�
 
 ### 2. Selecione seu Projeto
 
-1. Na lista de projetos, encontre e clique no projeto **"Meu Gestor"** (ou o nome do seu projeto)
+1. Na lista de projetos, encontre e clique no projeto **"ORGANIZAPAY"** (ou o nome do seu projeto)
 2. Isso abrirá a página do projeto
 
 ### 3. Vá para Settings (Configurações)
@@ -97,7 +97,7 @@ O cron é criado no **Dashboard da Vercel**, não no código. O código já est�
 
 ```
 Vercel Dashboard
-└── Seu Projeto (Meu Gestor)
+└── Seu Projeto (ORGANIZAPAY)
     └── Settings (aba no topo)
         └── Functions (menu lateral)
             └── Cron Jobs ← AQUI!

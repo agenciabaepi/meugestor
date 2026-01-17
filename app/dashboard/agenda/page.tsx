@@ -1,14 +1,15 @@
-import { getCompromissosRecords } from '@/lib/services/compromissos'
-import { getAuthenticatedTenantId, getCurrentUser } from '@/lib/utils/auth'
+import { getCompromissosRecordsForContext } from '@/lib/services/compromissos'
+import { getCurrentUser } from '@/lib/utils/auth'
+import { getSessionContext } from '@/lib/utils/session-context'
 import { getNowInBrazil } from '@/lib/utils/date-parser'
 import { AgendaClient } from './AgendaClient'
 
 async function getAgendaData() {
-  const tenantId = await getAuthenticatedTenantId()
+  const ctx = await getSessionContext()
   const user = await getCurrentUser()
   const userId = user?.id ?? null
   
-  if (!tenantId) {
+  if (!ctx) {
     return {
       compromissos: [],
     }
@@ -25,8 +26,8 @@ async function getAgendaData() {
   const rangeEnd = new Date(nowBrazil.getFullYear(), nowBrazil.getMonth() + 7, 0)
   rangeEnd.setHours(23, 59, 59, 999)
 
-  const compromissos = await getCompromissosRecords(
-    tenantId,
+  const compromissos = await getCompromissosRecordsForContext(
+    ctx,
     rangeStart.toISOString(),
     rangeEnd.toISOString(),
     userId,

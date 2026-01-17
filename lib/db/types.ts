@@ -13,10 +13,21 @@ export interface User {
   whatsapp_number: string
   whatsapp_welcome_sent_at?: string | null
   whatsapp_welcome_sent_number?: string | null
+  mode?: 'pessoal' | 'empresa'
+  empresa_id?: string | null
   role: 'admin' | 'user'
   name: string | null
   created_at: string
   updated_at: string
+}
+
+export interface Empresa {
+  id: string
+  tenant_id: string
+  nome_fantasia: string
+  razao_social: string | null
+  cnpj: string | null
+  created_at: string
 }
 
 export interface Financeiro {
@@ -93,4 +104,14 @@ export interface TenantContext {
   last_active_list_name: string | null
   created_at: string
   updated_at: string
+}
+
+export type AppMode = 'pessoal' | 'empresa'
+
+export interface SessionContext {
+  tenant_id: string
+  user_id: string
+  mode: AppMode
+  empresa_id: string | null
+  empresa_nome_fantasia?: string | null
 }

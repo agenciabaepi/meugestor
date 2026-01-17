@@ -13,8 +13,10 @@ import { processMessage } from '@/lib/ai/conversation'
 import { processAction } from '@/lib/ai/actions'
 import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
-import { createFinanceiroRecord } from '@/lib/services/financeiro'
+import { createFinanceiroRecordForContext } from '@/lib/services/financeiro'
 import { checkRateLimit } from '@/lib/utils/whatsapp-rate-limit'
+import { supabaseAdmin } from '@/lib/db/client'
+import { getSessionContextFromUserId } from '@/lib/db/user-profile'
 
 /**
  * GET - Verificação do webhook (chamado pelo WhatsApp na configuração inicial)
@@ -124,7 +126,7 @@ async function processWhatsAppMessage(
       await sendTextMessage(
         from,
         `🔒 *Acesso Restrito*\n\n` +
-        `Para usar o *Meu Gestor*, você precisa:\n\n` +
+        `Para usar o *ORGANIZAPAY*, você precisa:\n\n` +
         `1️⃣ Criar uma conta em: ${appUrl}/register\n` +
         `2️⃣ Fazer login em: ${appUrl}/login\n` +
         `3️⃣ Vincular seu número de WhatsApp no seu perfil\n\n` +
@@ -137,6 +139,15 @@ async function processWhatsAppMessage(
     const tenantId = tenantInfo.tenant_id
     const userId = tenantInfo.user_id
 
+    const sessionCtx = supabaseAdmin ? await getSessionContextFromUserId(supabaseAdmin as any, userId) : null
+    const isEmpresaMode = sessionCtx?.mode === 'empresa'
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'https://seu-dominio.com'
+
       // Salva a mensagem do usuário na conversa
       if (message.type === 'text' && message.text?.body) {
         const userMessage = message.text.body.toLowerCase().trim()
@@ -144,20 +155,26 @@ async function processWhatsAppMessage(
         // Verifica se é uma saudação inicial (oi, olá, etc)
         const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
         if (greetings.includes(userMessage)) {
-          let presentation = `👋 Olá! Tudo bem?\n\n` +
-            `Eu sou o assistente do *Meu Gestor* e estou aqui para te ajudar! 😊\n\n` +
-            `📋 *O que eu posso fazer por você:*\n` +
-            `• 💰 Registrar seus gastos e despesas\n` +
-            `• 📅 Criar e gerenciar seus compromissos\n` +
-            `• 📊 Consultar informações financeiras\n` +
-            `• 📈 Gerar relatórios e estatísticas\n` +
-            `• 🖼️ Processar comprovantes de imagem\n` +
-            `• 🎤 Entender seus áudios\n\n` +
-            `*Exemplos de como usar:*\n` +
-            `• "Gastei 50 reais de gasolina"\n` +
-            `• "Tenho reunião amanhã às 10h"\n` +
-            `• "Quanto gastei este mês?"\n\n` +
-            `Pode me enviar uma mensagem e eu te ajudo! 😉`
+          const presentation = isEmpresaMode
+            ? `👋 Olá!\n\n` +
+              `Você está no *modo empresa* do *ORGANIZAPAY*.\n\n` +
+              `📌 No modo empresa, o WhatsApp ainda está em fase de liberação para garantir isolamento total dos dados.\n\n` +
+              `✅ Por enquanto, use o painel web em ${appUrl}/dashboard para operar no contexto da empresa.\n\n` +
+              `Se quiser, me diga qual lista/ação você precisa que eu já te direciono.`
+            : `👋 Olá! Tudo bem?\n\n` +
+              `Eu sou o assistente do *ORGANIZAPAY* e estou aqui para te ajudar! 😊\n\n` +
+              `📋 *O que eu posso fazer por você:*\n` +
+              `• 💰 Registrar seus gastos e despesas\n` +
+              `• 📅 Criar e gerenciar seus compromissos\n` +
+              `• 📊 Consultar informações financeiras\n` +
+              `• 📈 Gerar relatórios e estatísticas\n` +
+              `• 🖼️ Processar comprovantes de imagem\n` +
+              `• 🎤 Entender seus áudios\n\n` +
+              `*Exemplos de como usar:*\n` +
+              `• "Gastei 50 reais de gasolina"\n` +
+              `• "Tenho reunião amanhã às 10h"\n` +
+              `• "Quanto gastei este mês?"\n\n` +
+              `Pode me enviar uma mensagem e eu te ajudo! 😉`
           
           await sendTextMessage(from, presentation)
           await createConversation(tenantId, message.text.body, 'user', userId)
@@ -189,8 +206,7 @@ async function processWhatsAppMessage(
               }
               
               // Registra o gasto
-              const record = await createFinanceiroRecord({
-                tenantId: tenantId,
+              const record = await createFinanceiroRecordForContext(sessionCtx || { tenant_id: tenantId, user_id: userId, mode: 'pessoal', empresa_id: null }, {
                 userId: userId,
                 amount: extractedData.amount || 0,
                 description: extractedData.description || extractedData.establishment || 'Gasto do comprovante',
@@ -216,6 +232,18 @@ async function processWhatsAppMessage(
         }
       }
       
+        if (isEmpresaMode) {
+          // Segurança: enquanto o bot não estiver 100% context-aware para listas/ações,
+          // bloqueia uso geral em modo empresa para não misturar dados pessoais e empresariais.
+          await sendTextMessage(
+            from,
+            `🏢 *Modo Empresa*\n\n` +
+              `Seu usuário está em *modo empresa*. Para garantir isolamento total de dados, o bot do WhatsApp ainda não executa ações nesse modo.\n\n` +
+              `Use o painel web em /dashboard para operar no contexto da empresa.`
+          )
+          return
+        }
+
         // Salva mensagem do usuário
         await createConversation(tenantId, message.text.body, 'user', userId)
         
@@ -310,6 +338,14 @@ async function processWhatsAppMessage(
         
         console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
     } else if (message.type === 'audio' && message.audio) {
+      if (isEmpresaMode) {
+        await sendTextMessage(
+          from,
+          `🏢 *Modo Empresa*\n\n` +
+            `Áudios ainda não estão habilitados no bot para o modo empresa. Use o painel web em /dashboard.`
+        )
+        return
+      }
       // Processa áudio com Whisper
       const audioResult = await processWhatsAppAudio(
         message.audio.id,

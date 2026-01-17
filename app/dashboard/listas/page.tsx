@@ -1,8 +1,8 @@
-import { getAuthenticatedTenantId } from '@/lib/utils/auth'
+import { getSessionContext } from '@/lib/utils/session-context'
 import { ListasClient } from './ListasClient'
 
 export default async function ListasPage() {
-  const tenantId = await getAuthenticatedTenantId()
-  return <ListasClient isAuthenticated={!!tenantId} />
+  const ctx = await getSessionContext()
+  return <ListasClient isAuthenticated={!!ctx?.tenant_id} />
 }
 

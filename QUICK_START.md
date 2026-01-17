@@ -1,4 +1,4 @@
-# ⚡ Quick Start - Meu Gestor
+# ⚡ Quick Start - ORGANIZAPAY
 
 ## 🚀 Comece em 5 Minutos
 

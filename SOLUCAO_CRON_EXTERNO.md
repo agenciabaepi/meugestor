@@ -11,7 +11,7 @@ Como o cron da Vercel não está executando automaticamente, vamos usar um servi
 ### Passo 2: Criar Cron Job
 1. Após fazer login, clique em **"Create cronjob"**
 2. Preencha:
-   - **Title**: `Lembretes Meu Gestor`
+   - **Title**: `Lembretes ORGANIZAPAY`
    - **Address (URL)**: `https://seu-dominio.vercel.app/api/cron/lembretes`
    - **Schedule**: Selecione **"Every 5 minutes"** ou configure manualmente: `*/5 * * * *`
    - **Request Method**: `GET` (ou POST se preferir)

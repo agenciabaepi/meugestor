@@ -1,10 +1,10 @@
-import { gerarRelatorioFinanceiro, gerarResumoMensal, gerarResumoSemanal, obterMaioresGastos } from '@/lib/services/relatorios'
-import { getAuthenticatedTenantId } from '@/lib/utils/auth'
+import { gerarResumoMensalForContext, gerarResumoSemanalForContext, obterMaioresGastosForContext } from '@/lib/services/relatorios'
+import { getSessionContext } from '@/lib/utils/session-context'
 
 async function getRelatoriosData() {
-  const tenantId = await getAuthenticatedTenantId()
+  const ctx = await getSessionContext()
   
-  if (!tenantId) {
+  if (!ctx) {
     return {
       resumoMensal: {
         total: 0,
@@ -22,9 +22,9 @@ async function getRelatoriosData() {
     }
   }
   
-  const resumoMensal = await gerarResumoMensal(tenantId)
-  const resumoSemanal = await gerarResumoSemanal(tenantId)
-  const maioresGastos = await obterMaioresGastos(tenantId, 10)
+  const resumoMensal = await gerarResumoMensalForContext(ctx)
+  const resumoSemanal = await gerarResumoSemanalForContext(ctx)
+  const maioresGastos = await obterMaioresGastosForContext(ctx, 10)
 
   return {
     resumoMensal,

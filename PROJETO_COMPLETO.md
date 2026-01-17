@@ -1,8 +1,8 @@
-# 🎉 Projeto Completo - Meu Gestor
+# 🎉 Projeto Completo - ORGANIZAPAY
 
 ## ✅ Todas as Etapas Concluídas!
 
-O sistema **Meu Gestor** está completamente implementado e funcional!
+O sistema **ORGANIZAPAY** está completamente implementado e funcional!
 
 ## 📊 Status Final
 
@@ -67,7 +67,7 @@ O sistema **Meu Gestor** está completamente implementado e funcional!
 ## 📁 Estrutura do Projeto
 
 ```
-Meu Gestor/
+ORGANIZAPAY/
 ├── app/
 │   ├── api/
 │   │   ├── whatsapp/        # Webhook WhatsApp

@@ -51,7 +51,7 @@ export function Charts({
                 formatter={(value: number) => `R$ ${value.toFixed(2)}`}
                 contentStyle={{ fontSize: isMobile ? '11px' : '12px', padding: isMobile ? '6px' : '8px' }}
               />
-              <Bar dataKey="total" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="total" fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

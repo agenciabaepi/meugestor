@@ -1,7 +1,6 @@
-import { redirect } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { BottomNav } from './BottomNav'
-import { getSession } from '@/lib/utils/auth'
+import { getSessionContext } from '@/lib/utils/session-context'
 
 export default async function DashboardLayout({
   children,
@@ -16,10 +15,12 @@ export default async function DashboardLayout({
   //   redirect('/login?redirect=/dashboard')
   // }
   
+  const sessionContext = await getSessionContext()
+
   return (
     <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100">
       {/* Sidebar - Fixo (Desktop) */}
-      <Sidebar />
+      <Sidebar sessionContext={sessionContext} />
 
       {/* Main Content - Sem gap, com margin para o sidebar fixo */}
       <main className="lg:ml-64 min-h-screen pb-20 lg:pb-0">
@@ -31,7 +32,7 @@ export default async function DashboardLayout({
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
-      <BottomNav />
+      <BottomNav sessionContext={sessionContext} />
     </div>
   )
 }

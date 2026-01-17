@@ -9,6 +9,7 @@ import {
   BarChart3,
   ListChecks,
 } from 'lucide-react'
+import type { SessionContext } from '@/lib/db/types'
 
 const navItems = [
   {
@@ -38,8 +39,13 @@ const navItems = [
   },
 ]
 
-export function BottomNav() {
+export function BottomNav({
+  sessionContext,
+}: {
+  sessionContext: SessionContext | null
+}) {
   const pathname = usePathname()
+  void sessionContext // reservado para futuras variações de menu por modo
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 safe-area-bottom shadow-lg">

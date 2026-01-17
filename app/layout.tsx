@@ -9,12 +9,17 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Meu Gestor - Assistente Inteligente',
+  title: 'ORGANIZAPAY - Assistente Inteligente',
   description: 'SaaS Multitenant - Assistente Inteligente via WhatsApp',
+  applicationName: 'ORGANIZAPAY',
+  icons: {
+    icon: [{ url: '/logo-OrganizaPay.png', type: 'image/png' }],
+    apple: [{ url: '/logo-OrganizaPay.png' }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Meu Gestor',
+    title: 'ORGANIZAPAY',
   },
   formatDetection: {
     telephone: false,
@@ -27,7 +32,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: 'cover',
-  themeColor: '#3B82F6',
+  themeColor: '#10B981', // Emerald-500 para seguir a identidade verde
 }
 
 export default function RootLayout({

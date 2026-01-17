@@ -1,4 +1,4 @@
-# 🎯 Meu Gestor - Assistente Inteligente via WhatsApp
+# 🎯 ORGANIZAPAY - Assistente Inteligente via WhatsApp
 
 ## 📋 Visão do Produto
 

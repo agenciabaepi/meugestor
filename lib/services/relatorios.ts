@@ -1,8 +1,10 @@
 import {
   calculateTotalSpent,
   getDespesasRecords,
+  getDespesasRecordsForContext,
 } from './financeiro'
 import { getCompromissosRecords, getTodayCompromissos } from './compromissos'
+import type { SessionContext } from '@/lib/db/types'
 
 export interface RelatorioFinanceiro {
   total: number
@@ -79,6 +81,89 @@ export async function gerarResumoMensal(tenantId: string): Promise<RelatorioFina
     startOfMonth.toISOString().split('T')[0],
     endOfMonth.toISOString().split('T')[0]
   )
+}
+
+export async function gerarRelatorioFinanceiroForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string
+): Promise<RelatorioFinanceiro> {
+  const despesas = await getDespesasRecordsForContext(ctx, startDate, endDate)
+  const total = despesas.reduce((sum, r) => sum + Number(r.amount), 0)
+
+  const porCategoria: Record<string, number> = {}
+  const categorias = [
+    'Alimentação',
+    'Moradia',
+    'Saúde',
+    'Transporte',
+    'Educação',
+    'Lazer e Entretenimento',
+    'Compras Pessoais',
+    'Assinaturas e Serviços',
+    'Financeiro e Obrigações',
+    'Impostos e Taxas',
+    'Pets',
+    'Doações e Presentes',
+    'Trabalho e Negócios',
+    'Outros',
+  ]
+
+  for (const categoria of categorias) {
+    const totalCategoria = despesas
+      .filter((d) => d.category === categoria)
+      .reduce((sum, d) => sum + Number(d.amount), 0)
+    if (totalCategoria > 0) porCategoria[categoria] = totalCategoria
+  }
+
+  return {
+    total,
+    porCategoria,
+    totalRegistros: despesas.length,
+    periodo: {
+      inicio: startDate || 'início',
+      fim: endDate || 'hoje',
+    },
+  }
+}
+
+export async function gerarResumoMensalForContext(ctx: SessionContext): Promise<RelatorioFinanceiro> {
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return gerarRelatorioFinanceiroForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+}
+
+export async function gerarResumoSemanalForContext(ctx: SessionContext): Promise<RelatorioFinanceiro> {
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  endOfWeek.setHours(23, 59, 59, 999)
+
+  return gerarRelatorioFinanceiroForContext(ctx, startOfWeek.toISOString(), endOfWeek.toISOString())
+}
+
+export async function obterMaioresGastosForContext(
+  ctx: SessionContext,
+  limit: number = 5
+): Promise<Array<{ description: string; amount: number; category: string }>> {
+  const registros = await getDespesasRecordsForContext(ctx)
+  return registros
+    .sort((a, b) => Number(b.amount) - Number(a.amount))
+    .slice(0, limit)
+    .map((r) => ({
+      description: r.description,
+      amount: Number(r.amount),
+      category: r.category,
+    }))
 }
 
 /**

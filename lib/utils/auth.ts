@@ -3,6 +3,7 @@
  */
 
 import { createServerClient } from '../db/client'
+import { getUserRowById } from '../db/user-profile'
 
 /**
  * Verifica se o usuário está autenticado (para uso no servidor)
@@ -51,18 +52,9 @@ export async function getAuthenticatedTenantId(): Promise<string | null> {
     }
 
     const supabase = await createServerClient()
-    const { data, error } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', session.user.id)
-      .single()
-
-    if (error || !data) {
-      console.error('Error fetching tenant_id for user:', error)
-      return null
-    }
-
-    return data.tenant_id
+    const row = await getUserRowById(supabase as any, session.user.id)
+    if (!row?.user?.tenant_id) return null
+    return row.user.tenant_id
   } catch (error) {
     console.error('Error in getAuthenticatedTenantId:', error)
     // Retorna null em caso de erro para não quebrar a página

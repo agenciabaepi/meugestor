@@ -25,7 +25,7 @@ WHATSAPP_VERIFY_TOKEN=<WHATSAPP_VERIFY_TOKEN>
   - Verificação de usuário cadastrado
   - Controle de acesso por nível
 
-### Projeto Atual (`Meu Gestor`)
+### Projeto Atual (`ORGANIZAPAY`)
 - **Endpoint**: `/api/whatsapp/webhook`
 - **Estrutura**: `/app/api/whatsapp/webhook/route.ts`
 - **Versão API**: v21.0

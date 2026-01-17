@@ -61,7 +61,7 @@ export async function sendWelcomeMessageIfNeeded(
 
   const message =
     `👋 *${greeting}*\n\n` +
-    `✅ Seu número foi cadastrado no *Meu Gestor*.\n` +
+    `✅ Seu número foi cadastrado no *ORGANIZAPAY*.\n` +
     `A partir de agora você pode falar comigo por aqui.\n\n` +
     `Exemplos:\n` +
     `- "Gastei 32,90 no mercado"\n` +

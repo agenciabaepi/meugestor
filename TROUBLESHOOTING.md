@@ -1,4 +1,4 @@
-# 🔧 Troubleshooting - Meu Gestor
+# 🔧 Troubleshooting - ORGANIZAPAY
 
 ## Problemas Comuns e Soluções
 

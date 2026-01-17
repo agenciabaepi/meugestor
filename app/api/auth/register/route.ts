@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, supabaseAdmin } from '@/lib/db/client'
 import { sendWelcomeMessageIfNeeded } from '@/lib/modules/whatsapp-onboarding'
+import { updateUserModeAndEmpresa } from '@/lib/db/user-profile'
 
 /**
  * POST - Registro de novo usuário
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, whatsappNumber } = await request.json()
+    const {
+      email,
+      password,
+      name,
+      whatsappNumber,
+      mode,
+      empresaNomeFantasia,
+      empresaRazaoSocial,
+      empresaCnpj,
+    } = await request.json()
 
     if (!email || !password) {
       return NextResponse.json(
@@ -37,11 +47,20 @@ export async function POST(request: NextRequest) {
 
     // Verifica se o WhatsApp já está vinculado a outro usuário
     if (supabaseAdmin) {
-      const { data: existingUser } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('whatsapp_number', normalizedWhatsApp)
-        .single()
+      const tryTables = ['users_meugestor', 'users'] as const
+      let existingUser: any = null
+      for (const table of tryTables) {
+        const { data, error } = await supabaseAdmin
+          .from(table)
+          .select('id')
+          .eq('whatsapp_number', normalizedWhatsApp)
+          .single()
+        if (!error && data) {
+          existingUser = data
+          break
+        }
+        // se tabela não existir, tenta a próxima
+      }
 
       if (existingUser) {
         return NextResponse.json(
@@ -65,6 +84,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: name || email,
           whatsapp_number: normalizedWhatsApp,
+          mode: mode === 'empresa' ? 'empresa' : 'pessoal',
         },
       },
     })
@@ -85,31 +105,99 @@ export async function POST(request: NextRequest) {
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // Verifica se o registro existe
-      const { data: existingUser, error: checkError } = await supabaseAdmin
-        .from('users')
-        .select('id, whatsapp_number, tenant_id')
-        .eq('id', data.user.id)
-        .single()
+      const tryTables = ['users_meugestor', 'users'] as const
+      let existingUser: any = null
+      let checkError: any = null
+      for (const table of tryTables) {
+        const res = await supabaseAdmin
+          .from(table)
+          .select('id, whatsapp_number, tenant_id')
+          .eq('id', data.user.id)
+          .single()
+        existingUser = res.data
+        checkError = res.error
+        if (!res.error && res.data) break
+      }
 
       if (checkError || !existingUser) {
         console.error('Erro: Registro não foi criado na tabela users pelo trigger:', checkError)
         // Tenta criar manualmente se o trigger falhou
         // (Mas isso não deveria acontecer se o trigger estiver funcionando)
       } else {
-        console.log('Registro encontrado na tabela users:', existingUser)
+        console.log('Registro encontrado (perfil):', existingUser)
         // Atualiza o whatsapp_number se necessário (o trigger deveria ter criado com o número correto)
         if (existingUser.whatsapp_number !== normalizedWhatsApp) {
           console.log('Atualizando whatsapp_number no registro:', { old: existingUser.whatsapp_number, new: normalizedWhatsApp })
-          const { error: updateError } = await supabaseAdmin
-            .from('users')
-            .update({ whatsapp_number: normalizedWhatsApp })
-            .eq('id', data.user.id)
+          // tenta atualizar em users_meugestor e fallback em users
+          let updateError: any = null
+          for (const table of tryTables) {
+            const res = await supabaseAdmin
+              .from(table)
+              .update({ whatsapp_number: normalizedWhatsApp })
+              .eq('id', data.user.id)
+            updateError = res.error
+            if (!res.error) break
+          }
           
           if (updateError) {
             console.error('Erro ao atualizar whatsapp_number:', updateError)
           } else {
             console.log('whatsapp_number atualizado com sucesso')
           }
+        }
+
+        // Modo empresa: cria empresa e grava contexto no perfil do usuário
+        if (mode === 'empresa') {
+          const nomeFantasia = typeof empresaNomeFantasia === 'string' ? empresaNomeFantasia.trim() : ''
+          if (!nomeFantasia) {
+            return NextResponse.json(
+              { error: 'Nome fantasia da empresa é obrigatório no modo empresarial' },
+              { status: 400 }
+            )
+          }
+
+          const { data: empresa, error: empresaError } = await supabaseAdmin
+            .from('empresas')
+            .insert({
+              tenant_id: existingUser.tenant_id,
+              nome_fantasia: nomeFantasia,
+              razao_social: typeof empresaRazaoSocial === 'string' ? empresaRazaoSocial.trim() : null,
+              cnpj: typeof empresaCnpj === 'string' ? empresaCnpj.trim() : null,
+            })
+            .select('id')
+            .single()
+
+          if (empresaError || !empresa?.id) {
+            console.error('Erro ao criar empresa:', empresaError)
+            return NextResponse.json(
+              { error: 'Erro ao criar empresa' },
+              { status: 500 }
+            )
+          }
+
+          console.log('Empresa criada com sucesso. ID:', empresa.id)
+
+          const ok = await updateUserModeAndEmpresa(supabaseAdmin as any, data.user.id, {
+            mode: 'empresa',
+            empresaId: empresa.id,
+          })
+          if (!ok) {
+            console.error('Falha ao vincular empresa ao usuário (mode/empresa_id).', {
+              userId: data.user.id,
+              tenantId: existingUser.tenant_id,
+              empresaId: empresa.id,
+            })
+            return NextResponse.json(
+              { error: 'Erro ao vincular empresa ao usuário' },
+              { status: 500 }
+            )
+          }
+        } else {
+          // garante modo pessoal explícito (idempotente)
+          await updateUserModeAndEmpresa(supabaseAdmin as any, data.user.id, {
+            mode: 'pessoal',
+            empresaId: null,
+          })
         }
       }
     }

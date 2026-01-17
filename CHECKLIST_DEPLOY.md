@@ -1,4 +1,4 @@
-# ✅ Checklist de Deploy - Meu Gestor
+# ✅ Checklist de Deploy - ORGANIZAPAY
 
 ## 📋 Antes do Deploy
 

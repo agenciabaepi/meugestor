@@ -1,4 +1,4 @@
-# 🎊 Finalização do Projeto - Meu Gestor
+# 🎊 Finalização do Projeto - ORGANIZAPAY
 
 ## ✅ Status: 100% Completo e Otimizado!
 
@@ -107,7 +107,7 @@ npm run dev
 
 ## 🎉 Parabéns!
 
-O projeto **Meu Gestor** está:
+O projeto **ORGANIZAPAY** está:
 - ✅ **100% completo**
 - ✅ **Totalmente funcional**
 - ✅ **Bem documentado**

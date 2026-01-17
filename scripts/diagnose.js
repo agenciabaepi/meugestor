@@ -8,7 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const { execSync } = require('child_process')
 
-console.log('🔍 Diagnóstico do Sistema - Meu Gestor\n')
+console.log('🔍 Diagnóstico do Sistema - ORGANIZAPAY\n')
 console.log('=' .repeat(50))
 
 // 1. Verificar Node.js

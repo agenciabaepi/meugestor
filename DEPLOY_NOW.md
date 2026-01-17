@@ -1,4 +1,4 @@
-# 🚀 Deploy Rápido - Meu Gestor
+# 🚀 Deploy Rápido - ORGANIZAPAY
 
 ## ✅ Checklist Pré-Deploy
 

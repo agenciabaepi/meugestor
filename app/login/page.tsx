@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -120,9 +121,19 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-emerald-50 via-white to-emerald-100">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Meu Gestor
-          </h2>
+          <div className="mt-2 flex justify-center">
+            <div className="relative h-10 w-[220px]">
+              <Image
+                src="/logo-OrganizaPay.png"
+                alt="ORGANIZAPAY"
+                fill
+                priority
+                sizes="220px"
+                className="object-contain"
+              />
+            </div>
+            <h2 className="sr-only">ORGANIZAPAY</h2>
+          </div>
           <p className="mt-2 text-center text-sm text-gray-600">
             Faça login para acessar seu painel
           </p>

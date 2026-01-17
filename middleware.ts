@@ -5,6 +5,11 @@ function isPublicPath(pathname: string) {
   // Páginas públicas
   if (pathname === '/login' || pathname === '/register') return true
 
+  // Qualquer arquivo estático (ex: /logo.png, /images/x.svg, /manifest.json, etc)
+  // Importante: assets em /public são servidos na raiz e não devem exigir autenticação
+  const lastSegment = pathname.split('/').pop() || ''
+  if (lastSegment.includes('.')) return true
+
   // Assets / arquivos públicos comuns
   if (pathname === '/favicon.ico') return true
   if (pathname === '/robots.txt') return true

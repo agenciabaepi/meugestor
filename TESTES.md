@@ -1,4 +1,4 @@
-# 🧪 Guia de Testes - Meu Gestor
+# 🧪 Guia de Testes - ORGANIZAPAY
 
 ## 📋 Como Testar o Sistema
 

@@ -1,18 +1,18 @@
 import { 
-  getFinanceiroRecords, 
-  getDespesasRecords,
-  getReceitasRecords,
-  calculateTotalSpent, 
-  calculateTotalRevenue,
+  getFinanceiroRecordsForContext, 
+  getDespesasRecordsForContext,
+  getReceitasRecordsForContext,
+  calculateTotalSpentForContext, 
+  calculateTotalRevenueForContext,
 } from '@/lib/services/financeiro'
-import { getAuthenticatedTenantId } from '@/lib/utils/auth'
+import { getSessionContext } from '@/lib/utils/session-context'
 import { FinanceiroTabs } from './tabs'
 import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
 
 async function getFinanceiroData() {
-  const tenantId = await getAuthenticatedTenantId()
+  const ctx = await getSessionContext()
   
-  if (!tenantId) {
+  if (!ctx) {
     return {
       despesasMes: [],
       receitasMes: [],
@@ -35,43 +35,43 @@ async function getFinanceiroData() {
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
   // Busca despesas e receitas separadamente
-  const despesasMes = await getDespesasRecords(
-    tenantId,
+  const despesasMes = await getDespesasRecordsForContext(
+    ctx,
     startOfMonth.toISOString().split('T')[0]
   )
   
-  const receitasMes = await getReceitasRecords(
-    tenantId,
+  const receitasMes = await getReceitasRecordsForContext(
+    ctx,
     startOfMonth.toISOString().split('T')[0]
   )
   
-  const todasTransacoes = await getFinanceiroRecords(
-    tenantId,
+  const todasTransacoes = await getFinanceiroRecordsForContext(
+    ctx,
     startOfMonth.toISOString().split('T')[0]
   )
   
   // Calcula totais
-  const totalDespesas = await calculateTotalSpent(
-    tenantId,
+  const totalDespesas = await calculateTotalSpentForContext(
+    ctx,
     startOfMonth.toISOString().split('T')[0]
   )
   
-  const totalReceitas = await calculateTotalRevenue(
-    tenantId,
+  const totalReceitas = await calculateTotalRevenueForContext(
+    ctx,
     startOfMonth.toISOString().split('T')[0]
   )
   
   const saldo = totalReceitas - totalDespesas
   
   // Totais do mês anterior
-  const totalDespesasAnterior = await calculateTotalSpent(
-    tenantId,
+  const totalDespesasAnterior = await calculateTotalSpentForContext(
+    ctx,
     startOfLastMonth.toISOString().split('T')[0],
     endOfLastMonth.toISOString().split('T')[0]
   )
   
-  const totalReceitasAnterior = await calculateTotalRevenue(
-    tenantId,
+  const totalReceitasAnterior = await calculateTotalRevenueForContext(
+    ctx,
     startOfLastMonth.toISOString().split('T')[0],
     endOfLastMonth.toISOString().split('T')[0]
   )
@@ -107,7 +107,7 @@ async function getFinanceiroData() {
 
   const dadosGraficoDespesas = await Promise.all(
     ultimos7Dias.map(async (date) => {
-      const despesas = await getDespesasRecords(tenantId, date, date)
+      const despesas = await getDespesasRecordsForContext(ctx, date, date)
       const total = despesas.reduce((sum, d) => sum + Number(d.amount), 0)
       return {
         date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
@@ -118,7 +118,7 @@ async function getFinanceiroData() {
   
   const dadosGraficoReceitas = await Promise.all(
     ultimos7Dias.map(async (date) => {
-      const receitas = await getReceitasRecords(tenantId, date, date)
+      const receitas = await getReceitasRecordsForContext(ctx, date, date)
       const total = receitas.reduce((sum, r) => sum + Number(r.amount), 0)
       return {
         date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),

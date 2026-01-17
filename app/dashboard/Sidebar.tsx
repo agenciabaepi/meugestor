@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
@@ -11,6 +12,7 @@ import {
   ListChecks,
 } from 'lucide-react'
 import LogoutButton from './LogoutButton'
+import type { SessionContext } from '@/lib/db/types'
 
 const menuItems = [
   {
@@ -40,8 +42,13 @@ const menuItems = [
   },
 ]
 
-export function Sidebar() {
+export function Sidebar({
+  sessionContext,
+}: {
+  sessionContext: SessionContext | null
+}) {
   const pathname = usePathname()
+  const isEmpresa = sessionContext?.mode === 'empresa'
 
   return (
     <>
@@ -54,15 +61,19 @@ export function Sidebar() {
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-linear-to-r from-emerald-50 to-emerald-100">
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 group"
+              className="flex items-center justify-center w-full group"
             >
-              <div className="w-10 h-10 bg-linear-to-br from-emerald-700 to-emerald-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-                <Wallet className="w-6 h-6 text-white" />
+              <div className="relative h-8 w-[180px] group-hover:opacity-95 transition-opacity">
+                <Image
+                  src="/logo-OrganizaPay.png"
+                  alt="ORGANIZAPAY"
+                  fill
+                  sizes="180px"
+                  className="object-contain"
+                  priority
+                />
               </div>
-              <div>
-                <span className="text-xl font-bold text-gray-900 block">Meu Gestor</span>
-                <span className="text-xs text-gray-500">Gestão Inteligente</span>
-              </div>
+              <span className="sr-only">ORGANIZAPAY</span>
             </Link>
           </div>
 
@@ -126,7 +137,7 @@ export function Sidebar() {
                   Upgrade to PRO
                 </h3>
                 <p className="text-sm text-white/90 mb-5 leading-relaxed px-1">
-                  Melhore seu processo de gestão e faça mais com Meu Gestor PRO!
+                  Melhore seu processo de gestão e faça mais com o plano PRO!
                 </p>
                 <button className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-200 backdrop-blur-sm border border-white/30 shadow-md hover:shadow-lg">
                   Upgrade to PRO

@@ -1,4 +1,4 @@
-# 🚀 Guia de Deploy - Meu Gestor
+# 🚀 Guia de Deploy - ORGANIZAPAY
 
 ## 📋 Checklist de Deploy
 
@@ -14,7 +14,7 @@
 #### Passo 1: Conectar Repositório
 1. Acesse [Vercel](https://vercel.com)
 2. Conecte seu repositório GitHub
-3. Selecione o projeto "Meu Gestor"
+3. Selecione o projeto "ORGANIZAPAY"
 
 #### Passo 2: Configurar Variáveis de Ambiente
 No painel da Vercel, adicione todas as variáveis:
@@ -45,7 +45,7 @@ NEXT_PUBLIC_APP_URL=https://seu-dominio.vercel.app
 #### Passo 3: Deploy
 1. Clique em "Deploy"
 2. Aguarde o build completar
-3. Anote a URL gerada (ex: `https://meu-gestor.vercel.app`)
+3. Anote a URL gerada (ex: `https://organizapay.vercel.app`)
 
 ### 3. Configurar WhatsApp Webhook
 

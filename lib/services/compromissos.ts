@@ -4,10 +4,16 @@ import {
   getCompromissoById,
   getCompromissosByTenant,
 } from '../db/queries'
+import {
+  cancelCompromissoEmpresa,
+  createCompromissoEmpresa,
+  getCompromissoEmpresaById,
+  getCompromissosEmpresaByEmpresa,
+} from '../db/queries-empresa'
 import { isValidDate } from '../utils/validation'
 import { ValidationError } from '../utils/errors'
 import { isFutureInBrazil } from '../utils/date-parser'
-import type { Compromisso } from '../db/types'
+import type { Compromisso, SessionContext } from '../db/types'
 
 export interface CreateCompromissoInput {
   tenantId: string
@@ -71,6 +77,51 @@ export async function createCompromissoRecord(
 
   console.log('Compromisso criado com sucesso:', compromisso.id)
   return compromisso
+}
+
+export async function createCompromissoRecordForContext(
+  ctx: SessionContext,
+  input: Omit<CreateCompromissoInput, 'tenantId'> & { tenantId?: never }
+): Promise<Compromisso> {
+  if (!input.title || input.title.trim().length === 0) {
+    throw new ValidationError('Título é obrigatório')
+  }
+  if (!input.scheduledAt) {
+    throw new ValidationError('Data/hora agendada é obrigatória')
+  }
+  if (!isValidDate(input.scheduledAt)) {
+    throw new ValidationError(`Data/hora agendada inválida: ${input.scheduledAt}`)
+  }
+  const scheduledDate = new Date(input.scheduledAt)
+  if (!isFutureInBrazil(scheduledDate, new Date())) {
+    throw new ValidationError('Não é possível agendar compromissos no passado. Por favor, informe uma data/hora futura.')
+  }
+
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) {
+      throw new ValidationError('Modo empresa sem empresa vinculada')
+    }
+    const created = await createCompromissoEmpresa(
+      ctx.tenant_id,
+      ctx.empresa_id,
+      input.title.trim(),
+      input.scheduledAt,
+      input.description?.trim() || null,
+      input.userId || null
+    )
+    if (!created) throw new ValidationError('Erro ao criar compromisso no banco de dados')
+    return created
+  }
+
+  const created = await createCompromisso(
+    ctx.tenant_id,
+    input.title.trim(),
+    input.scheduledAt,
+    input.description?.trim() || null,
+    input.userId || null
+  )
+  if (!created) throw new ValidationError('Erro ao criar compromisso no banco de dados')
+  return created
 }
 
 /**
@@ -143,6 +194,56 @@ export async function getCompromissosRecords(
   includeCancelled: boolean = false
 ): Promise<Compromisso[]> {
   return getCompromissosByTenant(tenantId, startDate, endDate, userId || null, includeCancelled)
+}
+
+/**
+ * Obtém compromissos respeitando o contexto (pessoal vs empresa).
+ */
+export async function getCompromissosRecordsForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null,
+  includeCancelled: boolean = false
+): Promise<Compromisso[]> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return []
+    return getCompromissosEmpresaByEmpresa(
+      ctx.tenant_id,
+      ctx.empresa_id,
+      startDate,
+      endDate,
+      userId || null,
+      includeCancelled
+    )
+  }
+  return getCompromissosByTenant(ctx.tenant_id, startDate, endDate, userId || null, includeCancelled)
+}
+
+export async function getCompromissoRecordByIdForContext(
+  ctx: SessionContext,
+  id: string,
+  userId?: string | null
+): Promise<Compromisso | null> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return null
+    return getCompromissoEmpresaById(id, ctx.tenant_id, ctx.empresa_id, userId || null)
+  }
+  return getCompromissoById(id, ctx.tenant_id, userId || null)
+}
+
+export async function cancelCompromissoRecordForContext(
+  ctx: SessionContext,
+  id: string,
+  userId?: string | null
+): Promise<boolean> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return false
+    const updated = await cancelCompromissoEmpresa(id, ctx.tenant_id, ctx.empresa_id, userId || null)
+    return updated !== null
+  }
+  const updated = await cancelCompromisso(id, ctx.tenant_id, userId || null)
+  return updated !== null
 }
 
 /**

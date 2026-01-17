@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Smartphone, Bot, Wallet, Calendar, CheckCircle, ArrowRight, Zap, Shield, BarChart } from 'lucide-react'
 
 export default function Home() {
@@ -8,9 +9,19 @@ export default function Home() {
       <div className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 sm:pt-24 sm:pb-20">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-              Meu Gestor
-            </h1>
+            <div className="flex justify-center mb-6">
+              <div className="relative h-12 w-[260px] sm:h-14 sm:w-[320px] lg:h-16 lg:w-[420px]">
+                <Image
+                  src="/logo-OrganizaPay.png"
+                  alt="ORGANIZAPAY"
+                  fill
+                  priority
+                  sizes="(max-width: 640px) 260px, (max-width: 1024px) 320px, 420px"
+                  className="object-contain"
+                />
+              </div>
+              <h1 className="sr-only">ORGANIZAPAY</h1>
+            </div>
             <p className="text-xl sm:text-2xl text-gray-600 mb-4 max-w-3xl mx-auto">
               Gerencie suas finanças e compromissos com inteligência artificial
             </p>
@@ -99,7 +110,16 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
-              Por que escolher o Meu Gestor?
+              <span>Por que escolher o</span>{' '}
+              <span className="inline-flex align-middle relative h-7 w-[170px]">
+                <Image
+                  src="/logo-OrganizaPay.png"
+                  alt="ORGANIZAPAY"
+                  fill
+                  sizes="170px"
+                  className="object-contain"
+                />
+              </span>
             </h2>
           </div>
 
@@ -166,9 +186,20 @@ export default function Home() {
       <footer className="bg-gray-900 text-gray-300 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-lg font-semibold text-white mb-2">Meu Gestor</p>
+            <div className="flex justify-center mb-3">
+              <div className="relative h-7 w-[180px]">
+                <Image
+                  src="/logo-OrganizaPay.png"
+                  alt="ORGANIZAPAY"
+                  fill
+                  sizes="180px"
+                  className="object-contain brightness-0 invert"
+                />
+              </div>
+              <p className="sr-only">ORGANIZAPAY</p>
+            </div>
             <p className="text-sm">
-              © {new Date().getFullYear()} Meu Gestor. Todos os direitos reservados.
+              © {new Date().getFullYear()}. Todos os direitos reservados.
             </p>
           </div>
         </div>

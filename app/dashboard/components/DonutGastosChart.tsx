@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 const DEFAULT_PALETTE = Object.freeze([
-  '#3b82f6', // blue
+  '#10B981', // emerald (verde principal)
   '#f97316', // orange
   '#a855f7', // purple
   '#22c55e', // green
@@ -78,7 +78,7 @@ function defaultIconForCategory(nome: string) {
 function defaultColorForCategory(nome: string) {
   const key = (nome || '').toLowerCase()
   if (key.includes('aliment')) return '#f97316' // laranja
-  if (key.includes('transp')) return '#3b82f6' // azul
+  if (key.includes('transp')) return '#10B981' // emerald
   if (key.includes('morad') || key.includes('casa')) return '#a855f7' // roxo
   if (key.includes('saúd')) return '#ef4444' // vermelho
   if (key.includes('educ')) return '#eab308' // amarelo

@@ -58,7 +58,7 @@ export async function sendOTPVerification(
     })
 
     // Envia código via WhatsApp
-    const message = `🔐 *Código de Verificação - Meu Gestor*\n\n` +
+    const message = `🔐 *Código de Verificação - ORGANIZAPAY*\n\n` +
       `Seu código de verificação é: *${code}*\n\n` +
       `Este código expira em 10 minutos.\n` +
       `Se você não solicitou este código, ignore esta mensagem.`
@@ -145,7 +145,7 @@ export async function verifyOTPAndLink(
       await sendTextMessage(
         normalized,
         `✅ *WhatsApp Vinculado com Sucesso!*\n\n` +
-          `Seu número foi vinculado à sua conta do Meu Gestor.`
+          `Seu número foi vinculado à sua conta do ORGANIZAPAY.`
       )
     }
 

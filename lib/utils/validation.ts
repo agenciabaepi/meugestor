@@ -44,6 +44,17 @@ export function isValidCategory(category: string): boolean {
     'Doações e Presentes',
     'Trabalho e Negócios',
     'Outros',
+    // Categorias empresariais (modo empresa)
+    'Vendas',
+    'Serviços',
+    'Contratos',
+    'Fornecedores',
+    'Impostos',
+    'Folha de Pagamento',
+    'Folha de pagamento',
+    'Marketing',
+    'Sistemas',
+    'Logística',
   ]
   return validCategories.includes(category)
 }

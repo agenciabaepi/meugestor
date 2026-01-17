@@ -1,4 +1,4 @@
-# 🚀 Início Rápido - Meu Gestor
+# 🚀 Início Rápido - ORGANIZAPAY
 
 ## ✅ Projeto 100% Completo!
 

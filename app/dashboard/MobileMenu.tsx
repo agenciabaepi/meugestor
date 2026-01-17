@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Menu, X } from 'lucide-react'
 
 export function MobileMenu() {
@@ -46,9 +47,19 @@ export function MobileMenu() {
                 <Link
                   href="/dashboard"
                   onClick={closeMenu}
-                  className="text-xl font-bold text-emerald-700"
+                  className="flex items-center"
                 >
-                  Meu Gestor
+                  <div className="relative h-7 w-[160px]">
+                    <Image
+                      src="/logo-OrganizaPay.png"
+                      alt="ORGANIZAPAY"
+                      fill
+                      sizes="160px"
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+                  <span className="sr-only">ORGANIZAPAY</span>
                 </Link>
                 <button
                   onClick={closeMenu}

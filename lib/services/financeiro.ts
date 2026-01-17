@@ -3,9 +3,10 @@ import {
   getFinanceiroByTenant,
   getFinanceiroByCategory,
 } from '../db/queries'
+import { getFinanceiroEmpresaByCategory, getFinanceiroEmpresaByEmpresa } from '../db/queries-empresa'
 import { isValidAmount, isValidDate, isValidCategory } from '../utils/validation'
 import { ValidationError } from '../utils/errors'
-import type { Financeiro } from '../db/types'
+import type { Financeiro, SessionContext } from '../db/types'
 
 export interface CreateFinanceiroInput {
   tenantId: string
@@ -37,9 +38,7 @@ export async function createFinanceiroRecord(
   }
 
   if (!isValidCategory(input.category)) {
-    throw new ValidationError(
-      'Categoria inválida. Use: Alimentação, Moradia, Saúde, Transporte, Educação, Lazer e Entretenimento, Compras Pessoais, Assinaturas e Serviços, Financeiro e Obrigações, Impostos e Taxas, Pets, Doações e Presentes, Trabalho e Negócios, Outros'
-    )
+    throw new ValidationError('Categoria inválida')
   }
 
   if (!isValidDate(input.date)) {
@@ -65,6 +64,67 @@ export async function createFinanceiroRecord(
     throw new ValidationError('Erro ao criar registro financeiro')
   }
 
+  return record
+}
+
+/**
+ * Cria um registro financeiro respeitando o contexto (pessoal vs empresa).
+ */
+export async function createFinanceiroRecordForContext(
+  ctx: SessionContext,
+  input: Omit<CreateFinanceiroInput, 'tenantId'> & { tenantId?: never }
+): Promise<Financeiro> {
+  // Validações (iguais ao modo pessoal)
+  if (!isValidAmount(input.amount)) {
+    throw new ValidationError('Valor deve ser maior que zero')
+  }
+  if (!input.description || input.description.trim().length === 0) {
+    throw new ValidationError('Descrição é obrigatória')
+  }
+  if (!isValidCategory(input.category)) {
+    throw new ValidationError('Categoria inválida')
+  }
+  if (!isValidDate(input.date)) {
+    throw new ValidationError('Data inválida')
+  }
+
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) {
+      throw new ValidationError('Modo empresa sem empresa vinculada')
+    }
+    const { createFinanceiroEmpresa } = await import('../db/queries-empresa')
+    const record = await createFinanceiroEmpresa(
+      ctx.tenant_id,
+      ctx.empresa_id,
+      input.amount,
+      input.description.trim(),
+      input.category,
+      input.date,
+      input.receiptImageUrl,
+      input.subcategory,
+      input.metadata,
+      input.tags,
+      input.transactionType || 'expense',
+      input.userId || null
+    )
+    if (!record) throw new ValidationError('Erro ao criar registro financeiro')
+    return record
+  }
+
+  const record = await createFinanceiro(
+    ctx.tenant_id,
+    input.amount,
+    input.description.trim(),
+    input.category,
+    input.date,
+    input.receiptImageUrl,
+    input.subcategory,
+    input.metadata,
+    input.tags,
+    input.transactionType || 'expense',
+    input.userId || null
+  )
+  if (!record) throw new ValidationError('Erro ao criar registro financeiro')
   return record
 }
 
@@ -127,6 +187,30 @@ export async function getFinanceiroRecords(
 }
 
 /**
+ * Obtém registros financeiros respeitando o contexto (pessoal vs empresa).
+ */
+export async function getFinanceiroRecordsForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  transactionType?: 'expense' | 'revenue',
+  userId?: string | null
+): Promise<Financeiro[]> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return []
+    return getFinanceiroEmpresaByEmpresa(
+      ctx.tenant_id,
+      ctx.empresa_id,
+      startDate,
+      endDate,
+      transactionType,
+      userId || null
+    )
+  }
+  return getFinanceiroByTenant(ctx.tenant_id, startDate, endDate, transactionType, userId || null)
+}
+
+/**
  * Obtém apenas despesas de um tenant
  */
 export async function getDespesasRecords(
@@ -150,6 +234,24 @@ export async function getReceitasRecords(
   return getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue', userId || null)
 }
 
+export async function getDespesasRecordsForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  return getFinanceiroRecordsForContext(ctx, startDate, endDate, 'expense', userId || null)
+}
+
+export async function getReceitasRecordsForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  return getFinanceiroRecordsForContext(ctx, startDate, endDate, 'revenue', userId || null)
+}
+
 /**
  * Obtém registros financeiros por categoria
  */
@@ -164,6 +266,22 @@ export async function getFinanceiroByCategoryRecords(
   }
 
   return getFinanceiroByCategory(tenantId, category, startDate, endDate)
+}
+
+export async function getFinanceiroByCategoryRecordsForContext(
+  ctx: SessionContext,
+  category: string,
+  startDate?: string,
+  endDate?: string
+): Promise<Financeiro[]> {
+  if (!isValidCategory(category)) {
+    throw new ValidationError('Categoria inválida')
+  }
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return []
+    return getFinanceiroEmpresaByCategory(ctx.tenant_id, ctx.empresa_id, category, startDate, endDate)
+  }
+  return getFinanceiroByCategory(ctx.tenant_id, category, startDate, endDate)
 }
 
 /**
@@ -257,6 +375,16 @@ export async function calculateTotalSpent(
   return records.reduce((total, record) => total + Number(record.amount), 0)
 }
 
+export async function calculateTotalSpentForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<number> {
+  const records = await getDespesasRecordsForContext(ctx, startDate, endDate, userId || null)
+  return records.reduce((total, record) => total + Number(record.amount), 0)
+}
+
 /**
  * Calcula total de receitas em um período
  */
@@ -267,6 +395,16 @@ export async function calculateTotalRevenue(
   userId?: string | null
 ): Promise<number> {
   const records = await getFinanceiroByTenant(tenantId, startDate, endDate, 'revenue', userId || null)
+  return records.reduce((total, record) => total + Number(record.amount), 0)
+}
+
+export async function calculateTotalRevenueForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<number> {
+  const records = await getReceitasRecordsForContext(ctx, startDate, endDate, userId || null)
   return records.reduce((total, record) => total + Number(record.amount), 0)
 }
 
@@ -281,6 +419,17 @@ export async function calculateBalance(
 ): Promise<number> {
   const receitas = await calculateTotalRevenue(tenantId, startDate, endDate, userId || null)
   const despesas = await calculateTotalSpent(tenantId, startDate, endDate, userId || null)
+  return receitas - despesas
+}
+
+export async function calculateBalanceForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<number> {
+  const receitas = await calculateTotalRevenueForContext(ctx, startDate, endDate, userId || null)
+  const despesas = await calculateTotalSpentForContext(ctx, startDate, endDate, userId || null)
   return receitas - despesas
 }
 

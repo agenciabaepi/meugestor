@@ -34,7 +34,7 @@ Você verá um formulário. Preencha:
 
 **Title (Título):**
 ```
-Lembretes Meu Gestor
+Lembretes ORGANIZAPAY
 ```
 
 **Address (URL):**
