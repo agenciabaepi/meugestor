@@ -556,7 +556,7 @@ async function executeAction(
       return await handleCreateList(semanticState, tenantId)
 
     case 'add_list_item':
-      return await handleAddListItem(semanticState, tenantId)
+      return await handleAddListItem(semanticState, tenantId, message)
 
     case 'remove_list_item':
       return await handleRemoveListItem(semanticState, tenantId)
@@ -624,9 +624,119 @@ async function handleCreateList(state: SemanticState, tenantId: string): Promise
   }
 }
 
-async function handleAddListItem(state: SemanticState, tenantId: string): Promise<ActionResult> {
+function looksLikeTitleLine(line: string): boolean {
+  const s = String(line || '').trim()
+  if (!s) return false
+  // Linha sem quantidade e sem verbo => provavelmente é "título" (ex: "Película iPhone")
+  const hasVerb = /\b(adiciona|adicione|inclui|incluir|coloca|coloque|bota|botar|add|acrescenta|acrescente)\b/i.test(s)
+  if (hasVerb) return false
+  return parseBatchListLine(s) === null
+}
+
+function parseBatchListLine(
+  line: string
+): { itemName: string; quantidade: number; unidade: string | null } | null {
+  const raw = String(line || '').trim()
+  if (!raw) return null
+
+  // Separadores aceitos:
+  // - "item - 10"
+  // - "item x2"
+  // - "item 5"
+  const patterns: Array<RegExp> = [
+    /^(.*?)\s*-\s*(\d+)\s*([^\d\s]+)?\s*$/i,
+    /^(.*?)\s*[xX]\s*(\d+)\s*([^\d\s]+)?\s*$/i,
+    /^(.*?)\s+(\d+)\s*([^\d\s]+)?\s*$/i,
+  ]
+
+  for (const re of patterns) {
+    const m = raw.match(re)
+    if (!m) continue
+    const itemName = (m[1] || '').trim()
+    const qtyRaw = (m[2] || '').trim()
+    const unidade = m[3] ? String(m[3]).trim() : null
+    const quantidade = Number(qtyRaw)
+    if (!itemName || !Number.isFinite(quantidade) || quantidade <= 0) return null
+    return { itemName, quantidade, unidade: unidade || null }
+  }
+  return null
+}
+
+async function handleAddListItem(state: SemanticState, tenantId: string, message: string): Promise<ActionResult> {
   try {
     const itemName = state.item_name ? String(state.item_name).trim() : ''
+    const hasMultiline = typeof message === 'string' && message.includes('\n')
+
+    // Entrada em lote (multilinha): cada linha é um item com quantidade
+    if (hasMultiline) {
+      const lines = message
+        .split(/\r?\n/g)
+        .map((l) => String(l).trim())
+        .filter((l) => l.length > 0)
+
+      // Se tiver menos de 2 linhas, cai no fluxo normal (item único)
+      if (lines.length >= 2) {
+        let listNameFromTitle: string | null = null
+        let startIndex = 0
+
+        // Se não veio list_name no estado, aceita a primeira linha como "título" (nome da lista),
+        // desde que não pareça uma linha de item válida.
+        if (!state.list_name && looksLikeTitleLine(lines[0])) {
+          listNameFromTitle = lines[0]
+          startIndex = 1
+        }
+
+        const parsed = lines
+          .slice(startIndex)
+          .map((line) => parseBatchListLine(line))
+          .filter((v): v is { itemName: string; quantidade: number; unidade: string | null } => v !== null)
+
+        // Ignora linhas "título solto" / inválidas (sem quantidade)
+        if (parsed.length > 0) {
+          const listName =
+            (state.list_name ? await resolveListNameFromContext(tenantId, state.list_name ?? null) : null) ??
+            listNameFromTitle ??
+            (await resolveListNameFromContext(tenantId, null))
+
+          if (!listName) return { success: true, message: 'Em qual lista?' }
+
+          let okCount = 0
+          const failed: string[] = []
+          let resolvedListName = listName
+
+          for (const it of parsed) {
+            try {
+              const r = await addItemToList({
+                tenantId,
+                listName: resolvedListName,
+                itemName: it.itemName,
+                quantidade: it.quantidade,
+                unidade: it.unidade,
+              })
+              resolvedListName = r.lista.nome
+              okCount += 1
+            } catch (e) {
+              failed.push(it.itemName)
+            }
+          }
+
+          if (okCount > 0) {
+            await touchLastActiveList(tenantId, resolvedListName)
+            const itemWord = okCount === 1 ? 'item' : 'itens'
+            const failSuffix = failed.length ? ` Não consegui adicionar: ${failed.slice(0, 10).join(', ')}.` : ''
+            return {
+              success: true,
+              message: `${okCount} ${itemWord} adicionados à lista ${resolvedListName}.${failSuffix}`,
+              data: { listName: resolvedListName, okCount, failed },
+            }
+          }
+
+          return { success: false, message: 'Não consegui adicionar esses itens.' }
+        }
+      }
+    }
+
+    // Fluxo normal (item único)
     if (!itemName) return { success: true, message: 'O que você quer adicionar?' }
 
     const listName = await resolveListNameFromContext(tenantId, state.list_name ?? null)
