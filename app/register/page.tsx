@@ -3,6 +3,32 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+function formatWhatsAppMask(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 13) // 55 + DDD + 9 dígitos
+  if (!digits) return ''
+
+  // Formato esperado (Brasil): +CC (DD) NNNNN-NNNN
+  const cc = digits.slice(0, 2)
+  const ddd = digits.slice(2, 4)
+  const rest = digits.slice(4)
+
+  let out = `+${cc}`
+  if (ddd.length) out += ` (${ddd}`
+  if (ddd.length === 2) out += `)`
+  if (rest.length) {
+    out += ' '
+    if (rest.length <= 4) {
+      out += rest
+    } else if (rest.length <= 8) {
+      out += `${rest.slice(0, 4)}-${rest.slice(4)}`
+    } else {
+      out += `${rest.slice(0, 5)}-${rest.slice(5)}`
+    }
+  }
+
+  return out
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
@@ -131,12 +157,17 @@ export default function RegisterPage() {
                 type="tel"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                placeholder="5511999999999"
+                placeholder="+55 (11) 99999-9999"
                 value={formData.whatsappNumber}
-                onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    whatsappNumber: formatWhatsAppMask(e.target.value),
+                  })
+                }
               />
               <p className="mt-1 text-sm text-gray-500">
-                Use o formato internacional (ex: 5511999999999)
+                Use o formato internacional (ex: +55 (11) 99999-9999)
               </p>
             </div>
             <div>

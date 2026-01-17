@@ -50,6 +50,23 @@ function validateDataCompleteness(state: SemanticState): boolean {
         state.scheduled_at !== null ||
         state.categoria !== null
       ))
+
+    case 'create_list':
+      return !!(state.list_name && String(state.list_name).trim().length > 0)
+
+    case 'add_list_item':
+      // list_name pode vir do contexto persistente (resolvido pelo sistema)
+      return !!(state.item_name && String(state.item_name).trim().length > 0)
+
+    case 'remove_list_item':
+      return !!(state.item_name && String(state.item_name).trim().length > 0)
+
+    case 'mark_item_done':
+      return !!(state.item_name && String(state.item_name).trim().length > 0)
+
+    case 'show_list':
+      // list_name pode vir do contexto persistente (resolvido pelo sistema)
+      return true
     
     default:
       return false
@@ -167,6 +184,21 @@ REGRAS CRÍTICAS (OBRIGATÓRIAS):
 4. Local (cidade/endereço) é OPCIONAL - nunca bloquear salvamento por falta de local
 5. PROIBIDO: pedir formato técnico de data, ISO 8601 ou fuso horário
 
+REGRA CRÍTICA - NOVO DOMÍNIO "listas":
+- Listas são para intenção futura (ex: compras). NUNCA registre gasto automaticamente.
+- Quando a mensagem for sobre listas (lista de compras, itens, marcar comprado), use domain: "listas".
+- Intenções de listas (execute direto quando possível):
+  - create_list: criar uma lista (ex: "cria uma lista chamada mercado")
+  - add_list_item: adicionar item em uma lista (ex: "adiciona leite no mercado"; "adiciona leite" como follow-up)
+  - remove_list_item: remover item (ex: "remove leite")
+  - mark_item_done: marcar como comprado (ex: "já comprei o arroz"; "leite comprado")
+  - show_list: mostrar itens (ex: "o que tem na lista do mercado?"; "o que falta comprar?")
+
+FOLLOW-UP (OBRIGATÓRIO):
+- Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
+  devem ser tratadas como continuação da última lista ativa.
+- Se não houver nome da lista na mensagem, retorne list_name: null (o SISTEMA resolve via contexto persistente).
+
 PROIBIDO:
 - Perguntar "qual a data exata" / "dd/mm/aaaa"
 - Mencionar ISO 8601
@@ -213,8 +245,8 @@ ${activeTaskContext}
 
 Responda APENAS com JSON no formato:
 {
-  "intent": "register_expense" | "register_revenue" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "query" | "report" | "chat" | "confirm" | "cancel",
-  "domain": "financeiro" | "agenda" | "geral" | null,
+  "intent": "register_expense" | "register_revenue" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
+  "domain": "financeiro" | "agenda" | "listas" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
@@ -223,6 +255,11 @@ Responda APENAS com JSON no formato:
   "title": string | null,
   "scheduled_at": string (apenas horário, ex: "15:00") | null,
   "description": string | null,
+  "list_name": string | null,
+  "list_type": string | null,
+  "item_name": string | null,
+  "quantidade": number | string | null,
+  "unidade": string | null,
   "confidence": 0.0-1.0,
   "needsClarification": boolean,
   "clarificationMessage": string | null,
@@ -297,6 +334,11 @@ REGRAS IMPORTANTES:
       title: parsed.title ?? null,
       scheduled_at: parsed.scheduled_at ?? null,
       description: parsed.description ?? null,
+      list_name: parsed.list_name ?? null,
+      list_type: parsed.list_type ?? null,
+      item_name: parsed.item_name ?? null,
+      quantidade: parsed.quantidade ?? null,
+      unidade: parsed.unidade ?? null,
       confidence: parsed.confidence ?? 0.5,
       needsClarification: parsed.needsClarification ?? false,
       clarificationMessage: parsed.clarificationMessage ?? null,
@@ -367,6 +409,34 @@ REGRAS IMPORTANTES:
               : missingAmount
                 ? 'Quanto foi?'
                 : 'Com o que foi?'
+        }
+      }
+      if (semanticState.intent === 'create_list') {
+        const missing = !semanticState.list_name || String(semanticState.list_name).trim().length === 0
+        if (missing) {
+          semanticState.needsClarification = true
+          semanticState.clarificationMessage = 'Qual o nome da lista? (ex: "mercado")'
+        }
+      }
+      if (semanticState.intent === 'add_list_item') {
+        const missingItem = !semanticState.item_name || String(semanticState.item_name).trim().length === 0
+        if (missingItem) {
+          semanticState.needsClarification = true
+          semanticState.clarificationMessage = 'O que você quer adicionar?'
+        }
+      }
+      if (semanticState.intent === 'remove_list_item') {
+        const missingItem = !semanticState.item_name || String(semanticState.item_name).trim().length === 0
+        if (missingItem) {
+          semanticState.needsClarification = true
+          semanticState.clarificationMessage = 'Qual item você quer remover?'
+        }
+      }
+      if (semanticState.intent === 'mark_item_done') {
+        const missingItem = !semanticState.item_name || String(semanticState.item_name).trim().length === 0
+        if (missingItem) {
+          semanticState.needsClarification = true
+          semanticState.clarificationMessage = 'Qual item você já comprou?'
         }
       }
     }

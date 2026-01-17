@@ -5,6 +5,10 @@ import type {
   Financeiro,
   Compromisso,
   Conversation,
+  Lista,
+  ListaItem,
+  ListaItemStatus,
+  TenantContext,
 } from './types'
 
 // ============================================
@@ -787,4 +791,356 @@ export async function getRecentConversations(
   }
 
   return data || []
+}
+
+// ============================================
+// LISTAS (compras)
+// ============================================
+
+export async function createLista(
+  tenantId: string,
+  nome: string,
+  tipo: string = 'compras'
+): Promise<Lista | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('listas')
+    .insert({
+      tenant_id: tenantId,
+      nome,
+      tipo,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating lista:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function getListaByName(
+  tenantId: string,
+  nome: string
+): Promise<Lista | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .ilike('nome', nome.trim())
+    .limit(1)
+
+  if (error) {
+    console.error('Error fetching lista by name:', error)
+    return null
+  }
+
+  return (data && data[0]) || null
+}
+
+export async function getListaById(
+  tenantId: string,
+  listaId: string
+): Promise<Lista | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('id', listaId)
+    .single()
+
+  if (error) {
+    return null
+  }
+
+  return data
+}
+
+export async function findListasByNameLike(
+  tenantId: string,
+  nome: string,
+  limit: number = 10
+): Promise<Lista[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+
+  const pattern = `%${nome.trim()}%`
+  const { data, error } = await client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .ilike('nome', pattern)
+    .limit(limit)
+
+  if (error) {
+    console.error('Error finding listas by name like:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function getListasByTenant(
+  tenantId: string,
+  tipo?: string | null,
+  limit: number = 50
+): Promise<Lista[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+
+  let query = client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+
+  if (tipo) {
+    query = query.eq('tipo', tipo)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching listas by tenant:', error)
+    return []
+  }
+
+  return data || []
+}
+
+export async function createListaItem(
+  listaId: string,
+  nome: string,
+  quantidade?: string | null,
+  unidade?: string | null,
+  status: ListaItemStatus = 'pendente'
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('lista_itens')
+    .insert({
+      lista_id: listaId,
+      nome,
+      quantidade: quantidade || null,
+      unidade: unidade || null,
+      status,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating lista item:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function getListaItemByName(
+  listaId: string,
+  nome: string
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('lista_itens')
+    .select('*')
+    .eq('lista_id', listaId)
+    .ilike('nome', nome.trim())
+    .limit(1)
+
+  if (error) {
+    console.error('Error fetching lista item by name:', error)
+    return null
+  }
+
+  return (data && data[0]) || null
+}
+
+export async function updateListaItemStatus(
+  itemId: string,
+  listaId: string,
+  status: ListaItemStatus
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('lista_itens')
+    .update({ status })
+    .eq('id', itemId)
+    .eq('lista_id', listaId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating lista item status:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function updateListaItemFields(
+  itemId: string,
+  listaId: string,
+  updates: { quantidade?: string | null; unidade?: string | null; status?: ListaItemStatus }
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('lista_itens')
+    .update(updates)
+    .eq('id', itemId)
+    .eq('lista_id', listaId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating lista item fields:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function deleteListaItemByName(
+  listaId: string,
+  nome: string
+): Promise<boolean> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return false
+  }
+  const client = supabaseAdmin
+
+  const { error } = await client
+    .from('lista_itens')
+    .delete()
+    .eq('lista_id', listaId)
+    .ilike('nome', nome.trim())
+
+  if (error) {
+    console.error('Error deleting lista item:', error)
+    return false
+  }
+
+  return true
+}
+
+export async function getListaItens(
+  listaId: string
+): Promise<ListaItem[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('lista_itens')
+    .select('*')
+    .eq('lista_id', listaId)
+    .order('status', { ascending: true }) // pendente vem antes de comprado (alfabético)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching lista itens:', error)
+    return []
+  }
+
+  return data || []
+}
+
+// ============================================
+// TENANT CONTEXT (lastActiveList)
+// ============================================
+
+export async function getTenantContext(
+  tenantId: string
+): Promise<TenantContext | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('tenant_context')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (error) {
+    // Se não existir ainda, retorna null (não é erro crítico)
+    return null
+  }
+
+  return data
+}
+
+export async function setLastActiveListName(
+  tenantId: string,
+  listName: string
+): Promise<void> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return
+  }
+  const client = supabaseAdmin
+
+  const { error } = await client
+    .from('tenant_context')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        last_active_list_name: listName,
+      },
+      { onConflict: 'tenant_id' }
+    )
+
+  if (error) {
+    console.error('Error setting last active list name:', error)
+  }
 }

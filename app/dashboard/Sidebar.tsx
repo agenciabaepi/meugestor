@@ -8,6 +8,7 @@ import {
   Calendar,
   BarChart3,
   User,
+  ListChecks,
 } from 'lucide-react'
 import LogoutButton from './LogoutButton'
 
@@ -26,6 +27,11 @@ const menuItems = [
     href: '/dashboard/agenda',
     label: 'Agenda',
     icon: Calendar,
+  },
+  {
+    href: '/dashboard/listas',
+    label: 'Listas',
+    icon: ListChecks,
   },
   {
     href: '/dashboard/relatorios',

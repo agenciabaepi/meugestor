@@ -7,6 +7,7 @@ import {
   Wallet,
   Calendar,
   BarChart3,
+  ListChecks,
 } from 'lucide-react'
 
 const navItems = [
@@ -24,6 +25,11 @@ const navItems = [
     href: '/dashboard/agenda',
     label: 'Agenda',
     icon: Calendar,
+  },
+  {
+    href: '/dashboard/listas',
+    label: 'Listas',
+    icon: ListChecks,
   },
   {
     href: '/dashboard/relatorios',

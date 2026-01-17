@@ -19,6 +19,17 @@ import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relator
 import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
+import { getListasByTenant, getTenantContext } from '../db/queries'
+import {
+  addItemToList,
+  ensureListaByName,
+  formatItemNameForReply,
+  formatListResponse,
+  getListView,
+  markItemDoneInList,
+  removeItemFromList,
+  touchLastActiveList,
+} from '../services/listas'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil, getBrazilDayStartISO, getBrazilDayEndISO } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
@@ -35,6 +46,10 @@ const MUTATING_INTENTS = new Set([
   'create_appointment',
   'update_appointment',
   'cancel_appointment',
+  'create_list',
+  'add_list_item',
+  'remove_list_item',
+  'mark_item_done',
 ])
 
 function isMutatingIntent(intent: string): boolean {
@@ -398,7 +413,29 @@ function buildCommitFinalMessage(state: SemanticState, actionResult: ActionResul
   }
   if (state.intent === 'register_expense') return 'Pronto! Registrei o gasto.'
   if (state.intent === 'register_revenue') return 'Pronto! Registrei a receita.'
+  if (state.intent === 'create_list') return actionResult.message || 'Lista criada.'
+  if (state.intent === 'add_list_item') return actionResult.message || 'Item adicionado.'
+  if (state.intent === 'remove_list_item') return actionResult.message || 'Item removido.'
+  if (state.intent === 'mark_item_done') return actionResult.message || 'Item marcado como comprado.'
+  if (state.intent === 'show_list') return actionResult.message || 'Aqui está sua lista.'
   return actionResult.message || 'Pronto!'
+}
+
+async function resolveListNameFromContext(
+  tenantId: string,
+  explicitListName?: string | null
+): Promise<string | null> {
+  const raw = explicitListName ? String(explicitListName).trim() : ''
+  if (raw) return raw
+
+  const ctx = await getTenantContext(tenantId)
+  const last = ctx?.last_active_list_name ? String(ctx.last_active_list_name).trim() : ''
+  if (last) return last
+
+  // Fallback estilo Alexa: se só existir 1 lista de compras, usa ela (sem perguntar)
+  const listas = await getListasByTenant(tenantId, 'compras', 2)
+  if (listas.length === 1) return listas[0].nome
+  return null
 }
 
 /**
@@ -515,6 +552,21 @@ async function executeAction(
         }
         return appointmentResult
 
+    case 'create_list':
+      return await handleCreateList(semanticState, tenantId)
+
+    case 'add_list_item':
+      return await handleAddListItem(semanticState, tenantId)
+
+    case 'remove_list_item':
+      return await handleRemoveListItem(semanticState, tenantId)
+
+    case 'mark_item_done':
+      return await handleMarkItemDone(semanticState, tenantId)
+
+    case 'show_list':
+      return await handleShowList(semanticState, tenantId)
+
       case 'query':
         // Validação rígida: verifica se queryType e domain estão corretos
         if (!semanticState.queryType) {
@@ -551,6 +603,133 @@ async function executeAction(
           message: 'Mensagem recebida. Processando...',
         }
     }
+}
+
+async function handleCreateList(state: SemanticState, tenantId: string): Promise<ActionResult> {
+  try {
+    const listName = state.list_name ? String(state.list_name).trim() : ''
+    if (!listName) {
+      return { success: true, message: 'Qual o nome da lista?' }
+    }
+    const lista = await ensureListaByName(tenantId, listName, state.list_type ? String(state.list_type) : 'compras')
+    await touchLastActiveList(tenantId, lista.nome)
+    // Se já existia, ainda assim mantém resposta curta
+    return { success: true, message: `Lista '${lista.nome}' criada.`, data: lista }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao criar lista:', error)
+    return { success: false, message: 'Não consegui criar a lista.' }
+  }
+}
+
+async function handleAddListItem(state: SemanticState, tenantId: string): Promise<ActionResult> {
+  try {
+    const itemName = state.item_name ? String(state.item_name).trim() : ''
+    if (!itemName) return { success: true, message: 'O que você quer adicionar?' }
+
+    const listName = await resolveListNameFromContext(tenantId, state.list_name ?? null)
+    if (!listName) return { success: true, message: 'Em qual lista?' }
+
+    const result = await addItemToList({
+      tenantId,
+      listName,
+      itemName,
+      quantidade: state.quantidade ?? null,
+      unidade: state.unidade ?? null,
+    })
+
+    await touchLastActiveList(tenantId, result.lista.nome)
+
+    const itemLabel = formatItemNameForReply(result.item.nome)
+    if (result.wasAlreadyPending) {
+      return { success: true, message: `${itemLabel} já está na lista ${result.lista.nome}.`, data: result }
+    }
+    return { success: true, message: `${itemLabel} adicionado à lista ${result.lista.nome}.`, data: result }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao adicionar item:', error)
+    return { success: false, message: 'Não consegui adicionar esse item.' }
+  }
+}
+
+async function handleRemoveListItem(state: SemanticState, tenantId: string): Promise<ActionResult> {
+  try {
+    const itemName = state.item_name ? String(state.item_name).trim() : ''
+    if (!itemName) return { success: true, message: 'Qual item você quer remover?' }
+
+    const listName = await resolveListNameFromContext(tenantId, state.list_name ?? null)
+    if (!listName) return { success: true, message: 'Em qual lista?' }
+
+    const result = await removeItemFromList({ tenantId, listName, itemName })
+    await touchLastActiveList(tenantId, result.lista.nome)
+
+    const itemLabel = formatItemNameForReply(itemName)
+    if (!result.removed) {
+      return { success: true, message: `Não achei ${itemLabel} na lista ${result.lista.nome}.` }
+    }
+    return { success: true, message: `${itemLabel} removido da lista ${result.lista.nome}.` }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao remover item:', error)
+    return { success: false, message: 'Não consegui remover esse item.' }
+  }
+}
+
+async function handleMarkItemDone(state: SemanticState, tenantId: string): Promise<ActionResult> {
+  try {
+    const itemName = state.item_name ? String(state.item_name).trim() : ''
+    if (!itemName) return { success: true, message: 'Qual item você já comprou?' }
+
+    const listName = await resolveListNameFromContext(tenantId, state.list_name ?? null)
+    if (!listName) return { success: true, message: 'Em qual lista?' }
+
+    const result = await markItemDoneInList({ tenantId, listName, itemName })
+    await touchLastActiveList(tenantId, result.lista.nome)
+
+    const itemLabel = formatItemNameForReply(itemName)
+    if (!result.item) {
+      return { success: true, message: `Não achei ${itemLabel} na lista ${result.lista.nome}.` }
+    }
+    if (!result.updated) {
+      return { success: true, message: `${itemLabel} já está como comprado.` }
+    }
+    return { success: true, message: `${itemLabel} marcado como comprado.`, data: result }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao marcar como comprado:', error)
+    return { success: false, message: 'Não consegui marcar como comprado.' }
+  }
+}
+
+async function handleShowList(state: SemanticState, tenantId: string): Promise<ActionResult> {
+  try {
+    const listName = await resolveListNameFromContext(tenantId, state.list_name ?? null)
+    if (!listName) return { success: true, message: 'Qual lista?' }
+
+    const view = await getListView({ tenantId, listName })
+    await touchLastActiveList(tenantId, view.lista.nome)
+
+    const message = formatListResponse({
+      listName: view.lista.nome,
+      pendentes: view.pendentes,
+      comprados: view.comprados,
+    })
+    return { success: true, message, data: view }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao mostrar lista:', error)
+    return { success: false, message: 'Não consegui mostrar a lista.' }
+  }
 }
 
 /**

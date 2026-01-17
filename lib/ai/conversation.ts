@@ -264,14 +264,16 @@ Analise a mensagem do usuário e retorne um ESTADO SEMÂNTICO COMPLETO.
 REGRA CRÍTICA - SEPARAÇÃO DE DOMÍNIOS:
 - Financeiro: gastos, receitas, despesas (register_expense, register_revenue, query sobre gastos)
 - Agenda: compromissos, reuniões, eventos (create_appointment, query sobre compromissos)
+- Listas: lista de compras, itens, marcar comprado (create_list, add_list_item, remove_list_item, mark_item_done, show_list)
 - NUNCA misture domínios
 - "gastei", "gasto", "despesa" → SEMPRE domínio financeiro
 - "compromisso", "agenda", "reunião" → SEMPRE domínio agenda
+- "lista", "lista de compras", "compras", "marcar como comprado" → SEMPRE domínio listas
 
 Responda APENAS com JSON no formato:
 {
-  "intent": "register_expense" | "register_revenue" | "create_appointment" | "query" | "report" | "chat",
-  "domain": "financeiro" | "agenda" | "geral" | null,
+  "intent": "register_expense" | "register_revenue" | "create_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat",
+  "domain": "financeiro" | "agenda" | "listas" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
@@ -280,6 +282,11 @@ Responda APENAS com JSON no formato:
   "title": string | null,
   "scheduled_at": string (ISO 8601) | null,
   "description": string | null,
+  "list_name": string | null,
+  "list_type": string | null,
+  "item_name": string | null,
+  "quantidade": number | string | null,
+  "unidade": string | null,
   "confidence": 0.0-1.0,
   "needsClarification": boolean,
   "clarificationMessage": string | null
@@ -289,6 +296,11 @@ INTENÇÕES (intent):
 - register_expense: registrar gasto/despesa
 - register_revenue: registrar receita/entrada
 - create_appointment: criar compromisso/agendamento
+- create_list: criar uma lista (ex: lista de compras)
+- add_list_item: adicionar item em uma lista
+- remove_list_item: remover item de uma lista
+- mark_item_done: marcar item como comprado
+- show_list: mostrar itens de uma lista
 - query: consultar informações existentes
 - report: relatório completo
 - chat: conversa geral
@@ -296,6 +308,7 @@ INTENÇÕES (intent):
 DOMÍNIOS (domain):
 - financeiro: gastos, receitas, despesas
 - agenda: compromissos, reuniões, eventos
+- listas: listas (ex: compras) e itens
 - geral: conversa sem domínio específico
 
 PERÍODOS (periodo):

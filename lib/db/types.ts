@@ -11,6 +11,8 @@ export interface User {
   tenant_id: string
   email: string
   whatsapp_number: string
+  whatsapp_welcome_sent_at?: string | null
+  whatsapp_welcome_sent_number?: string | null
   role: 'admin' | 'user'
   name: string | null
   created_at: string
@@ -56,4 +58,33 @@ export interface Conversation {
   message: string
   role: 'user' | 'assistant'
   created_at: string
+}
+
+export interface Lista {
+  id: string
+  tenant_id: string
+  nome: string
+  tipo: string
+  created_at: string
+  updated_at: string
+}
+
+export type ListaItemStatus = 'pendente' | 'comprado'
+
+export interface ListaItem {
+  id: string
+  lista_id: string
+  nome: string
+  quantidade: string | null
+  unidade: string | null
+  status: ListaItemStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface TenantContext {
+  tenant_id: string
+  last_active_list_name: string | null
+  created_at: string
+  updated_at: string
 }

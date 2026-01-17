@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, supabaseAdmin } from '@/lib/db/client'
+import { sendWelcomeMessageIfNeeded } from '@/lib/modules/whatsapp-onboarding'
 
 /**
  * POST - Registro de novo usuário
@@ -110,6 +111,16 @@ export async function POST(request: NextRequest) {
             console.log('whatsapp_number atualizado com sucesso')
           }
         }
+      }
+    }
+
+    // Boas-vindas (idempotente): envia mensagem para novos números cadastrados
+    if (data.user) {
+      try {
+        const result = await sendWelcomeMessageIfNeeded(data.user.id, normalizedWhatsApp)
+        console.log('Welcome message result:', result)
+      } catch (err) {
+        console.warn('Falha ao enviar mensagem de boas-vindas (não bloqueante):', err)
       }
     }
 

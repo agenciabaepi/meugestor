@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from '../db/client'
 import { sendTextMessage } from './whatsapp'
+import { sendWelcomeMessageIfNeeded } from './whatsapp-onboarding'
 
 // Armazena códigos OTP temporários (em produção, use Redis ou banco de dados)
 const otpStore = new Map<string, { code: string; expiresAt: number; userId: string }>()
@@ -135,13 +136,18 @@ export async function verifyOTPAndLink(
     // Remove código usado
     otpStore.delete(key)
 
-    // Envia confirmação
-    await sendTextMessage(
-      normalized,
-      `✅ *WhatsApp Vinculado com Sucesso!*\n\n` +
-      `Seu número foi vinculado à sua conta do Meu Gestor.\n` +
-      `Agora você pode usar o bot normalmente! 😊`
-    )
+    // Envia boas-vindas (idempotente) para o número recém-vinculado
+    try {
+      await sendWelcomeMessageIfNeeded(userId, normalized)
+    } catch (err) {
+      console.warn('Falha ao enviar boas-vindas após vinculação (não bloqueante):', err)
+      // fallback mínimo: confirmação simples
+      await sendTextMessage(
+        normalized,
+        `✅ *WhatsApp Vinculado com Sucesso!*\n\n` +
+          `Seu número foi vinculado à sua conta do Meu Gestor.`
+      )
+    }
 
     return { success: true }
   } catch (error) {
