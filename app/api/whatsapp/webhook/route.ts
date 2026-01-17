@@ -311,8 +311,6 @@ async function processWhatsAppMessage(
         console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
     } else if (message.type === 'audio' && message.audio) {
       // Processa áudio com Whisper
-      await sendTextMessage(from, '🎤 Processando seu áudio...')
-      
       const audioResult = await processWhatsAppAudio(
         message.audio.id,
         tenantId,
