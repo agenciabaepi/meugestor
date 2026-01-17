@@ -15,6 +15,12 @@ export async function GET() {
     const ctx = await getTenantContext(tenantId)
     let activeListName = ctx?.last_active_list_name || null
 
+    // Se a lista ativa não existe mais (ex: apagada), corrige automaticamente.
+    if (activeListName && !listas.some((l) => l.nome === activeListName)) {
+      activeListName = null
+      await setLastActiveListName(tenantId, null)
+    }
+
     // Se não houver lista ativa e existir apenas 1 lista de compras, define automaticamente.
     if (!activeListName) {
       const compras = listas.filter(l => String(l.tipo) === 'compras')

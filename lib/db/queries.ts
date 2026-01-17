@@ -1352,7 +1352,7 @@ export async function getTenantContext(
 
 export async function setLastActiveListName(
   tenantId: string,
-  listName: string
+  listName: string | null
 ): Promise<void> {
   if (!supabaseAdmin) {
     console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
@@ -1365,7 +1365,7 @@ export async function setLastActiveListName(
     .upsert(
       {
         tenant_id: tenantId,
-        last_active_list_name: listName,
+        last_active_list_name: listName ? listName : null,
       },
       { onConflict: 'tenant_id' }
     )

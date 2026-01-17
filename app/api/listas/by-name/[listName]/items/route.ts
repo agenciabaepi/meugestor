@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { addItemToList, getListView, markItemDoneInList, removeItemFromList, touchLastActiveList } from '@/lib/services/listas'
+import { ValidationError } from '@/lib/utils/errors'
 
 export async function GET(
   _request: NextRequest,
@@ -20,6 +21,9 @@ export async function GET(
 
     return NextResponse.json({ view })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
     console.error('Erro em GET /api/listas/by-name/[listName]/items:', error)
     return NextResponse.json({ error: 'Erro ao buscar itens' }, { status: 500 })
   }
@@ -58,6 +62,9 @@ export async function POST(
 
     return NextResponse.json({ result })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Erro em POST /api/listas/by-name/[listName]/items:', error)
     return NextResponse.json({ error: 'Erro ao adicionar item' }, { status: 500 })
   }
@@ -94,6 +101,9 @@ export async function PATCH(
     await touchLastActiveList(tenantId, result.lista.nome)
     return NextResponse.json({ result })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Erro em PATCH /api/listas/by-name/[listName]/items:', error)
     return NextResponse.json({ error: 'Erro ao atualizar item' }, { status: 500 })
   }

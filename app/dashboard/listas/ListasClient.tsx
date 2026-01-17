@@ -47,6 +47,9 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
 
   const [view, setView] = useState<View | null>(null)
 
+  // Mobile UX: alterna entre "listas" e "itens" para reduzir confusão visual
+  const [mobilePanel, setMobilePanel] = useState<'listas' | 'itens'>('listas')
+
   const [newListName, setNewListName] = useState('')
   const [newItemName, setNewItemName] = useState('')
   const [newItemQty, setNewItemQty] = useState('')
@@ -80,6 +83,10 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ listName: name }),
     })
+    // Em mobile, após selecionar lista, vai direto para os itens
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobilePanel('itens')
+    }
   }
 
   async function loadView(name: string) {
@@ -90,7 +97,16 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
         cache: 'no-store',
       })
       const data = await safeJson(res)
-      if (!res.ok) throw new Error(data?.error || 'Erro ao buscar itens')
+      if (!res.ok) {
+        // Lista pode ter sido apagada/ficado stale no contexto
+        if (res.status === 404) {
+          setView(null)
+          setActiveListName(null)
+          await loadListas()
+          throw new Error(data?.error || 'Lista não encontrada')
+        }
+        throw new Error(data?.error || 'Erro ao buscar itens')
+      }
       setView(data?.view || null)
     } catch (e: any) {
       setError(e?.message || 'Erro ao buscar itens')
@@ -232,6 +248,13 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeListName, isAuthenticated])
 
+  useEffect(() => {
+    // Se não há lista ativa, em mobile mostra painel de listas
+    if (!activeListName) {
+      setMobilePanel('listas')
+    }
+  }, [activeListName])
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -266,7 +289,12 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
       {isAuthenticated && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* Coluna listas */}
-          <div className="lg:col-span-4">
+          <div
+            className={[
+              'lg:col-span-4',
+              mobilePanel === 'itens' ? 'hidden lg:block' : 'block',
+            ].join(' ')}
+          >
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
               <div className="px-6 py-5 bg-linear-to-r from-emerald-50 to-white border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -281,6 +309,13 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
               </div>
 
               <div className="p-4 space-y-3">
+                {/* Toggle mobile */}
+                <div className="lg:hidden flex items-center justify-between">
+                  <div className="text-xs font-semibold text-gray-600">
+                    Toque em uma lista para ver os itens
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <input
                     value={newListName}
@@ -370,15 +405,35 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
           </div>
 
           {/* Coluna itens */}
-          <div className="lg:col-span-8">
+          <div
+            className={[
+              'lg:col-span-8',
+              mobilePanel === 'listas' ? 'hidden lg:block' : 'block',
+            ].join(' ')}
+          >
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
               <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900">
-                  {activeListName ? `Lista: ${activeListName}` : 'Selecione uma lista'}
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Pendentes primeiro • depois comprados
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold text-gray-900 truncate">
+                      {activeListName ? `Lista: ${activeListName}` : 'Selecione uma lista'}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Pendentes primeiro • depois comprados
+                    </p>
+                  </div>
+
+                  {/* Controles mobile */}
+                  <div className="lg:hidden shrink-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMobilePanel('listas')}
+                      className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="p-4 sm:p-6 space-y-4">
