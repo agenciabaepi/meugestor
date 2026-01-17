@@ -3,6 +3,7 @@ import {
   createListaItem,
   deleteListaItemByName,
   findListasByNameLike,
+  findListasByNormalizedNameLike,
   getListaByName,
   getListasByNormalizedName,
   getListaItemByName,
@@ -59,15 +60,19 @@ export async function ensureListaByNameMeta(
 
   const nomeNormalizado = normalizeListName(nomeOriginal)
 
-  // Regra: buscar por nome_normalizado (se existir no banco)
+  // REGRA DE OURO: buscar por nome_normalizado
   if (nomeNormalizado) {
     const matches = await getListasByNormalizedName(tenantId, nomeNormalizado, 2)
     if (matches.length >= 1) return { lista: matches[0], created: false }
   }
 
-  // Compatibilidade: fallback para lookup literal por nome
-  const existing = await getListaByName(tenantId, nomeOriginal)
-  if (existing) return { lista: existing, created: false }
+  // Compatibilidade (quando coluna não existe ainda): busca e compara por normalização em memória
+  // (ainda respeita comparação semântica, só não depende do schema novo)
+  if (nomeNormalizado) {
+    const all = await findListasByNameLike(tenantId, nomeOriginal, 50)
+    const found = all.find((l) => normalizeListName(String((l as any).nome_original || l.nome || '')) === nomeNormalizado) || null
+    if (found) return { lista: found, created: false }
+  }
 
   const created = await createLista(tenantId, nomeOriginal, tipo, nomeNormalizado || null)
   if (!created) throw new ValidationError('Erro ao criar a lista')
@@ -99,7 +104,14 @@ export async function resolveListaByName(
     if (byNorm.length > 1) return { ok: false, reason: 'ambiguous', candidates: byNorm }
   }
 
-  // Fallback: match literal / parcial (compatibilidade)
+  // Busca parcial por nome_normalizado (ex: "iphone" deve achar "pelicula iphone")
+  if (nomeNormalizado) {
+    const partial = await findListasByNormalizedNameLike(tenantId, nomeNormalizado, 10)
+    if (partial.length === 1) return { ok: true, lista: partial[0] }
+    if (partial.length > 1) return { ok: false, reason: 'ambiguous', candidates: partial }
+  }
+
+  // Compatibilidade: fallback literal / parcial em nome (apenas se schema antigo)
   const exact = await getListaByName(tenantId, nomeOriginal)
   if (exact) return { ok: true, lista: exact }
 

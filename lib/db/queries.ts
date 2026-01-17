@@ -911,6 +911,48 @@ export async function getListasByNormalizedName(
   return data || []
 }
 
+export async function findListasByNormalizedNameLike(
+  tenantId: string,
+  nomeNormalizado: string,
+  limit: number = 10
+): Promise<Lista[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+
+  const pattern = `%${String(nomeNormalizado || '').trim()}%`
+  if (!pattern || pattern === '%%') return []
+
+  let { data, error } = await client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .ilike('nome_normalizado', pattern)
+    .limit(limit)
+
+  // Compatibilidade: se coluna não existir, cai em nome (literal)
+  if (error && (error.message?.includes('nome_normalizado') || error.code === '42703')) {
+    console.warn('Campo nome_normalizado não existe em listas, usando fallback em nome (aplique migration 015)')
+    const retry = await client
+      .from('listas')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .ilike('nome', pattern)
+      .limit(limit)
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error) {
+    console.error('Error finding listas by normalized name like:', error)
+    return []
+  }
+
+  return data || []
+}
+
 export async function getListaById(
   tenantId: string,
   listaId: string
