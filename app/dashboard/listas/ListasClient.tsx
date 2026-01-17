@@ -124,6 +124,32 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
     }
   }
 
+  async function deleteList(listId: string, listName: string) {
+    const ok = window.confirm(`Apagar a lista "${listName}"?`)
+    if (!ok) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/listas/${encodeURIComponent(listId)}`, {
+        method: 'DELETE',
+      })
+      const data = await safeJson(res)
+      if (!res.ok) throw new Error(data?.error || 'Erro ao apagar lista')
+
+      // Se apagou a lista ativa, limpa seleção e view
+      if (activeListName === listName) {
+        setActiveListName(null)
+        setView(null)
+      }
+
+      await loadListas()
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao apagar lista')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function addItem() {
     const listName = activeListName
     const itemName = newItemName.trim()
@@ -304,12 +330,27 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                               <div className="font-semibold truncate">{l.nome}</div>
                               <div className="text-xs text-gray-500">tipo: {l.tipo}</div>
                             </div>
-                            {active && (
-                              <div className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                                <ListChecks className="h-4 w-4" />
-                                ativa
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {active && (
+                                <div className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                                  <ListChecks className="h-4 w-4" />
+                                  ativa
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  deleteList(l.id, l.nome)
+                                }}
+                                disabled={loading}
+                                className="inline-flex items-center justify-center rounded-lg bg-white p-2 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-red-600 disabled:opacity-60"
+                                title="Apagar lista"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         </button>
                       )

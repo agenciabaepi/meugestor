@@ -800,7 +800,8 @@ export async function getRecentConversations(
 export async function createLista(
   tenantId: string,
   nome: string,
-  tipo: string = 'compras'
+  tipo: string = 'compras',
+  nomeNormalizado?: string | null
 ): Promise<Lista | null> {
   if (!supabaseAdmin) {
     console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
@@ -808,15 +809,33 @@ export async function createLista(
   }
   const client = supabaseAdmin
 
-  const { data, error } = await client
+  let { data, error } = await client
     .from('listas')
     .insert({
       tenant_id: tenantId,
       nome,
+      nome_original: nome,
+      nome_normalizado: nomeNormalizado || null,
       tipo,
     })
     .select()
     .single()
+
+  // Compatibilidade: se colunas novas não existirem ainda, tenta inserir sem elas (aplique migration 015)
+  if (error && (error.message?.includes('nome_normalizado') || error.message?.includes('nome_original') || error.code === '42703')) {
+    console.warn('Colunas nome_original/nome_normalizado não existem em listas, inserindo sem elas (aplique migration 015)')
+    const retry = await client
+      .from('listas')
+      .insert({
+        tenant_id: tenantId,
+        nome,
+        tipo,
+      })
+      .select()
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
 
   if (error) {
     console.error('Error creating lista:', error)
@@ -851,6 +870,47 @@ export async function getListaByName(
   return (data && data[0]) || null
 }
 
+export async function getListasByNormalizedName(
+  tenantId: string,
+  nomeNormalizado: string,
+  limit: number = 10
+): Promise<Lista[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+
+  let { data, error } = await client
+    .from('listas')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+
+  // Compatibilidade: se coluna não existir, tenta fallback literal em `nome`
+  if (error && (error.message?.includes('nome_normalizado') || error.code === '42703')) {
+    console.warn('Campo nome_normalizado não existe em listas, usando fallback em nome (aplique migration 015)')
+    const retry = await client
+      .from('listas')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .ilike('nome', nomeNormalizado)
+      .order('updated_at', { ascending: false })
+      .limit(limit)
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error) {
+    console.error('Error fetching listas by normalized name:', error)
+    return []
+  }
+
+  return data || []
+}
+
 export async function getListaById(
   tenantId: string,
   listaId: string
@@ -873,6 +933,27 @@ export async function getListaById(
   }
 
   return data
+}
+
+export async function deleteListaById(tenantId: string, listaId: string): Promise<boolean> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return false
+  }
+  const client = supabaseAdmin
+
+  const { error } = await client
+    .from('listas')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('id', listaId)
+
+  if (error) {
+    console.error('Error deleting lista:', error)
+    return false
+  }
+
+  return true
 }
 
 export async function findListasByNameLike(

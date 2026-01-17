@@ -23,6 +23,7 @@ import { getListasByTenant, getTenantContext } from '../db/queries'
 import {
   addItemToList,
   ensureListaByName,
+  ensureListaByNameMeta,
   formatItemNameForReply,
   formatListRawResponse,
   getListView,
@@ -611,9 +612,15 @@ async function handleCreateList(state: SemanticState, tenantId: string): Promise
     if (!listName) {
       return { success: true, message: 'Qual o nome da lista?' }
     }
-    const lista = await ensureListaByName(tenantId, listName, state.list_type ? String(state.list_type) : 'compras')
+    const { lista, created } = await ensureListaByNameMeta(
+      tenantId,
+      listName,
+      state.list_type ? String(state.list_type) : 'compras'
+    )
     await touchLastActiveList(tenantId, lista.nome)
-    // Se já existia, ainda assim mantém resposta curta
+    if (!created) {
+      return { success: true, message: `A lista ${lista.nome} já existe.`, data: lista }
+    }
     return { success: true, message: `Lista '${lista.nome}' criada.`, data: lista }
   } catch (error) {
     if (error instanceof ValidationError) {

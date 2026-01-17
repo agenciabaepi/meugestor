@@ -4,6 +4,7 @@ import {
   deleteListaItemByName,
   findListasByNameLike,
   getListaByName,
+  getListasByNormalizedName,
   getListaItemByName,
   getListaItens,
   setLastActiveListName,
@@ -20,6 +21,29 @@ export type ResolveListaResult =
 
 function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, ' ')
+}
+
+export function normalizeListName(name: string): string {
+  const raw = normalizeName(name)
+  if (!raw) return ''
+
+  const stopwords = new Set(['de', 'da', 'do', 'das', 'dos', 'para'])
+
+  const tokens = raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/\s+/g)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t) => !stopwords.has(t))
+    .map((t) => {
+      // plural simples (ex: "peliculas" -> "pelicula")
+      if (t.length > 3 && t.endsWith('s') && !t.endsWith('ss')) return t.slice(0, -1)
+      return t
+    })
+
+  return tokens.join(' ').trim().replace(/\s+/g, ' ')
 }
 
 function normalizeForCompare(input: string): string {
@@ -42,33 +66,61 @@ function canonicalItemName(input: string): string {
   return base.charAt(0).toUpperCase() + base.slice(1)
 }
 
+export async function ensureListaByNameMeta(
+  tenantId: string,
+  listName: string,
+  tipo: string = 'compras'
+): Promise<{ lista: Lista; created: boolean }> {
+  const nomeOriginal = normalizeName(listName)
+  if (!nomeOriginal) throw new ValidationError('Nome da lista é obrigatório')
+
+  const nomeNormalizado = normalizeListName(nomeOriginal)
+
+  // Regra: buscar por nome_normalizado (se existir no banco)
+  if (nomeNormalizado) {
+    const matches = await getListasByNormalizedName(tenantId, nomeNormalizado, 2)
+    if (matches.length >= 1) return { lista: matches[0], created: false }
+  }
+
+  // Compatibilidade: fallback para lookup literal por nome
+  const existing = await getListaByName(tenantId, nomeOriginal)
+  if (existing) return { lista: existing, created: false }
+
+  const created = await createLista(tenantId, nomeOriginal, tipo, nomeNormalizado || null)
+  if (!created) throw new ValidationError('Erro ao criar a lista')
+  return { lista: created, created: true }
+}
+
 export async function ensureListaByName(
   tenantId: string,
   listName: string,
   tipo: string = 'compras'
 ): Promise<Lista> {
-  const nome = normalizeName(listName)
-  if (!nome) throw new ValidationError('Nome da lista é obrigatório')
-
-  const existing = await getListaByName(tenantId, nome)
-  if (existing) return existing
-
-  const created = await createLista(tenantId, nome, tipo)
-  if (!created) throw new ValidationError('Erro ao criar a lista')
-  return created
+  const { lista } = await ensureListaByNameMeta(tenantId, listName, tipo)
+  return lista
 }
 
 export async function resolveListaByName(
   tenantId: string,
   listName: string
 ): Promise<ResolveListaResult> {
-  const nome = normalizeName(listName)
-  if (!nome) return { ok: false, reason: 'not_found' }
+  const nomeOriginal = normalizeName(listName)
+  if (!nomeOriginal) return { ok: false, reason: 'not_found' }
 
-  const exact = await getListaByName(tenantId, nome)
+  const nomeNormalizado = normalizeListName(nomeOriginal)
+
+  // Prioridade: match por nome_normalizado
+  if (nomeNormalizado) {
+    const byNorm = await getListasByNormalizedName(tenantId, nomeNormalizado, 10)
+    if (byNorm.length === 1) return { ok: true, lista: byNorm[0] }
+    if (byNorm.length > 1) return { ok: false, reason: 'ambiguous', candidates: byNorm }
+  }
+
+  // Fallback: match literal / parcial (compatibilidade)
+  const exact = await getListaByName(tenantId, nomeOriginal)
   if (exact) return { ok: true, lista: exact }
 
-  const candidates = await findListasByNameLike(tenantId, nome, 10)
+  const candidates = await findListasByNameLike(tenantId, nomeOriginal, 10)
   if (candidates.length === 1) return { ok: true, lista: candidates[0] }
   if (candidates.length > 1) return { ok: false, reason: 'ambiguous', candidates }
   return { ok: false, reason: 'not_found' }

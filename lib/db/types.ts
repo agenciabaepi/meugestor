@@ -64,6 +64,8 @@ export interface Lista {
   id: string
   tenant_id: string
   nome: string
+  nome_original?: string | null
+  nome_normalizado?: string | null
   tipo: string
   created_at: string
   updated_at: string
