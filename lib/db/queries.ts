@@ -1027,17 +1027,46 @@ export async function createListaItem(
   }
   const client = supabaseAdmin
 
-  const { data, error } = await client
+  let { data, error } = await client
     .from('lista_itens')
     .insert({
       lista_id: listaId,
       nome,
+      nome_original: nome,
+      nome_normalizado: null,
       quantidade: quantidade || null,
+      quantidade_num: null,
       unidade: unidade || null,
       status,
+      checked: status === 'comprado',
     })
     .select()
     .single()
+
+  // Compatibilidade: se colunas novas não existirem ainda, tenta inserir sem elas (aplique migration 016)
+  if (
+    error &&
+    (error.message?.includes('nome_normalizado') ||
+      error.message?.includes('nome_original') ||
+      error.message?.includes('checked') ||
+      error.message?.includes('quantidade_num') ||
+      error.code === '42703')
+  ) {
+    console.warn('Colunas novas não existem em lista_itens, inserindo sem elas (aplique migration 016)')
+    const retry = await client
+      .from('lista_itens')
+      .insert({
+        lista_id: listaId,
+        nome,
+        quantidade: quantidade || null,
+        unidade: unidade || null,
+        status,
+      })
+      .select()
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
 
   if (error) {
     console.error('Error creating lista item:', error)
@@ -1045,6 +1074,44 @@ export async function createListaItem(
   }
 
   return data
+}
+
+export async function getListaItemByNormalizedName(
+  listaId: string,
+  nomeNormalizado: string
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  let { data, error } = await client
+    .from('lista_itens')
+    .select('*')
+    .eq('lista_id', listaId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .limit(1)
+
+  // Compatibilidade: se coluna não existir, cai no lookup por nome (literal)
+  if (error && (error.message?.includes('nome_normalizado') || error.code === '42703')) {
+    console.warn('Campo nome_normalizado não existe em lista_itens, usando fallback em nome (aplique migration 016)')
+    const retry = await client
+      .from('lista_itens')
+      .select('*')
+      .eq('lista_id', listaId)
+      .ilike('nome', nomeNormalizado)
+      .limit(1)
+    data = retry.data
+    error = retry.error
+  }
+
+  if (error) {
+    console.error('Error fetching lista item by normalized name:', error)
+    return null
+  }
+
+  return (data && data[0]) || null
 }
 
 export async function getListaItemByName(
@@ -1096,6 +1163,46 @@ export async function updateListaItemStatus(
     return null
   }
 
+  return data
+}
+
+export async function updateListaItemChecked(
+  itemId: string,
+  listaId: string,
+  checked: boolean
+): Promise<ListaItem | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  let { data, error } = await client
+    .from('lista_itens')
+    .update({ checked, status: checked ? 'comprado' : 'pendente' })
+    .eq('id', itemId)
+    .eq('lista_id', listaId)
+    .select()
+    .single()
+
+  // Compatibilidade: se coluna checked não existir, atualiza apenas status
+  if (error && (error.message?.includes('checked') || error.code === '42703')) {
+    console.warn('Campo checked não existe em lista_itens, atualizando status (aplique migration 016)')
+    const retry = await client
+      .from('lista_itens')
+      .update({ status: checked ? 'comprado' : 'pendente' })
+      .eq('id', itemId)
+      .eq('lista_id', listaId)
+      .select()
+      .single()
+    data = retry.data as any
+    error = retry.error as any
+  }
+
+  if (error) {
+    console.error('Error updating lista item checked:', error)
+    return null
+  }
   return data
 }
 

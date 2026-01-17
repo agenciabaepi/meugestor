@@ -26,6 +26,7 @@ import {
 } from '../utils/date-parser'
 import { filterBySemanticCategory } from '../utils/semantic-filter'
 import { getListasByTenant } from '../db/queries'
+import { normalizeText } from '../utils/normalize-text'
 
 function formatTimeBR(iso: string): string {
   const parts = new Intl.DateTimeFormat('pt-BR', {
@@ -299,7 +300,15 @@ async function queryListas(
   const tipo = tipoRaw ? tipoRaw : null
 
   const listas = await getListasByTenant(tenantId, tipo, 200)
-  const total = listas.length
+  // Regra: contar DISTINCT(nome_normalizado) por tenant
+  const byNorm = new Map<string, any>()
+  for (const l of listas) {
+    const norm = String((l as any).nome_normalizado || '').trim() || normalizeText(String((l as any).nome_original || l.nome || ''))
+    if (!norm) continue
+    if (!byNorm.has(norm)) byNorm.set(norm, l)
+  }
+  const unique = Array.from(byNorm.values())
+  const total = unique.length
 
   if (total === 0) {
     return {
@@ -310,12 +319,12 @@ async function queryListas(
   }
 
   const title = tipo ? `📋 Você tem ${total} lista${total === 1 ? '' : 's'} de ${tipo}:` : `📋 Você tem ${total} lista${total === 1 ? '' : 's'}:`
-  const names = listas.map((l) => `- ${String(l.nome).trim()}`).join('\n')
+  const names = unique.map((l) => `• ${String((l as any).nome_original || l.nome).trim()}`).join('\n')
 
   return {
     success: true,
     message: `${title}\n\n${names}`,
-    data: { total, listas },
+    data: { total, listas: unique },
   }
 }
 

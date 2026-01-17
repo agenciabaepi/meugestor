@@ -77,9 +77,13 @@ export interface ListaItem {
   id: string
   lista_id: string
   nome: string
+  nome_original?: string | null
+  nome_normalizado?: string | null
   quantidade: string | null
   unidade: string | null
   status: ListaItemStatus
+  checked?: boolean | null
+  quantidade_num?: number | null
   created_at: string
   updated_at: string
 }

@@ -313,10 +313,18 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                     listas.map((l) => {
                       const active = l.nome === activeListName
                       return (
-                        <button
+                        <div
                           key={l.id}
-                          onClick={async () => {
-                            await setActive(l.nome)
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            void setActive(l.nome)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              void setActive(l.nome)
+                            }
                           }}
                           className={[
                             'w-full text-left rounded-lg px-4 py-3 border transition-all',
@@ -352,7 +360,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                               </button>
                             </div>
                           </div>
-                        </button>
+                        </div>
                       )
                     })
                   )}

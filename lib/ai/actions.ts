@@ -708,6 +708,7 @@ async function handleAddListItem(state: SemanticState, tenantId: string, message
           if (!listName) return { success: true, message: 'Em qual lista?' }
 
           let okCount = 0
+          let alreadyCount = 0
           const failed: string[] = []
           let resolvedListName = listName
 
@@ -721,20 +722,27 @@ async function handleAddListItem(state: SemanticState, tenantId: string, message
                 unidade: it.unidade,
               })
               resolvedListName = r.lista.nome
-              okCount += 1
+              if (r.created) okCount += 1
+              else alreadyCount += 1
             } catch (e) {
               failed.push(it.itemName)
             }
           }
 
-          if (okCount > 0) {
+          if (okCount > 0 || alreadyCount > 0) {
             await touchLastActiveList(tenantId, resolvedListName)
             const itemWord = okCount === 1 ? 'item' : 'itens'
+            const alreadySuffix = alreadyCount
+              ? ` ${alreadyCount} já estava${alreadyCount === 1 ? '' : 'm'} na lista.`
+              : ''
             const failSuffix = failed.length ? ` Não consegui adicionar: ${failed.slice(0, 10).join(', ')}.` : ''
             return {
               success: true,
-              message: `${okCount} ${itemWord} adicionados à lista ${resolvedListName}.${failSuffix}`,
-              data: { listName: resolvedListName, okCount, failed },
+              message:
+                okCount > 0
+                  ? `${okCount} ${itemWord} adicionados à lista ${resolvedListName}.${alreadySuffix}${failSuffix}`
+                  : `${alreadyCount} item${alreadyCount === 1 ? '' : 'ens'} já estava${alreadyCount === 1 ? '' : 'm'} na lista ${resolvedListName}.${failSuffix}`,
+              data: { listName: resolvedListName, okCount, alreadyCount, failed },
             }
           }
 
@@ -760,9 +768,7 @@ async function handleAddListItem(state: SemanticState, tenantId: string, message
     await touchLastActiveList(tenantId, result.lista.nome)
 
     const itemLabel = formatItemNameForReply(result.item.nome)
-    if (result.wasAlreadyPending) {
-      return { success: true, message: `${itemLabel} já está na lista ${result.lista.nome}.`, data: result }
-    }
+    if (result.alreadyExists) return { success: true, message: `${itemLabel} já está na lista ${result.lista.nome}.`, data: result }
     return { success: true, message: `${itemLabel} adicionado à lista ${result.lista.nome}.`, data: result }
   } catch (error) {
     if (error instanceof ValidationError) {
