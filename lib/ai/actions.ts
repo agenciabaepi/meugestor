@@ -13,7 +13,15 @@ import {
   persistResolvedConfirmation,
 } from './confirmation-manager'
 import { getActiveTask, setActiveTask, clearActiveTask, queueMessageForTask, consumeQueuedMessage } from './session-focus'
-import { createFinanceiroRecord, getFinanceiroBySubcategoryRecords, getFinanceiroByTagsRecords, calculateTotalByCategory, getDespesasRecords, getReceitasRecords } from '../services/financeiro'
+import {
+  createFinanceiroRecord,
+  createFinanceiroRecordForContext,
+  getFinanceiroBySubcategoryRecords,
+  getFinanceiroByTagsRecords,
+  calculateTotalByCategory,
+  getDespesasRecords,
+  getReceitasRecords,
+} from '../services/financeiro'
 import { createCompromissoRecord, getCompromissosRecords } from '../services/compromissos'
 import { gerarRelatorioFinanceiro, gerarResumoMensal } from '../services/relatorios'
 import { getFinanceiroRecords } from '../services/financeiro'
@@ -31,6 +39,12 @@ import {
   removeItemFromList,
   touchLastActiveList,
 } from '../services/listas'
+import type { SessionContext } from '../db/types'
+import {
+  ensureFornecedorByNameForContext,
+  extractSupplierNameFromCreateCommand,
+  extractSupplierNameFromExpenseText,
+} from '../services/fornecedores'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil, getBrazilDayStartISO, getBrazilDayEndISO } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
@@ -42,6 +56,7 @@ import { clearFocus } from './focus-lock'
 const MUTATING_INTENTS = new Set([
   'register_expense',
   'register_revenue',
+  'create_supplier',
   'update_expense',
   'update_revenue',
   'create_appointment',
@@ -116,7 +131,8 @@ function validateAndCorrectIntention(
 export async function processAction(
   message: string,
   tenantId: string,
-  userId: string
+  userId: string,
+  sessionContext?: SessionContext | null
 ): Promise<ActionResult> {
   try {
     console.log('=== PROCESS ACTION INICIADO ===')
@@ -152,7 +168,13 @@ export async function processAction(
         console.log('processAction - Confirmação recebida (activeTask), executando ação ativa')
         await persistResolvedConfirmation(tenantId, userId)
         clearPendingConfirmation(tenantId, userId)
-        const actionResult = await executeAction({ ...activeTask.state }, tenantId, userId, message)
+        const actionResult = await executeAction(
+          { ...activeTask.state },
+          tenantId,
+          userId,
+          message,
+          sessionContext || null
+        )
         if (actionResult.success && isMutatingIntent(activeTask.state.intent)) {
           await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
         } else {
@@ -181,7 +203,7 @@ export async function processAction(
         await persistResolvedConfirmation(tenantId, userId)
 
         // Executa imediatamente (gatilho de execução)
-        const actionResult = await executeAction(semanticState, tenantId, userId, message)
+        const actionResult = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
 
         // Se havia uma pergunta em fila durante a ação ativa, responde após concluir
         const queued = consumeQueuedMessage(tenantId, userId)
@@ -193,7 +215,7 @@ export async function processAction(
           clearActiveTask(tenantId, userId)
         }
         if (queued) {
-          const followUp = await processAction(queued, tenantId, userId)
+          const followUp = await processAction(queued, tenantId, userId, sessionContext || null)
           if (followUp?.message) {
             return {
               success: true,
@@ -228,6 +250,28 @@ export async function processAction(
       }
     }
     
+    // =========================================================
+    // DETECÇÃO DETERMINÍSTICA (SEM IA) — FORNECEDORES (MODO EMPRESA)
+    // Regra de ouro: se o usuário pedir explicitamente para cadastrar/criar fornecedor,
+    // deve executar IMEDIATAMENTE, sem perguntas e sem desvio de fluxo.
+    // =========================================================
+    const supplierFromCmd = extractSupplierNameFromCreateCommand(message)
+    if (supplierFromCmd) {
+      const forced: SemanticState = {
+        intent: 'create_supplier',
+        domain: 'empresa',
+        supplier_name: supplierFromCmd,
+        confidence: 1,
+        readyToSave: true,
+      }
+
+      const result = await executeAction(forced, tenantId, userId, message, sessionContext || null)
+      if (result.success && isMutatingIntent(forced.intent)) {
+        await cleanupAfterMutation(tenantId, userId, forced.intent)
+      }
+      return result
+    }
+
     // Usa assistente conversacional (novo modelo)
     console.log('processAction - Analisando intenção conversacional...')
     const semanticState = await analyzeConversationalIntention(message, recentContext, tenantId, userId, activeTask)
@@ -247,7 +291,7 @@ export async function processAction(
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
       console.log('processAction - Dados completos, executando diretamente sem confirmação')
-      const result = await executeAction(semanticState, tenantId, userId, message)
+      const result = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
       if (result.success && isMutatingIntent(semanticState.intent)) {
         await cleanupAfterMutation(tenantId, userId, semanticState.intent)
       }
@@ -352,7 +396,7 @@ export async function processAction(
       setActiveTask(tenantId, userId, semanticState.intent, semanticState)
     }
 
-    const result = await executeAction(semanticState, tenantId, userId, message)
+    const result = await executeAction(semanticState, tenantId, userId, message, sessionContext || null)
     // Após qualquer ação mutável, encerra o fluxo e reseta estado
     if (result.success && isMutatingIntent(semanticState.intent)) {
       await cleanupAfterMutation(tenantId, userId, semanticState.intent)
@@ -446,12 +490,13 @@ async function executeAction(
   semanticState: SemanticState,
   tenantId: string,
   userId: string,
-  message: string
+  message: string,
+  sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   switch (semanticState.intent) {
     case 'register_expense':
       console.log('executeAction - Chamando handleRegisterExpense')
-      const expenseResult = await handleRegisterExpense(semanticState, tenantId, userId)
+      const expenseResult = await handleRegisterExpense(semanticState, tenantId, userId, message, sessionContext)
       if (expenseResult.success && expenseResult.data) {
         // Salva no histórico de ações
         saveRecentAction({
@@ -471,7 +516,7 @@ async function executeAction(
 
     case 'register_revenue':
       console.log('executeAction - Chamando handleRegisterRevenue')
-      const revenueResult = await handleRegisterRevenue(semanticState, tenantId, userId)
+      const revenueResult = await handleRegisterRevenue(semanticState, tenantId, userId, sessionContext)
       if (revenueResult.success && revenueResult.data) {
         saveRecentAction({
           id: revenueResult.data.id,
@@ -487,6 +532,9 @@ async function executeAction(
         })
       }
       return revenueResult
+
+    case 'create_supplier':
+      return await handleCreateSupplier(semanticState, tenantId, userId, sessionContext)
 
     case 'update_expense':
     case 'update_revenue':
@@ -1153,7 +1201,9 @@ async function handleCancelAppointment(
 async function handleRegisterExpense(
   state: SemanticState,
   tenantId: string,
-  userId: string
+  userId: string,
+  message: string,
+  sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   try {
     // Validação rígida: verifica dados obrigatórios
@@ -1209,19 +1259,45 @@ async function handleRegisterExpense(
       confidence: state.confidence || 0.8,
     }
 
+    // Regra inteligente (modo empresa): se mencionar fornecedor e não existir, cria automaticamente.
+    if (sessionContext?.mode === 'empresa') {
+      const supplierName = extractSupplierNameFromExpenseText(message)
+      if (supplierName) {
+        try {
+          const { fornecedor } = await ensureFornecedorByNameForContext(sessionContext, supplierName)
+          metadata.fornecedor = { id: fornecedor.id, nome: fornecedor.nome }
+        } catch {
+          // Não bloqueia o gasto por falha ao criar fornecedor (fail-safe).
+        }
+      }
+    }
+
     // Cria o registro
-    const record = await createFinanceiroRecord({
-      tenantId,
-      userId,
-      amount,
-      description: description.trim(),
-      category,
-      date,
-      subcategory,
-      metadata,
-      tags,
-      transactionType: 'expense',
-    })
+    const record =
+      sessionContext?.mode === 'empresa'
+        ? await createFinanceiroRecordForContext(sessionContext, {
+            userId,
+            amount,
+            description: description.trim(),
+            category,
+            date,
+            subcategory,
+            metadata,
+            tags,
+            transactionType: 'expense',
+          })
+        : await createFinanceiroRecord({
+            tenantId,
+            userId,
+            amount,
+            description: description.trim(),
+            category,
+            date,
+            subcategory,
+            metadata,
+            tags,
+            transactionType: 'expense',
+          })
 
     let responseMessage = `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
     
@@ -1254,7 +1330,8 @@ async function handleRegisterExpense(
 async function handleRegisterRevenue(
   state: SemanticState,
   tenantId: string,
-  userId: string
+  userId: string,
+  sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   try {
     // Validação rígida: verifica dados obrigatórios
@@ -1311,18 +1388,31 @@ async function handleRegisterRevenue(
     }
 
     // Cria o registro (única diferença: transactionType: 'revenue')
-    const record = await createFinanceiroRecord({
-      tenantId,
-      userId,
-      amount,
-      description: description.trim(),
-      category,
-      date,
-      subcategory,
-      metadata,
-      tags,
-      transactionType: 'revenue',
-    })
+    const record =
+      sessionContext?.mode === 'empresa'
+        ? await createFinanceiroRecordForContext(sessionContext, {
+            userId,
+            amount,
+            description: description.trim(),
+            category,
+            date,
+            subcategory,
+            metadata,
+            tags,
+            transactionType: 'revenue',
+          })
+        : await createFinanceiroRecord({
+            tenantId,
+            userId,
+            amount,
+            description: description.trim(),
+            category,
+            date,
+            subcategory,
+            metadata,
+            tags,
+            transactionType: 'revenue',
+          })
 
     let responseMessage = `✅ Receita registrada com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
     
@@ -1345,6 +1435,52 @@ async function handleRegisterRevenue(
       }
     }
     throw error
+  }
+}
+
+/**
+ * Cria/cadastra fornecedor (modo empresa)
+ * Regra de ouro: se o usuário pediu explicitamente, cria imediatamente (ou informa duplicado).
+ */
+async function handleCreateSupplier(
+  state: SemanticState,
+  tenantId: string,
+  userId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  try {
+    const name = state.supplier_name ? String(state.supplier_name).trim() : ''
+    if (!name) {
+      return { success: true, message: 'Qual o nome do fornecedor?' }
+    }
+
+    if (!sessionContext || sessionContext.mode !== 'empresa') {
+      return {
+        success: true,
+        message: 'Fornecedores só existem no modo empresa. Para cadastrar fornecedor, ative o modo empresa na sua conta.',
+      }
+    }
+
+    const { fornecedor, created } = await ensureFornecedorByNameForContext(sessionContext, name)
+    if (!created) {
+      return {
+        success: true,
+        message: `ℹ️ O fornecedor ${fornecedor.nome} já está cadastrado.`,
+        data: fornecedor,
+      }
+    }
+
+    return {
+      success: true,
+      message: `✅ Fornecedor *${fornecedor.nome}* cadastrado com sucesso.`,
+      data: fornecedor,
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao criar fornecedor:', error)
+    return { success: false, message: 'Não consegui cadastrar o fornecedor.' }
   }
 }
 

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     console.log('Processando ação...')
-    const result = await processAction(message, finalTenantId, finalUserId)
+    const result = await processAction(message, finalTenantId, finalUserId, null)
     
     console.log('Resultado:', JSON.stringify(result, null, 2))
     

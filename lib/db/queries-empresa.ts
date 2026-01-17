@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './client'
-import type { Compromisso, Financeiro, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
+import type { Fornecedor, Compromisso, Financeiro, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
 
 function requireAdmin() {
   if (!supabaseAdmin) {
@@ -536,3 +536,55 @@ export async function setLastActiveListNameEmpresa(
   if (error) console.error('Error setting last active list name (empresa):', error)
 }
 
+
+// ============================================
+// FORNECEDORES
+// ============================================
+
+export async function getFornecedorByNormalizedName(
+  tenantId: string,
+  empresaId: string,
+  nomeNormalizado: string
+): Promise<Fornecedor | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('fornecedores')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .single()
+  if (error) return null
+  return data
+}
+
+export async function createFornecedor(
+  tenantId: string,
+  empresaId: string,
+  nome: string,
+  nomeNormalizado: string,
+  telefone?: string | null,
+  email?: string | null,
+  observacao?: string | null
+): Promise<Fornecedor | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('fornecedores')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      nome,
+      nome_normalizado: nomeNormalizado,
+      telefone: telefone || null,
+      email: email || null,
+      observacao: observacao || null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating fornecedor:', error)
+    return null
+  }
+  return data
+}

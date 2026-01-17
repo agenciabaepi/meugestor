@@ -30,6 +30,18 @@ export interface Empresa {
   created_at: string
 }
 
+export interface Fornecedor {
+  id: string
+  tenant_id: string
+  empresa_id: string
+  nome: string
+  nome_normalizado: string | null
+  telefone: string | null
+  email: string | null
+  observacao: string | null
+  created_at: string
+}
+
 export interface Financeiro {
   id: string
   tenant_id: string

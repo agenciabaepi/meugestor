@@ -155,26 +155,20 @@ async function processWhatsAppMessage(
         // Verifica se é uma saudação inicial (oi, olá, etc)
         const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
         if (greetings.includes(userMessage)) {
-          const presentation = isEmpresaMode
-            ? `👋 Olá!\n\n` +
-              `Você está no *modo empresa* do *ORGANIZAPAY*.\n\n` +
-              `📌 No modo empresa, o WhatsApp ainda está em fase de liberação para garantir isolamento total dos dados.\n\n` +
-              `✅ Por enquanto, use o painel web em ${appUrl}/dashboard para operar no contexto da empresa.\n\n` +
-              `Se quiser, me diga qual lista/ação você precisa que eu já te direciono.`
-            : `👋 Olá! Tudo bem?\n\n` +
-              `Eu sou o assistente do *ORGANIZAPAY* e estou aqui para te ajudar! 😊\n\n` +
-              `📋 *O que eu posso fazer por você:*\n` +
-              `• 💰 Registrar seus gastos e despesas\n` +
-              `• 📅 Criar e gerenciar seus compromissos\n` +
-              `• 📊 Consultar informações financeiras\n` +
-              `• 📈 Gerar relatórios e estatísticas\n` +
-              `• 🖼️ Processar comprovantes de imagem\n` +
-              `• 🎤 Entender seus áudios\n\n` +
-              `*Exemplos de como usar:*\n` +
-              `• "Gastei 50 reais de gasolina"\n` +
-              `• "Tenho reunião amanhã às 10h"\n` +
-              `• "Quanto gastei este mês?"\n\n` +
-              `Pode me enviar uma mensagem e eu te ajudo! 😉`
+          const presentation =
+            `👋 Olá! Tudo bem?\n\n` +
+            `Eu sou o assistente do *ORGANIZAPAY* e estou aqui para te ajudar.\n\n` +
+            (isEmpresaMode
+              ? `🏢 Você está no *modo empresa*.\n\n` +
+                `Você pode, por exemplo:\n` +
+                `• "cadastra um fornecedor chamado Megamix"\n` +
+                `• "gastei 50 reais com tinta no fornecedor Megamix"\n\n`
+              : '') +
+            `*Exemplos:*\n` +
+            `• "Gastei 50 reais de gasolina"\n` +
+            `• "Tenho reunião amanhã às 10h"\n` +
+            `• "Quanto gastei este mês?"\n\n` +
+            `Pode me enviar uma mensagem e eu te ajudo!`
           
           await sendTextMessage(from, presentation)
           await createConversation(tenantId, message.text.body, 'user', userId)
@@ -232,18 +226,6 @@ async function processWhatsAppMessage(
         }
       }
       
-        if (isEmpresaMode) {
-          // Segurança: enquanto o bot não estiver 100% context-aware para listas/ações,
-          // bloqueia uso geral em modo empresa para não misturar dados pessoais e empresariais.
-          await sendTextMessage(
-            from,
-            `🏢 *Modo Empresa*\n\n` +
-              `Seu usuário está em *modo empresa*. Para garantir isolamento total de dados, o bot do WhatsApp ainda não executa ações nesse modo.\n\n` +
-              `Use o painel web em /dashboard para operar no contexto da empresa.`
-          )
-          return
-        }
-
         // Salva mensagem do usuário
         await createConversation(tenantId, message.text.body, 'user', userId)
         
@@ -255,7 +237,7 @@ async function processWhatsAppMessage(
           console.log('Webhook - TenantId:', tenantId)
           console.log('Webhook - From:', from)
           
-          actionResult = await processAction(message.text.body, tenantId, userId)
+          actionResult = await processAction(message.text.body, tenantId, userId, sessionCtx)
           
           console.log('Webhook - Resultado da ação:', {
             success: actionResult.success,
@@ -338,14 +320,6 @@ async function processWhatsAppMessage(
         
         console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
     } else if (message.type === 'audio' && message.audio) {
-      if (isEmpresaMode) {
-        await sendTextMessage(
-          from,
-          `🏢 *Modo Empresa*\n\n` +
-            `Áudios ainda não estão habilitados no bot para o modo empresa. Use o painel web em /dashboard.`
-        )
-        return
-      }
       // Processa áudio com Whisper
       const audioResult = await processWhatsAppAudio(
         message.audio.id,
@@ -363,7 +337,7 @@ async function processWhatsAppMessage(
         )
 
         // Processa a mensagem transcrita normalmente
-        const actionResult = await processAction(audioResult.text, tenantId, userId)
+        const actionResult = await processAction(audioResult.text, tenantId, userId, sessionCtx)
 
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)

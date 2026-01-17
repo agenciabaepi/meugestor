@@ -9,6 +9,7 @@ export interface SemanticState {
   intent:
     | 'register_expense'
     | 'register_revenue'
+    | 'create_supplier'
     | 'create_appointment'
     | 'update_expense'
     | 'update_revenue'
@@ -26,7 +27,7 @@ export interface SemanticState {
     | 'cancel'
   // Campos opcionais podem ser null quando o GPT não conseguiu extrair
   // (isso permite distinguir "não mencionado" vs "ausente")
-  domain?: 'financeiro' | 'agenda' | 'listas' | 'geral' | null
+  domain?: 'financeiro' | 'agenda' | 'listas' | 'empresa' | 'geral' | null
   periodo?: 'hoje' | 'ontem' | 'amanhã' | 'semana' | 'mês' | 'ano' | null
   categoria?: string | null
   subcategoria?: string | null
@@ -41,6 +42,8 @@ export interface SemanticState {
   item_name?: string | null
   quantidade?: string | number | null
   unidade?: string | null
+  // EMPRESA
+  supplier_name?: string | null
   confidence: number
   needsClarification?: boolean
   clarificationMessage?: string | null
