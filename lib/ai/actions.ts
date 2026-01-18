@@ -12,7 +12,16 @@ import {
   persistPendingConfirmation,
   persistResolvedConfirmation,
 } from './confirmation-manager'
-import { getActiveTask, setActiveTask, clearActiveTask, queueMessageForTask, consumeQueuedMessage } from './session-focus'
+import {
+  getActiveTask,
+  setActiveTask,
+  clearActiveTask,
+  queueMessageForTask,
+  consumeQueuedMessage,
+  loadLatestActiveTask,
+  persistActiveTask,
+  persistClearedActiveTask,
+} from './session-focus'
 import {
   createFinanceiroRecord,
   createFinanceiroRecordForContext,
@@ -47,6 +56,7 @@ import {
   extractSupplierNameFromCreateCommand,
   extractSupplierNameFromExpenseText,
 } from '../services/fornecedores'
+import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil, getBrazilDayStartISO, getBrazilDayEndISO } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
@@ -78,6 +88,9 @@ async function cleanupAfterMutation(tenantId: string, userId: string, intent: st
   // Limpa qualquer pendência para evitar loop/reabertura
   clearPendingConfirmation(tenantId, userId)
   clearActiveTask(tenantId, userId)
+
+  // Marca task como encerrada (persistido) para não reabrir em ambiente serverless
+  await persistClearedActiveTask(tenantId, userId)
 
   // Marca resolvido para não reabrir pending persistido em invocações futuras
   await persistResolvedConfirmation(tenantId, userId)
@@ -151,8 +164,22 @@ export async function processAction(
 
     // Busca contexto recente para o GPT entender a conversa completa
     const { getRecentConversations } = await import('../db/queries')
-    const recentConversations = await getRecentConversations(tenantId, 10, userId)
-    const recentContext = recentConversations.map(c => ({
+    const recentConversations = await getRecentConversations(tenantId, 15, userId)
+    // Não poluir o GPT com mensagens internas persistidas
+    const INTERNAL_PREFIXES = [
+      '[PENDING_ACTION]',
+      '[PENDING_ACTION_RESOLVED]',
+      '[ACTIVE_TASK]',
+      '[ACTIVE_TASK_CLEARED]',
+    ]
+    const recentContext = recentConversations
+      .filter((c) => {
+        if (c.role !== 'assistant') return true
+        const msg = String(c.message || '')
+        return !INTERNAL_PREFIXES.some((p) => msg.startsWith(p))
+      })
+      .slice(0, 10)
+      .map(c => ({
       role: c.role,
       message: c.message
     }))
@@ -167,8 +194,15 @@ export async function processAction(
       pendingConfirmation = await loadLatestPendingConfirmation(tenantId, userId)
     }
 
-    // Session focus: ação ativa (create/update compromisso)
-    const activeTask = getActiveTask(tenantId, userId)
+    // Session focus: ação ativa (persistida para funcionar em serverless)
+    let activeTask = getActiveTask(tenantId, userId)
+    if (!activeTask) {
+      const persisted = await loadLatestActiveTask(tenantId, userId)
+      if (persisted) {
+        setActiveTask(tenantId, userId, persisted.type as any, persisted.state)
+        activeTask = getActiveTask(tenantId, userId)
+      }
+    }
 
     // COMMIT POINT (SESSION FOCUS):
     // Mesmo sem pendingConfirmation (ex: execução direta), se houver uma ação ativa e o usuário disser
@@ -288,8 +322,15 @@ export async function processAction(
     
     console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
-    // Se precisa esclarecimento, retorna mensagem
+    // Se precisa esclarecimento, mantém tarefa ativa (persistida) para entender os próximos passos
     if (semanticState.needsClarification && semanticState.clarificationMessage) {
+      try {
+        setActiveTask(tenantId, userId, semanticState.intent as any, semanticState)
+        const task = getActiveTask(tenantId, userId)
+        if (task) await persistActiveTask(tenantId, userId, task as any)
+      } catch {
+        // não bloqueia
+      }
       return {
         success: true,
         message: semanticState.clarificationMessage,
@@ -1242,11 +1283,18 @@ async function handleRegisterExpense(
     let tags: string[] = []
 
     if (!category || category === 'Outros') {
-      // Aplica categorização inteligente baseada na descrição
-      const categorization = categorizeExpense(description, amount)
-      category = categorization.category
-      subcategory = categorization.subcategory
-      tags = categorization.tags
+      if (sessionContext?.mode === 'empresa') {
+        const c = categorizeEmpresaExpense(description)
+        category = c.category
+        subcategory = c.subcategory
+        tags = c.tags
+      } else {
+        // Aplica categorização inteligente baseada na descrição
+        const categorization = categorizeExpense(description, amount)
+        category = categorization.category
+        subcategory = categorization.subcategory
+        tags = categorization.tags
+      }
     } else {
       // Se categoria foi fornecida, ainda tenta extrair subcategoria e tags
       const categorization = categorizeExpense(description, amount)

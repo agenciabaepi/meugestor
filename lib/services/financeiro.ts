@@ -81,8 +81,12 @@ export async function createFinanceiroRecordForContext(
   if (!input.description || input.description.trim().length === 0) {
     throw new ValidationError('Descrição é obrigatória')
   }
-  if (!isValidCategory(input.category)) {
+  // Modo empresa: categorias são definidas pelo módulo empresarial (não pela lista fixa do modo pessoal)
+  if (ctx.mode !== 'empresa' && !isValidCategory(input.category)) {
     throw new ValidationError('Categoria inválida')
+  }
+  if (ctx.mode === 'empresa' && (!input.category || String(input.category).trim().length === 0)) {
+    throw new ValidationError('Categoria é obrigatória')
   }
   if (!isValidDate(input.date)) {
     throw new ValidationError('Data inválida')
