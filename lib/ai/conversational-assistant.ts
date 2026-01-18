@@ -229,6 +229,8 @@ DADOS ESSENCIAIS POR INTENÇÃO:
 - create_appointment: título + (tempo relativo + horário) → readyToSave: true (scheduled_at pode ser null; backend converte)
 - register_expense: amount + description → readyToSave: true
 - register_revenue: amount + description → readyToSave: true
+- create_supplier: supplier_name → readyToSave: true (modo empresa)
+- create_employee: employee_name → readyToSave: true (modo empresa)
 
 EXEMPLOS DE QUANDO NÃO PERGUNTAR:
 - "tenho dentista amanhã às 10" → Dados completos! readyToSave: true, executar diretamente
@@ -251,7 +253,7 @@ ${activeTaskContext}
 
 Responda APENAS com JSON no formato:
 {
-  "intent": "register_expense" | "register_revenue" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
+  "intent": "register_expense" | "register_revenue" | "create_supplier" | "create_employee" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
   "domain": "financeiro" | "agenda" | "listas" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,

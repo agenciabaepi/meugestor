@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './client'
-import type { Compromisso, Financeiro, Fornecedor, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
+import type { Compromisso, Financeiro, Fornecedor, Funcionario, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
 
 function requireAdmin() {
   if (!supabaseAdmin) {
@@ -68,6 +68,7 @@ export async function getFinanceiroEmpresaByEmpresa(
     .eq('tenant_id', tenantId)
     .eq('empresa_id', empresaId)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (userId) query = query.eq('user_id', userId)
   if (startDate) query = query.gte('date', startDate)
@@ -97,6 +98,7 @@ export async function getFinanceiroEmpresaByCategory(
     .eq('empresa_id', empresaId)
     .eq('category', category)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (startDate) query = query.gte('date', startDate)
   if (endDate) query = query.lte('date', endDate)
@@ -648,4 +650,106 @@ export async function getCategoriasEmpresa(
     return []
   }
   return data || []
+}
+
+// ============================================
+// FUNCIONÁRIOS
+// ============================================
+
+export async function getFuncionarioByNormalizedName(
+  tenantId: string,
+  empresaId: string,
+  nomeNormalizado: string
+): Promise<Funcionario | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .eq('ativo', true)
+    .single()
+  if (error) return null
+  return data
+}
+
+export async function findFuncionariosByNormalizedNameLike(
+  tenantId: string,
+  empresaId: string,
+  nomeNormalizadoPartial: string,
+  limit: number = 10
+): Promise<Funcionario[]> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('ativo', true)
+    .ilike('nome_normalizado', `%${nomeNormalizadoPartial}%`)
+    .order('nome_original', { ascending: true })
+    .limit(limit)
+  if (error) return []
+  return data || []
+}
+
+export async function getFuncionariosByEmpresa(
+  tenantId: string,
+  empresaId: string,
+  ativo?: boolean,
+  limit: number = 100
+): Promise<Funcionario[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .order('nome_original', { ascending: true })
+    .limit(limit)
+
+  if (ativo !== undefined) {
+    query = query.eq('ativo', ativo)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching funcionarios:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function createFuncionario(
+  tenantId: string,
+  empresaId: string,
+  nomeOriginal: string,
+  nomeNormalizado: string,
+  cargo?: string | null,
+  salarioBase?: number | null,
+  tipo?: 'fixo' | 'freelancer' | 'temporario' | null
+): Promise<Funcionario | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('funcionarios')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      nome_original: nomeOriginal,
+      nome_normalizado: nomeNormalizado,
+      cargo: cargo || null,
+      salario_base: salarioBase || null,
+      tipo: tipo || null,
+      ativo: true,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating funcionario:', error)
+    return null
+  }
+  return data
 }

@@ -56,6 +56,10 @@ import {
   extractSupplierNameFromCreateCommand,
   extractSupplierNameFromExpenseText,
 } from '../services/fornecedores'
+import {
+  ensureFuncionarioByNameForContext,
+  extractEmployeeNameFromPaymentText,
+} from '../services/funcionarios'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseMultiItemExpense } from '../utils/parse-multi-item-expense'
@@ -70,6 +74,7 @@ const MUTATING_INTENTS = new Set([
   'register_expense',
   'register_revenue',
   'create_supplier',
+  'create_employee',
   'update_expense',
   'update_revenue',
   'create_appointment',
@@ -587,6 +592,9 @@ async function executeAction(
 
     case 'create_supplier':
       return await handleCreateSupplier(semanticState, tenantId, userId, sessionContext)
+
+    case 'create_employee':
+      return await handleCreateEmployee(semanticState, tenantId, userId, sessionContext)
 
     case 'update_expense':
     case 'update_revenue':
@@ -1285,7 +1293,7 @@ async function handleRegisterExpense(
 
     // Usa dados do estado semântico
     const amount = state.amount
-    const description = state.description
+    let description = state.description
     const date = new Date().toISOString().split('T')[0] // Sempre usa hoje para registros
 
     // Usa categoria do estado ou categoriza automaticamente
@@ -1328,15 +1336,43 @@ async function handleRegisterExpense(
       confidence: state.confidence || 0.8,
     }
 
-    // Regra inteligente (modo empresa): se mencionar fornecedor e não existir, cria automaticamente.
+    // Regra inteligente (modo empresa): detecta pagamento de funcionário e ajusta categoria automaticamente.
+    let employeeCreated = false
+    let employeeNameCreated: string | null = null
+    
     if (sessionContext?.mode === 'empresa') {
-      const supplierName = extractSupplierNameFromExpenseText(message)
-      if (supplierName) {
+      // Prioridade 1: Detecta pagamento de funcionário
+      const employeeName = extractEmployeeNameFromPaymentText(message)
+      if (employeeName) {
         try {
-          const { fornecedor } = await ensureFornecedorByNameForContext(sessionContext, supplierName)
-          metadata.fornecedor = { id: fornecedor.id, nome: fornecedor.nome }
+          // Busca ou cria funcionário automaticamente
+          const { funcionario, created } = await ensureFuncionarioByNameForContext(sessionContext, employeeName)
+          metadata.funcionario = { id: funcionario.id, nome: funcionario.nome_original }
+          employeeCreated = created
+          employeeNameCreated = funcionario.nome_original
+          
+          // Sobrescreve categoria para "Funcionários"
+          category = 'Funcionários'
+          subcategory = 'salário'
+          tags = ['funcionário', 'salário']
+          
+          // Atualiza descrição se necessário
+          if (!description.toLowerCase().includes(funcionario.nome_original.toLowerCase())) {
+            description = `Pagamento funcionário ${funcionario.nome_original}`
+          }
         } catch {
-          // Não bloqueia o gasto por falha ao criar fornecedor (fail-safe).
+          // Não bloqueia o gasto por falha ao criar funcionário (fail-safe).
+        }
+      } else {
+        // Prioridade 2: Detecta fornecedor (apenas se não for pagamento de funcionário)
+        const supplierName = extractSupplierNameFromExpenseText(message)
+        if (supplierName) {
+          try {
+            const { fornecedor } = await ensureFornecedorByNameForContext(sessionContext, supplierName)
+            metadata.fornecedor = { id: fornecedor.id, nome: fornecedor.nome }
+          } catch {
+            // Não bloqueia o gasto por falha ao criar fornecedor (fail-safe).
+          }
         }
       }
     }
@@ -1368,13 +1404,22 @@ async function handleRegisterExpense(
             transactionType: 'expense',
           })
 
-    let responseMessage = `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
-    
-    if (subcategory) {
-      responseMessage += `\n📌 Subcategoria: ${subcategory}`
+    // Formata resposta específica para pagamento de funcionário (conforme doc)
+    let responseMessage: string
+    if (employeeCreated && employeeNameCreated && category === 'Funcionários') {
+      responseMessage = `✅ Funcionário *${employeeNameCreated}* cadastrado e pagamento registrado.\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: Funcionários`
+    } else if (metadata.funcionario && category === 'Funcionários') {
+      const funcionarioNome = metadata.funcionario.nome || employeeNameCreated || 'Funcionário'
+      responseMessage = `✅ Pagamento de *${funcionarioNome}* registrado:\n• Valor: R$ ${amount.toFixed(2)}\n• Categoria: Funcionários`
+    } else {
+      responseMessage = `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
+      
+      if (subcategory) {
+        responseMessage += `\n📌 Subcategoria: ${subcategory}`
+      }
+      
+      responseMessage += `\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}`
     }
-    
-    responseMessage += `\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}`
 
     return {
       success: true,
@@ -1702,6 +1747,62 @@ async function handleCreateSupplier(
     }
     console.error('Erro ao criar fornecedor:', error)
     return { success: false, message: 'Não consegui cadastrar o fornecedor.' }
+  }
+}
+
+/**
+ * Cria um funcionário (modo empresa).
+ */
+async function handleCreateEmployee(
+  state: SemanticState,
+  tenantId: string,
+  userId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  try {
+    const name = state.employee_name ? String(state.employee_name).trim() : ''
+    if (!name) {
+      return { success: true, message: 'Qual o nome do funcionário?' }
+    }
+
+    if (!sessionContext) {
+      return {
+        success: true,
+        message:
+          'Não consegui identificar seu contexto (pessoal/empresa). ' +
+          'Abra seu perfil no painel e selecione o modo *Empresa* para habilitar funcionários.',
+      }
+    }
+
+    if (sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+      return {
+        success: true,
+        message:
+          'Funcionários só existem no modo empresa. ' +
+          'No painel, vá em *Perfil* e selecione o modo *Empresa* e uma empresa para vincular ao seu usuário.',
+      }
+    }
+
+    const { funcionario, created } = await ensureFuncionarioByNameForContext(sessionContext, name)
+    if (!created) {
+      return {
+        success: true,
+        message: `ℹ️ O funcionário *${funcionario.nome_original}* já está cadastrado.`,
+        data: funcionario,
+      }
+    }
+
+    return {
+      success: true,
+      message: `✅ Funcionário *${funcionario.nome_original}* cadastrado com sucesso.`,
+      data: funcionario,
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao criar funcionário:', error)
+    return { success: false, message: 'Não consegui cadastrar o funcionário.' }
   }
 }
 

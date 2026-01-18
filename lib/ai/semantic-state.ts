@@ -10,6 +10,7 @@ export interface SemanticState {
     | 'register_expense'
     | 'register_revenue'
     | 'create_supplier'
+    | 'create_employee'
     | 'create_appointment'
     | 'update_expense'
     | 'update_revenue'
@@ -44,6 +45,7 @@ export interface SemanticState {
   unidade?: string | null
   // EMPRESA
   supplier_name?: string | null
+  employee_name?: string | null
   confidence: number
   needsClarification?: boolean
   clarificationMessage?: string | null

@@ -48,6 +48,14 @@ const MAPPINGS: Record<string, MapEntry> = {
   estoque: { category: 'Estoque', subcategory: null, tags: ['estoque'] },
   produto: { category: 'Produtos', subcategory: null, tags: ['produtos'] },
   produtos: { category: 'Produtos', subcategory: null, tags: ['produtos'] },
+
+  // Funcionários (pagamentos)
+  funcionario: { category: 'Funcionários', subcategory: 'salário', tags: ['funcionário', 'salário'] },
+  funcionários: { category: 'Funcionários', subcategory: 'salário', tags: ['funcionário', 'salário'] },
+  salario: { category: 'Funcionários', subcategory: 'salário', tags: ['salário', 'funcionário'] },
+  salário: { category: 'Funcionários', subcategory: 'salário', tags: ['salário', 'funcionário'] },
+  pagamento: { category: 'Funcionários', subcategory: 'pagamento', tags: ['pagamento', 'funcionário'] },
+  paguei: { category: 'Funcionários', subcategory: 'pagamento', tags: ['pagamento', 'funcionário'] },
 }
 
 export function categorizeEmpresaExpense(description: string): EmpresaCategorizationResult {

@@ -42,6 +42,20 @@ export interface Fornecedor {
   created_at: string
 }
 
+export interface Funcionario {
+  id: string
+  tenant_id: string
+  empresa_id: string
+  nome_original: string
+  nome_normalizado: string | null
+  cargo: string | null
+  salario_base: number | null
+  tipo: 'fixo' | 'freelancer' | 'temporario' | null
+  ativo: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Financeiro {
   id: string
   tenant_id: string
