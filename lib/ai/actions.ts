@@ -60,6 +60,7 @@ import {
   ensureFuncionarioByNameForContext,
   extractEmployeeNameFromPaymentText,
   extractEmployeeNameFromCreateCommand,
+  extractPaymentAmount,
 } from '../services/funcionarios'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
@@ -325,7 +326,36 @@ export async function processAction(
       return result
     }
 
-    // Prioridade 2: Detecção de fornecedor
+    // Prioridade 2: Detecção determinística de PAGAMENTO de funcionário (modo empresa)
+    // Se detectar funcionário + valor + verbo de pagamento → registra diretamente
+    if (effectiveSessionContext?.mode === 'empresa' && effectiveSessionContext.empresa_id) {
+      const employeeName = extractEmployeeNameFromPaymentText(message)
+      const paymentAmount = extractPaymentAmount(message)
+      const hasPaymentVerb = /\b(paguei|fiz\s+(?:o\s+)?pagamento|sal[aá]rio|gerei\s+pagamento|paguei\s+o\s+sal[aá]rio)\b/i.test(message)
+      
+      if (employeeName && paymentAmount && hasPaymentVerb) {
+        // Pagamento de funcionário detectado → registra diretamente como register_expense
+        const forced: SemanticState = {
+          intent: 'register_expense',
+          domain: 'empresa',
+          amount: paymentAmount,
+          description: `Pagamento funcionário ${employeeName}`,
+          employee_name: employeeName,
+          categoria: 'Funcionários',
+          subcategoria: 'salário',
+          confidence: 1,
+          readyToSave: true,
+        }
+
+        const result = await executeAction(forced, tenantId, userId, message, effectiveSessionContext)
+        if (result.success && isMutatingIntent(forced.intent)) {
+          await cleanupAfterMutation(tenantId, userId, forced.intent)
+        }
+        return result
+      }
+    }
+
+    // Prioridade 3: Detecção de fornecedor
     const supplierFromCmd = extractSupplierNameFromCreateCommand(message)
     if (supplierFromCmd) {
       const forced: SemanticState = {

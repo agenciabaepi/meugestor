@@ -200,16 +200,23 @@ REGRA CRÍTICA - NOVO DOMÍNIO "listas":
   - "quais itens tem na lista do mercado?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "mercado"
   - "quantos itens tenho na lista de películas de iphone?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "películas de iphone"
 
-REGRA CRÍTICA - CONSULTAS DE FUNCIONÁRIOS (MODO EMPRESA):
-- Perguntas sobre pagamentos de funcionários devem ser query (NÃO chat):
-  - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês" (se não mencionado, assume este mês)
+REGRA CRÍTICA - PAGAMENTOS DE FUNCIONÁRIOS (MODO EMPRESA):
+- DISTINGUIR entre REGISTRO vs CONSULTA:
+
+REGISTRO (register_expense + readyToSave: true):
+  - "paguei o salário do Pedro Oliveira de 1500" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro Oliveira", readyToSave: true
+  - "fiz o pagamento do Pedro, 1500 reais" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro", readyToSave: true
+  - "salário do Pedro 1500" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro", readyToSave: true
+  - "paguei 2 mil para o funcionário João" → intent: "register_expense", amount: 2000, description: "Pagamento funcionário João", readyToSave: true
+- REGRA: Se contém VERBO DE AÇÃO (paguei, fiz pagamento, gerei pagamento) + VALOR + FUNCIONÁRIO → register_expense com readyToSave: true
+- NÃO perguntar confirmação quando: funcionário + valor + verbo de pagamento estiverem presentes
+
+CONSULTA (query + queryType: "employee_payments"):
+  - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
   - "quem eu paguei este mês?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
-  - "pagamentos de funcionários" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
-  - "salários pagos" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
   - "já paguei o Pedro?" → intent: "query", domain: "empresa", queryType: "employee_payments", employee_name: "Pedro", periodo: "mês"
   - "quanto paguei para funcionários este ano?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "ano"
-- REGRA DE PERÍODO: Se período não for mencionado, SEMPRE assume "mês" (este mês).
-- Funcionário específico: Se mencionar nome de funcionário, use employee_name.
+- REGRA: Se contém APENAS PERGUNTA (sem verbo de ação) → query com queryType: "employee_payments"
 
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"

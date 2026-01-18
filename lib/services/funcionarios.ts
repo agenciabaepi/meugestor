@@ -70,6 +70,33 @@ export function extractEmployeeNameFromCreateCommand(message: string): string | 
 }
 
 /**
+ * Extrai valor numérico de uma mensagem de pagamento.
+ * Padrões: "1500", "1.500", "1,500", "1500 reais", "2 mil"
+ */
+export function extractPaymentAmount(message: string): number | null {
+  const raw = String(message || '').trim()
+  if (!raw) return null
+
+  // Padrão 1: "1500", "1.500", "1,500"
+  const directMatch = raw.match(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s*(?:reais?|rs?|r\$)?/i)
+  if (directMatch) {
+    const valueStr = directMatch[1].replace(/\./g, '').replace(',', '.')
+    const value = parseFloat(valueStr)
+    if (!isNaN(value) && value > 0) return value
+  }
+
+  // Padrão 2: "2 mil", "1 mil", "1.5 mil"
+  const milMatch = raw.match(/(\d+(?:[.,]\d+)?)\s*mil/i)
+  if (milMatch) {
+    const valueStr = milMatch[1].replace(',', '.')
+    const value = parseFloat(valueStr) * 1000
+    if (!isNaN(value) && value > 0) return value
+  }
+
+  return null
+}
+
+/**
  * Extrai nome de funcionário mencionado em uma frase de pagamento:
  * - "fiz o pagamento do Pedro Oliveira, 1500 reais"
  * - "paguei 2 mil para o funcionário Pedro"
