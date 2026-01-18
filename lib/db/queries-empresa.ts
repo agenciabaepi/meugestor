@@ -24,32 +24,50 @@ export async function createFinanceiroEmpresa(
   metadata?: Record<string, any> | null,
   tags?: string[] | null,
   transactionType: 'expense' | 'revenue' = 'expense',
-  userId?: string | null
+  userId?: string | null,
+  funcionarioId?: string | null
 ): Promise<Financeiro | null> {
   const client = requireAdmin()
+  const insertData: any = {
+    tenant_id: tenantId,
+    empresa_id: empresaId,
+    user_id: userId || null,
+    amount,
+    description,
+    category,
+    date,
+    receipt_image_url: receiptImageUrl || null,
+    subcategory: subcategory || null,
+    metadata: metadata || {},
+    tags: tags || [],
+    transaction_type: transactionType,
+  }
+
+  // Adiciona funcionario_id se fornecido e se a coluna existir
+  if (funcionarioId) {
+    insertData.funcionario_id = funcionarioId
+  }
+
   const { data, error } = await client
     .from('financeiro_empresa')
-    .insert({
-      tenant_id: tenantId,
-      empresa_id: empresaId,
-      user_id: userId || null,
-      amount,
-      description,
-      category,
-      date,
-      receipt_image_url: receiptImageUrl || null,
-      subcategory: subcategory || null,
-      metadata: metadata || {},
-      tags: tags || [],
-      transaction_type: transactionType,
-    })
+    .insert(insertData)
     .select()
     .single()
 
   if (error) {
     console.error('Error creating financeiro_empresa:', error)
+    console.error('Insert data:', JSON.stringify(insertData, null, 2))
     return null
   }
+  
+  // Log para debug
+  if (funcionarioId && (data as any).funcionario_id !== funcionarioId) {
+    console.warn('Aviso: funcionario_id pode não ter sido salvo corretamente', {
+      esperado: funcionarioId,
+      recebido: (data as any).funcionario_id
+    })
+  }
+  
   return data
 }
 
@@ -78,6 +96,34 @@ export async function getFinanceiroEmpresaByEmpresa(
   const { data, error } = await query
   if (error) {
     console.error('Error fetching financeiro_empresa:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getFinanceiroEmpresaByFuncionario(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<Financeiro[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('financeiro_empresa')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('funcionario_id', funcionarioId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (startDate) query = query.gte('date', startDate)
+  if (endDate) query = query.lte('date', endDate)
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching financeiro_empresa by funcionario:', error)
     return []
   }
   return data || []
