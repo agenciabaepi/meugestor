@@ -11,6 +11,7 @@ export interface SemanticState {
     | 'register_revenue'
     | 'create_supplier'
     | 'create_employee'
+    | 'pay_employee_salary'
     | 'create_appointment'
     | 'update_expense'
     | 'update_revenue'

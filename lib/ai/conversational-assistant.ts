@@ -39,6 +39,10 @@ function validateDataCompleteness(state: SemanticState): boolean {
       // Precisa: amount + description
       return !!(state.amount && state.amount > 0 && state.description)
     
+    case 'pay_employee_salary':
+      // Precisa: employee_name (salário será buscado automaticamente)
+      return !!(state.employee_name && String(state.employee_name).trim().length > 0)
+    
     case 'update_expense':
     case 'update_revenue':
     case 'update_appointment':
@@ -201,15 +205,21 @@ REGRA CRÍTICA - NOVO DOMÍNIO "listas":
   - "quantos itens tenho na lista de películas de iphone?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "películas de iphone"
 
 REGRA CRÍTICA - PAGAMENTOS DE FUNCIONÁRIOS (MODO EMPRESA):
-- DISTINGUIR entre REGISTRO vs CONSULTA:
+- DISTINGUIR entre REGISTRO COM VALOR, REGISTRO SEM VALOR (busca salário) e CONSULTA:
 
-REGISTRO (register_expense + readyToSave: true):
+REGISTRO COM VALOR (register_expense + readyToSave: true):
   - "paguei o salário do Pedro Oliveira de 1500" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro Oliveira", readyToSave: true
   - "fiz o pagamento do Pedro, 1500 reais" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro", readyToSave: true
   - "salário do Pedro 1500" → intent: "register_expense", amount: 1500, description: "Pagamento funcionário Pedro", readyToSave: true
   - "paguei 2 mil para o funcionário João" → intent: "register_expense", amount: 2000, description: "Pagamento funcionário João", readyToSave: true
 - REGRA: Se contém VERBO DE AÇÃO (paguei, fiz pagamento, gerei pagamento) + VALOR + FUNCIONÁRIO → register_expense com readyToSave: true
-- NÃO perguntar confirmação quando: funcionário + valor + verbo de pagamento estiverem presentes
+
+REGISTRO SEM VALOR - BUSCA SALÁRIO AUTOMÁTICO (pay_employee_salary + readyToSave: true):
+  - "paguei o salário do funcionário Paulo Souza" → intent: "pay_employee_salary", employee_name: "Paulo Souza", readyToSave: true
+  - "já paguei o Paulo Souza" → intent: "pay_employee_salary", employee_name: "Paulo Souza", readyToSave: true
+  - "marca o salário do Paulo Souza como pago" → intent: "pay_employee_salary", employee_name: "Paulo Souza", readyToSave: true
+- REGRA: Se contém VERBO DE AÇÃO (paguei, já paguei, marca como pago) + FUNCIONÁRIO + SEM VALOR → pay_employee_salary com readyToSave: true
+- O sistema busca o salario_base do funcionário automaticamente e registra
 
 CONSULTA (query + queryType: "employee_payments"):
   - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
@@ -249,6 +259,7 @@ DADOS ESSENCIAIS POR INTENÇÃO:
 - register_revenue: amount + description → readyToSave: true
 - create_supplier: supplier_name → readyToSave: true (modo empresa)
 - create_employee: employee_name → readyToSave: true (modo empresa)
+- pay_employee_salary: employee_name → readyToSave: true (modo empresa, busca salario_base automaticamente)
 
 EXEMPLOS DE QUANDO NÃO PERGUNTAR:
 - "tenho dentista amanhã às 10" → Dados completos! readyToSave: true, executar diretamente
@@ -271,7 +282,7 @@ ${activeTaskContext}
 
 Responda APENAS com JSON no formato:
 {
-  "intent": "register_expense" | "register_revenue" | "create_supplier" | "create_employee" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
+  "intent": "register_expense" | "register_revenue" | "create_supplier" | "create_employee" | "pay_employee_salary" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
   "domain": "financeiro" | "agenda" | "listas" | "empresa" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,

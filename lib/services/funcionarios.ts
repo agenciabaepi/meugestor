@@ -151,3 +151,38 @@ export async function findFuncionarioByName(
 
   return null
 }
+
+/**
+ * Extrai nome de funcionário de mensagens de pagamento de salário SEM valor.
+ * Exemplos:
+ * - "paguei o salário do funcionário Paulo Souza"
+ * - "já paguei o Paulo Souza"
+ * - "marca o salário do Paulo Souza como pago"
+ */
+export function extractEmployeeNameFromSalaryPayment(message: string): string | null {
+  const raw = String(message || '').trim()
+  if (!raw) return null
+
+  // Padrões específicos para pagamento de salário sem valor mencionado
+  const patterns = [
+    /\b(?:paguei|j[aá]\s+paguei|fiz\s+o\s+pagamento|pagamento\s+feito|marca|marcar)\s+(?:o\s+)?(?:sal[aá]rio\s+)?(?:do|da|de)\s+(?:funcion[aá]rio\s+)?(.+?)(?:\s+como\s+pago|\s+de\s+\d|$|!|\.)/i,
+    /\b(?:paguei|j[aá]\s+paguei)\s+(?:o\s+)?(.+?)(?:\s+de\s+\d|$|!|\.)/i,
+    /\b(?:sal[aá]rio\s+)?(?:do|da|de)\s+(?:funcion[aá]rio\s+)?(.+?)(?:\s+como\s+pago|\s+de\s+\d|$|!|\.)/i,
+  ]
+
+  for (const pattern of patterns) {
+    const m = raw.match(pattern)
+    if (!m) continue
+    const name = normalizeName(m[1] || '')
+      .replace(/^["'""'']+/, '')
+      .replace(/["'""'']+$/, '')
+      .trim()
+      .replace(/\s+(como|pago|de|do|da|funcion[aá]rio)$/i, '')
+      .trim()
+    
+    // Remove palavras comuns que podem ter ficado no nome
+    const cleaned = name.replace(/\s+(como|pago|de|do|da|funcion[aá]rio|sal[aá]rio)$/i, '').trim()
+    if (cleaned && cleaned.length >= 2) return cleaned
+  }
+  return null
+}

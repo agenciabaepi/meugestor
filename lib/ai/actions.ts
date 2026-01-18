@@ -61,6 +61,8 @@ import {
   extractEmployeeNameFromPaymentText,
   extractEmployeeNameFromCreateCommand,
   extractPaymentAmount,
+  extractEmployeeNameFromSalaryPayment,
+  findFuncionarioByName,
 } from '../services/funcionarios'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
@@ -77,6 +79,7 @@ const MUTATING_INTENTS = new Set([
   'register_revenue',
   'create_supplier',
   'create_employee',
+  'pay_employee_salary',
   'update_expense',
   'update_revenue',
   'create_appointment',
@@ -327,14 +330,13 @@ export async function processAction(
     }
 
     // Prioridade 2: Detecção determinística de PAGAMENTO de funcionário (modo empresa)
-    // Se detectar funcionário + valor + verbo de pagamento → registra diretamente
     if (effectiveSessionContext?.mode === 'empresa' && effectiveSessionContext.empresa_id) {
       const employeeName = extractEmployeeNameFromPaymentText(message)
       const paymentAmount = extractPaymentAmount(message)
       const hasPaymentVerb = /\b(paguei|fiz\s+(?:o\s+)?pagamento|sal[aá]rio|gerei\s+pagamento|paguei\s+o\s+sal[aá]rio)\b/i.test(message)
       
+      // Caso 1: Pagamento COM valor → register_expense
       if (employeeName && paymentAmount && hasPaymentVerb) {
-        // Pagamento de funcionário detectado → registra diretamente como register_expense
         const forced: SemanticState = {
           intent: 'register_expense',
           domain: 'empresa',
@@ -343,6 +345,26 @@ export async function processAction(
           employee_name: employeeName,
           categoria: 'Funcionários',
           subcategoria: 'salário',
+          confidence: 1,
+          readyToSave: true,
+        }
+
+        const result = await executeAction(forced, tenantId, userId, message, effectiveSessionContext)
+        if (result.success && isMutatingIntent(forced.intent)) {
+          await cleanupAfterMutation(tenantId, userId, forced.intent)
+        }
+        return result
+      }
+      
+      // Caso 2: Pagamento SEM valor (apenas referência) → pay_employee_salary (busca salário automaticamente)
+      const employeeNameFromSalary = extractEmployeeNameFromSalaryPayment(message)
+      const hasSalaryPaymentVerb = /\b(paguei|j[aá]\s+paguei|fiz\s+o\s+pagamento|pagamento\s+feito|marca|marcar)\s+(?:o\s+)?(?:sal[aá]rio\s+)?(?:do|da|de)\s+(?:funcion[aá]rio\s+)?/i.test(message)
+      
+      if (employeeNameFromSalary && hasSalaryPaymentVerb && !paymentAmount) {
+        const forced: SemanticState = {
+          intent: 'pay_employee_salary',
+          domain: 'empresa',
+          employee_name: employeeNameFromSalary,
           confidence: 1,
           readyToSave: true,
         }
@@ -646,6 +668,9 @@ async function executeAction(
 
     case 'create_employee':
       return await handleCreateEmployee(semanticState, tenantId, userId, message, sessionContext)
+
+    case 'pay_employee_salary':
+      return await handlePayEmployeeSalary(semanticState, tenantId, userId, message, sessionContext)
 
     case 'update_expense':
     case 'update_revenue':
@@ -1866,6 +1891,142 @@ async function handleCreateEmployee(
     }
     console.error('Erro ao criar funcionário:', error)
     return { success: false, message: 'Não consegui cadastrar o funcionário.' }
+  }
+}
+
+/**
+ * Registra pagamento de salário de funcionário (busca salario_base automaticamente)
+ */
+async function handlePayEmployeeSalary(
+  state: SemanticState,
+  tenantId: string,
+  userId: string,
+  message: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  try {
+    if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+      return {
+        success: false,
+        message: 'Pagamento de funcionários só está disponível no modo empresa.',
+      }
+    }
+
+    // Extrai nome do funcionário (do estado ou da mensagem)
+    let employeeName = state.employee_name ? String(state.employee_name).trim() : null
+    if (!employeeName) {
+      employeeName = extractEmployeeNameFromSalaryPayment(message)
+    }
+
+    if (!employeeName) {
+      return {
+        success: false,
+        message: 'Qual funcionário recebeu o pagamento?',
+      }
+    }
+
+    // Busca funcionário
+    const funcionario = await findFuncionarioByName(sessionContext, employeeName)
+    if (!funcionario) {
+      return {
+        success: false,
+        message: `Não encontrei o funcionário *${employeeName}*. Deseja cadastrá-lo primeiro?`,
+      }
+    }
+
+    // Verifica se tem salário base cadastrado
+    if (!funcionario.salario_base || funcionario.salario_base <= 0) {
+      return {
+        success: false,
+        message: `Não encontrei o salário cadastrado do funcionário *${funcionario.nome_original}*. Qual é o valor?`,
+      }
+    }
+
+    const salarioBase = funcionario.salario_base
+
+    // Verifica se já foi pago neste mês (evita duplicação)
+    const { getFinanceiroEmpresaByFuncionario } = await import('../db/queries-empresa')
+    const { getBrazilDayStartISO, getBrazilDayEndISO } = await import('../utils/date-parser')
+    
+    const hoje = new Date()
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+    
+    const startDate = primeiroDiaMes.toISOString()
+    const endDate = ultimoDiaMes.toISOString()
+    
+    const pagamentosMes = await getFinanceiroEmpresaByFuncionario(
+      tenantId,
+      sessionContext.empresa_id,
+      funcionario.id,
+      startDate,
+      endDate
+    )
+
+    // Verifica se já existe pagamento no mês atual
+    if (pagamentosMes.length > 0) {
+      const ultimoPagamento = pagamentosMes[0]
+      const dataPagamento = new Date(ultimoPagamento.date)
+      const mesPagamento = dataPagamento.getMonth()
+      const anoPagamento = dataPagamento.getFullYear()
+      
+      if (mesPagamento === hoje.getMonth() && anoPagamento === hoje.getFullYear()) {
+        return {
+          success: true,
+          message: `ℹ️ O salário de *${funcionario.nome_original}* já foi registrado neste mês (${dataPagamento.toLocaleDateString('pt-BR')}).`,
+        }
+      }
+    }
+
+    // Registra o pagamento no financeiro
+    const { createFinanceiroEmpresa } = await import('../db/queries-empresa')
+    const hojeISO = hoje.toISOString().split('T')[0] // YYYY-MM-DD
+    
+    const record = await createFinanceiroEmpresa(
+      tenantId,
+      sessionContext.empresa_id,
+      salarioBase,
+      `Salário funcionário ${funcionario.nome_original}`,
+      'Funcionários',
+      hojeISO,
+      null, // receiptImageUrl
+      'salário', // subcategory
+      {
+        funcionario: {
+          id: funcionario.id,
+          nome: funcionario.nome_original,
+        },
+        tipo: 'salario_mensal',
+        periodo: `${hoje.getMonth() + 1}/${hoje.getFullYear()}`,
+      },
+      ['funcionário', 'salário'],
+      'expense',
+      userId,
+      funcionario.id // funcionarioId
+    )
+
+    if (!record) {
+      return {
+        success: false,
+        message: 'Não consegui registrar o pagamento. Tente novamente.',
+      }
+    }
+
+    // Formata resposta final
+    const mesNome = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    const mesNomeCapitalizado = mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
+
+    return {
+      success: true,
+      message: `✅ Salário pago com sucesso!\n\n👤 Funcionário: *${funcionario.nome_original}*\n💰 Valor: R$ ${salarioBase.toFixed(2).replace('.', ',')}\n📅 Período: ${mesNomeCapitalizado}\n📂 Categoria: Funcionários › Salário\n\nO pagamento já foi lançado nos gastos da empresa.`,
+      data: record,
+    }
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return { success: false, message: error.message }
+    }
+    console.error('Erro ao registrar pagamento de salário:', error)
+    return { success: false, message: 'Não consegui registrar o pagamento. Tente novamente.' }
   }
 }
 
