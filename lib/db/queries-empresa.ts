@@ -797,3 +797,56 @@ export async function createFuncionario(
   }
   return data
 }
+
+export async function updateFuncionario(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId: string,
+  updates: {
+    nome_original?: string
+    nome_normalizado?: string
+    cargo?: string | null
+    salario_base?: number | null
+    tipo?: 'fixo' | 'freelancer' | 'temporario' | null
+    ativo?: boolean
+  }
+): Promise<Funcionario | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('funcionarios')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', funcionarioId)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating funcionario:', error)
+    return null
+  }
+  return data
+}
+
+export async function deleteFuncionario(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId: string
+): Promise<boolean> {
+  const client = requireAdmin()
+  const { error } = await client
+    .from('funcionarios')
+    .delete()
+    .eq('id', funcionarioId)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+
+  if (error) {
+    console.error('Error deleting funcionario:', error)
+    return false
+  }
+  return true
+}
