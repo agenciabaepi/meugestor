@@ -13,14 +13,24 @@ export interface EmpresaCategorizationResult {
 type MapEntry = { category: string; subcategory: string | null; tags: string[] }
 
 const MAPPINGS: Record<string, MapEntry> = {
-  // Materiais
+  // Materiais (pintura/construção)
   tinta: { category: 'Materiais', subcategory: 'tinta', tags: ['materiais', 'tinta'] },
+  epox: { category: 'Materiais', subcategory: 'tinta', tags: ['materiais', 'tinta', 'epox'] },
+  epóxi: { category: 'Materiais', subcategory: 'tinta', tags: ['materiais', 'tinta', 'epox'] },
+  epoxi: { category: 'Materiais', subcategory: 'tinta', tags: ['materiais', 'tinta', 'epox'] },
+  verniz: { category: 'Materiais', subcategory: 'verniz', tags: ['materiais', 'verniz'] },
   spray: { category: 'Materiais', subcategory: 'spray', tags: ['materiais', 'spray'] },
   rolo: { category: 'Materiais', subcategory: 'rolo', tags: ['materiais', 'rolo'] },
   pincel: { category: 'Materiais', subcategory: 'pincel', tags: ['materiais', 'pincel'] },
+  pinceis: { category: 'Materiais', subcategory: 'pincel', tags: ['materiais', 'pincel'] },
+  pincéis: { category: 'Materiais', subcategory: 'pincel', tags: ['materiais', 'pincel'] },
+  lata: { category: 'Materiais', subcategory: null, tags: ['materiais'] },
+  litros: { category: 'Materiais', subcategory: null, tags: ['materiais'] },
   massa: { category: 'Materiais', subcategory: 'massa', tags: ['materiais'] },
   cimento: { category: 'Materiais', subcategory: 'cimento', tags: ['materiais'] },
   areia: { category: 'Materiais', subcategory: 'areia', tags: ['materiais'] },
+  material: { category: 'Materiais', subcategory: null, tags: ['materiais'] },
+  materiais: { category: 'Materiais', subcategory: null, tags: ['materiais'] },
 
   // Serviços terceirizados
   eletricista: { category: 'Serviços terceirizados', subcategory: 'eletricista', tags: ['serviço', 'terceirizado'] },

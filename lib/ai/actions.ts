@@ -58,6 +58,7 @@ import {
 } from '../services/fornecedores'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
+import { parseMultiItemExpense } from '../utils/parse-multi-item-expense'
 import { parseScheduledAt, resolveScheduledAt, applyTimeToISOInBrazil, extractAppointmentFromMessage, isFutureInBrazil, getNowInBrazil, getTodayStartInBrazil, getTodayEndInBrazil, getYesterdayStartInBrazil, getYesterdayEndInBrazil, getBrazilDayStartISO, getBrazilDayEndISO } from '../utils/date-parser'
 import { analyzeAppointmentContext, analyzeSystemFeaturesRequest, analyzeConversationalIntent } from './context-analyzer'
 import type { SemanticState } from './semantic-state'
@@ -1248,6 +1249,7 @@ async function handleCancelAppointment(
 
 /**
  * Registra um gasto
+ * Agora suporta múltiplos itens em uma única mensagem (modo empresa).
  */
 async function handleRegisterExpense(
   state: SemanticState,
@@ -1257,6 +1259,15 @@ async function handleRegisterExpense(
   sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   try {
+    // REGRA DE OURO: Detectar se a mensagem contém múltiplos itens
+    const multiItem = parseMultiItemExpense(message)
+
+    // Se há múltiplos itens, criar um gasto por item
+    if (multiItem && multiItem.items.length >= 2) {
+      return await handleMultiItemExpense(multiItem, tenantId, userId, sessionContext, state)
+    }
+
+    // Caso contrário, comportamento tradicional (gasto único)
     // Validação rígida: verifica dados obrigatórios
     if (!state.amount || state.amount <= 0) {
       return {
@@ -1378,6 +1389,147 @@ async function handleRegisterExpense(
       }
     }
     throw error
+  }
+}
+
+/**
+ * Registra múltiplos gastos (um por item).
+ * Cada item é uma despesa independente, mesmo que pertença ao mesmo fornecedor.
+ */
+async function handleMultiItemExpense(
+  multiItem: { fornecedor: string | null; items: Array<{ quantidade: number | null; descricao: string; valor: number | null }> },
+  tenantId: string,
+  userId: string,
+  sessionContext: SessionContext | null,
+  state: SemanticState
+): Promise<ActionResult> {
+  const date = new Date().toISOString().split('T')[0]
+  const records: any[] = []
+  const failed: string[] = []
+  let fornecedorInfo: { id: string; nome: string } | null = null
+
+  // Regra inteligente: cria/obtém fornecedor uma vez e reutiliza para todos os itens
+  if (sessionContext?.mode === 'empresa' && multiItem.fornecedor) {
+    try {
+      const { fornecedor } = await ensureFornecedorByNameForContext(sessionContext, multiItem.fornecedor)
+      fornecedorInfo = { id: fornecedor.id, nome: fornecedor.nome }
+    } catch {
+      // Não bloqueia os gastos por falha ao criar fornecedor (fail-safe).
+    }
+  }
+
+  // Processa cada item individualmente
+  for (const item of multiItem.items) {
+    // Validação por item
+    if (!item.valor || item.valor <= 0) {
+      failed.push(`${item.descricao} (sem valor)`)
+      continue
+    }
+
+    if (!item.descricao || item.descricao.trim().length === 0) {
+      failed.push(`item sem descrição`)
+      continue
+    }
+
+    // Categorização por item (baseada na descrição)
+    let category = 'Outros'
+    let subcategory: string | null = null
+    let tags: string[] = []
+
+    if (sessionContext?.mode === 'empresa') {
+      const c = categorizeEmpresaExpense(item.descricao)
+      category = c.category
+      subcategory = c.subcategory
+      tags = c.tags
+    } else {
+      const categorization = categorizeExpense(item.descricao, item.valor)
+      category = categorization.category
+      subcategory = categorization.subcategory
+      tags = categorization.tags
+    }
+
+    // Monta descrição completa (incluindo quantidade se houver)
+    let fullDescription = item.descricao.trim()
+    if (item.quantidade !== null && item.quantidade > 0) {
+      fullDescription = `${item.quantidade} ${fullDescription}`
+    }
+
+    // Prepara metadados (inclui fornecedor se disponível)
+    const metadata: Record<string, any> = {
+      extractedAt: new Date().toISOString(),
+      confidence: state.confidence || 0.8,
+    }
+    if (fornecedorInfo) {
+      metadata.fornecedor = fornecedorInfo
+    }
+
+    // Cria registro individual
+    try {
+      const record =
+        sessionContext?.mode === 'empresa'
+          ? await createFinanceiroRecordForContext(sessionContext, {
+              userId,
+              amount: item.valor,
+              description: fullDescription,
+              category,
+              date,
+              subcategory,
+              metadata,
+              tags,
+              transactionType: 'expense',
+            })
+          : await createFinanceiroRecord({
+              tenantId,
+              userId,
+              amount: item.valor,
+              description: fullDescription,
+              category,
+              date,
+              subcategory,
+              metadata,
+              tags,
+              transactionType: 'expense',
+            })
+
+      records.push(record)
+    } catch (error) {
+      console.error(`Erro ao registrar item "${item.descricao}":`, error)
+      failed.push(`${item.descricao} (erro)`)
+    }
+  }
+
+  // Monta resposta consolidada
+  if (records.length === 0) {
+    return {
+      success: false,
+      message: `Não consegui registrar nenhum gasto.${failed.length > 0 ? `\n\nItens com problema: ${failed.join(', ')}` : ''}`,
+    }
+  }
+
+  const fornecedorLabel = fornecedorInfo ? ` no fornecedor *${fornecedorInfo.nome}*` : ''
+  let responseMessage = `✅ ${records.length} gasto${records.length > 1 ? 's' : ''} registrado${records.length > 1 ? 's' : ''} com sucesso${fornecedorLabel}:\n\n`
+
+  // Lista cada item registrado
+  const itemLines: string[] = []
+  for (let i = 0; i < Math.min(records.length, 10); i++) {
+    const record = records[i]
+    const item = multiItem.items[i]
+    itemLines.push(`• ${item.quantidade !== null && item.quantidade > 0 ? `${item.quantidade} ` : ''}${item.descricao} — R$ ${(item.valor || 0).toFixed(2)}`)
+  }
+  responseMessage += itemLines.join('\n')
+
+  if (records.length > 10) {
+    responseMessage += `\n\n... e mais ${records.length - 10} item${records.length - 10 > 1 ? 'ns' : ''}.`
+  }
+
+  if (failed.length > 0) {
+    responseMessage += `\n\n⚠️ Não consegui registrar: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ` (+${failed.length - 5})` : ''}`
+  }
+
+  return {
+    success: true,
+    message: responseMessage,
+    data: { records, count: records.length, failed },
   }
 }
 
