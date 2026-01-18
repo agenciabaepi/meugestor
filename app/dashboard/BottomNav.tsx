@@ -8,6 +8,7 @@ import {
   Calendar,
   BarChart3,
   ListChecks,
+  Building2,
 } from 'lucide-react'
 import type { SessionContext } from '@/lib/db/types'
 
@@ -16,26 +17,37 @@ const navItems = [
     href: '/dashboard',
     label: 'Início',
     icon: LayoutDashboard,
+    showAlways: true,
   },
   {
     href: '/dashboard/financeiro',
     label: 'Financeiro',
     icon: Wallet,
+    showAlways: true,
   },
   {
     href: '/dashboard/agenda',
     label: 'Agenda',
     icon: Calendar,
+    showAlways: true,
   },
   {
     href: '/dashboard/listas',
     label: 'Listas',
     icon: ListChecks,
+    showAlways: true,
+  },
+  {
+    href: '/dashboard/fornecedores',
+    label: 'Fornecedores',
+    icon: Building2,
+    showAlways: false, // Apenas para empresas
   },
   {
     href: '/dashboard/relatorios',
     label: 'Relatórios',
     icon: BarChart3,
+    showAlways: true,
   },
 ]
 
@@ -45,12 +57,14 @@ export function BottomNav({
   sessionContext: SessionContext | null
 }) {
   const pathname = usePathname()
-  void sessionContext // reservado para futuras variações de menu por modo
+  const isEmpresa = sessionContext?.mode === 'empresa'
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 safe-area-bottom shadow-lg">
       <div className="flex items-center justify-around px-1 py-2 max-w-3xl mx-auto">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => item.showAlways || isEmpresa)
+          .map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
 

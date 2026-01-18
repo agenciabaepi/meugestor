@@ -12,15 +12,41 @@ import { supabaseAdmin } from '@/lib/db/client'
  * IMPORTANTE: server-only (usa cookies/sessão).
  */
 export async function getSessionContext(): Promise<SessionContext | null> {
-  const supabase = await createServerClient()
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession()
+  try {
+    const supabase = await createServerClient()
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
 
-  if (error || !session?.user?.id) return null
+    if (error || !session?.user?.id) {
+      console.warn('[getSessionContext] Sem sessão ou erro:', error?.message)
+      return null
+    }
 
-  // Preferir admin para conseguir fallback via auth.user_metadata quando necessário.
-  return getSessionContextFromUserId((supabaseAdmin as any) || (supabase as any), session.user.id)
+    // Preferir admin para conseguir fallback via auth.user_metadata quando necessário.
+    const client = (supabaseAdmin as any) || (supabase as any)
+    if (!client) {
+      console.warn('[getSessionContext] Cliente Supabase não disponível')
+      return null
+    }
+
+    const ctx = await getSessionContextFromUserId(client, session.user.id)
+    if (!ctx) {
+      console.warn('[getSessionContext] Contexto não encontrado para userId:', session.user.id)
+      // Retorna contexto mínimo baseado apenas na sessão
+      return {
+        tenant_id: '', // vazio se não encontrou
+        user_id: session.user.id,
+        mode: 'pessoal',
+        empresa_id: null,
+      }
+    }
+
+    return ctx
+  } catch (error) {
+    console.error('[getSessionContext] Erro inesperado:', error)
+    return null
+  }
 }
 

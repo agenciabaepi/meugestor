@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './client'
-import type { Fornecedor, Compromisso, Financeiro, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
+import type { Compromisso, Financeiro, Fornecedor, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
 
 function requireAdmin() {
   if (!supabaseAdmin) {
@@ -536,7 +536,6 @@ export async function setLastActiveListNameEmpresa(
   if (error) console.error('Error setting last active list name (empresa):', error)
 }
 
-
 // ============================================
 // FORNECEDORES
 // ============================================
@@ -556,6 +555,27 @@ export async function getFornecedorByNormalizedName(
     .single()
   if (error) return null
   return data
+}
+
+export async function getFornecedoresByEmpresa(
+  tenantId: string,
+  empresaId: string,
+  limit: number = 100
+): Promise<Fornecedor[]> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('fornecedores')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .order('nome', { ascending: true })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching fornecedores:', error)
+    return []
+  }
+  return data || []
 }
 
 export async function createFornecedor(
@@ -587,4 +607,45 @@ export async function createFornecedor(
     return null
   }
   return data
+}
+
+// ============================================
+// CATEGORIAS EMPRESA
+// ============================================
+
+export interface CategoriaEmpresa {
+  id: string
+  tenant_id: string
+  empresa_id: string
+  nome: string
+  nome_normalizado: string | null
+  tipo: 'fixo' | 'variavel'
+  is_default: boolean
+  created_at: string
+}
+
+export async function getCategoriasEmpresa(
+  tenantId: string,
+  empresaId: string,
+  tipo?: 'fixo' | 'variavel'
+): Promise<CategoriaEmpresa[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('categorias_empresa')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .order('nome', { ascending: true })
+
+  if (tipo) {
+    query = query.eq('tipo', tipo)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching categorias_empresa:', error)
+    return []
+  }
+  return data || []
 }

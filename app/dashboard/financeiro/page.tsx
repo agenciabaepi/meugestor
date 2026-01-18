@@ -8,6 +8,7 @@ import {
 import { getSessionContext } from '@/lib/utils/session-context'
 import { FinanceiroTabs } from './tabs'
 import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
+import { EmpresaCategoriasTabela } from './EmpresaCategoriasTabela'
 
 async function getFinanceiroData() {
   const ctx = await getSessionContext()
@@ -145,6 +146,8 @@ async function getFinanceiroData() {
 
 export default async function FinanceiroPage() {
   const data = await getFinanceiroData()
+  const ctx = await getSessionContext()
+  const isEmpresa = ctx?.mode === 'empresa'
   
   const variacaoDespesas = data.totalDespesasAnterior > 0 
     ? ((data.totalDespesas - data.totalDespesasAnterior) / data.totalDespesasAnterior * 100).toFixed(1)
@@ -227,6 +230,14 @@ export default async function FinanceiroPage() {
           </p>
         </div>
       </div>
+
+      {/* Seção de Empresas: Tabela por Categoria */}
+      {isEmpresa && (
+        <EmpresaCategoriasTabela
+          despesas={data.despesasMes}
+          receitas={data.receitasMes}
+        />
+      )}
 
       {/* Componente de Abas */}
       <FinanceiroTabs 

@@ -51,8 +51,14 @@ export async function getAuthenticatedTenantId(): Promise<string | null> {
       return null
     }
 
-    const supabase = await createServerClient()
-    const row = await getUserRowById(supabase as any, session.user.id)
+    // Importa supabaseAdmin dinamicamente para evitar problemas de inicialização
+    const { supabaseAdmin } = await import('../db/client')
+    if (!supabaseAdmin) {
+      console.warn('[getAuthenticatedTenantId] supabaseAdmin não configurado')
+      return null
+    }
+
+    const row = await getUserRowById(supabaseAdmin as any, session.user.id)
     if (!row?.user?.tenant_id) return null
     return row.user.tenant_id
   } catch (error) {

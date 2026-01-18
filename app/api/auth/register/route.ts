@@ -199,6 +199,30 @@ export async function POST(request: NextRequest) {
           } catch (e) {
             console.error('Exceção ao atualizar perfil com contexto empresa:', e, { profileTable })
           }
+          
+          // CRÍTICO: Atualiza user_session_context também para garantir que o contexto seja reconhecido imediatamente
+          if (linked && existingUser) {
+            try {
+              const ctxUpd = await supabaseAdmin
+                .from('user_session_context')
+                .upsert(
+                  {
+                    user_id: data.user.id,
+                    tenant_id: existingUser.tenant_id,
+                    mode: 'empresa',
+                    empresa_id: empresa.id,
+                  },
+                  { onConflict: 'user_id' }
+                )
+              if (ctxUpd.error) {
+                console.warn('Aviso: Falha ao atualizar user_session_context (não bloqueante):', ctxUpd.error)
+              } else {
+                console.log('user_session_context atualizado com sucesso durante registro')
+              }
+            } catch (e) {
+              console.warn('Exceção ao atualizar user_session_context (não bloqueante):', e)
+            }
+          }
 
           if (!linked) {
             // Mantém fallback em metadata (para não perder a vinculação), mas não trata como "sucesso silencioso":

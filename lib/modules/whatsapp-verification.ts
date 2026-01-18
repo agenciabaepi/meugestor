@@ -7,6 +7,16 @@ import { supabaseAdmin } from '../db/client'
 import { sendTextMessage } from './whatsapp'
 import { sendWelcomeMessageIfNeeded } from './whatsapp-onboarding'
 
+function normalizeWhatsApp(whatsappNumber: string): string {
+  return String(whatsappNumber || '').replace(/\D/g, '')
+}
+
+function isMissingRelationOrColumn(err: any): boolean {
+  const msg = String(err?.message || '').toLowerCase()
+  const code = String(err?.code || '')
+  return code === '42P01' || code === '42703' || msg.includes('does not exist') || msg.includes('column')
+}
+
 // Armazena códigos OTP temporários (em produção, use Redis ou banco de dados)
 const otpStore = new Map<string, { code: string; expiresAt: number; userId: string }>()
 
@@ -30,19 +40,23 @@ export async function sendOTPVerification(
     }
 
     // Normaliza o número
-    const normalized = whatsappNumber.replace(/\D/g, '')
+    const normalized = normalizeWhatsApp(whatsappNumber)
     
     // Verifica se o número já está vinculado a outro usuário
-    const { data: existing } = await supabaseAdmin
-      .from('users')
-      .select('id, whatsapp_number')
-      .eq('whatsapp_number', normalized)
-      .single()
-
-    if (existing && existing.id !== userId) {
-      return {
-        success: false,
-        error: 'Este número do WhatsApp já está vinculado a outra conta',
+    for (const table of ['users', 'users_meugestor'] as const) {
+      const { data: existing, error } = await supabaseAdmin
+        .from(table)
+        .select('id')
+        .eq('whatsapp_number', normalized)
+        .maybeSingle()
+      if (error && !isMissingRelationOrColumn(error)) {
+        console.error(`Erro ao verificar WhatsApp existente (${table}):`, error)
+      }
+      if (existing?.id && existing.id !== userId) {
+        return {
+          success: false,
+          error: 'Este número do WhatsApp já está vinculado a outra conta',
+        }
       }
     }
 
@@ -85,7 +99,7 @@ export async function verifyOTPAndLink(
       return { success: false, error: 'Sistema não configurado' }
     }
 
-    const normalized = whatsappNumber.replace(/\D/g, '')
+    const normalized = normalizeWhatsApp(whatsappNumber)
     const key = `${userId}:${normalized}`
     const stored = otpStore.get(key)
 
@@ -108,29 +122,43 @@ export async function verifyOTPAndLink(
     }
 
     // Verifica novamente se o número não está vinculado a outro usuário
-    const { data: existing } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('whatsapp_number', normalized)
-      .single()
-
-    if (existing && existing.id !== userId) {
-      otpStore.delete(key)
-      return {
-        success: false,
-        error: 'Este número já está vinculado a outra conta',
+    for (const table of ['users', 'users_meugestor'] as const) {
+      const { data: existing, error } = await supabaseAdmin
+        .from(table)
+        .select('id')
+        .eq('whatsapp_number', normalized)
+        .maybeSingle()
+      if (error && !isMissingRelationOrColumn(error)) {
+        console.error(`Erro ao verificar WhatsApp existente (${table}):`, error)
+      }
+      if (existing?.id && existing.id !== userId) {
+        otpStore.delete(key)
+        return {
+          success: false,
+          error: 'Este número já está vinculado a outra conta',
+        }
       }
     }
 
     // Vincula o número ao usuário
-    const { error } = await supabaseAdmin
-      .from('users')
-      .update({ whatsapp_number: normalized })
-      .eq('id', userId)
+    let updated = false
+    for (const table of ['users', 'users_meugestor'] as const) {
+      const { error } = await supabaseAdmin.from(table).update({ whatsapp_number: normalized }).eq('id', userId)
+      if (!error) updated = true
+      if (error && !isMissingRelationOrColumn(error)) {
+        console.error(`Erro ao vincular WhatsApp (${table}):`, error)
+      }
+    }
+    if (!updated) return { success: false, error: 'Erro ao vincular número' }
 
-    if (error) {
-      console.error('Erro ao vincular WhatsApp:', error)
-      return { success: false, error: 'Erro ao vincular número' }
+    // Atualiza auth.user_metadata (fallback canônico)
+    try {
+      const admin = (supabaseAdmin as any).auth?.admin
+      if (admin?.updateUserById) {
+        await admin.updateUserById(userId, { user_metadata: { whatsapp_number: normalized } })
+      }
+    } catch {
+      // ignore
     }
 
     // Remove código usado

@@ -36,6 +36,13 @@ export default function PerfilPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [empresaId, setEmpresaId] = useState<string>('')
   const [savingContext, setSavingContext] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [userName, setUserName] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null)
+  const [editingEmpresa, setEditingEmpresa] = useState(false)
+  const [empresaForm, setEmpresaForm] = useState({ nome_fantasia: '', razao_social: '', cnpj: '' })
+  const [savingEmpresa, setSavingEmpresa] = useState(false)
 
   useEffect(() => {
     loadUser()
@@ -51,6 +58,7 @@ export default function PerfilPage() {
       const data = await response.json()
       setUser(data.user)
       setWhatsappNumber(data.user.whatsapp_number)
+      setUserName(data.user.name || '')
       // Se já existe empresa_id, o usuário já é "empresa" (sem precisar escolher de novo).
       setMode(data.user.empresa_id ? 'empresa' : data.user.mode === 'empresa' ? 'empresa' : 'pessoal')
       setEmpresaId(data.user.empresa_id || '')
@@ -58,9 +66,30 @@ export default function PerfilPage() {
       // carrega empresas do tenant
       try {
         const empRes = await fetch('/api/empresas')
-        const empJson = await empRes.json()
-        setEmpresas(Array.isArray(empJson.empresas) ? empJson.empresas : [])
-      } catch {
+        if (!empRes.ok) {
+          console.error('[Perfil] Erro ao carregar empresas:', empRes.status, empRes.statusText)
+          setEmpresas([])
+        } else {
+          const empJson = await empRes.json()
+          const empresasList = Array.isArray(empJson.empresas) ? empJson.empresas : []
+          console.log('[Perfil] Empresas carregadas:', empresasList.length)
+          setEmpresas(empresasList)
+          
+          // Se há empresa_id, preenche o formulário de edição
+          if (data.user.empresa_id) {
+            const empresa = empresasList.find((e: Empresa) => e.id === data.user.empresa_id)
+            if (empresa) {
+              setSelectedEmpresa(empresa)
+              setEmpresaForm({
+                nome_fantasia: empresa.nome_fantasia || '',
+                razao_social: empresa.razao_social || '',
+                cnpj: empresa.cnpj || '',
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Perfil] Erro ao carregar empresas:', error)
         setEmpresas([])
       }
     } catch (error) {
@@ -77,8 +106,16 @@ export default function PerfilPage() {
     setMessage(null)
 
     try {
-      const response = await fetch('/api/auth/link-whatsapp', {
-        method: 'POST',
+      // Validação básica
+      const normalized = whatsappNumber.replace(/\D/g, '')
+      if (normalized.length < 10) {
+        setMessage({ type: 'error', text: 'O número do WhatsApp deve ter pelo menos 10 dígitos' })
+        setSaving(false)
+        return
+      }
+
+      const response = await fetch('/api/auth/me', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ whatsappNumber }),
       })
@@ -86,14 +123,15 @@ export default function PerfilPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setMessage({ type: 'error', text: data.error || 'Erro ao vincular WhatsApp' })
+        setMessage({ type: 'error', text: data.error || 'Erro ao atualizar WhatsApp' })
         return
       }
 
-      setMessage({ type: 'success', text: 'WhatsApp vinculado com sucesso!' })
+      setMessage({ type: 'success', text: 'WhatsApp atualizado com sucesso!' })
       await loadUser()
     } catch (error) {
-      setMessage({ type: 'error', text: 'Erro ao vincular WhatsApp' })
+      console.error('Erro ao atualizar WhatsApp:', error)
+      setMessage({ type: 'error', text: 'Erro ao atualizar WhatsApp' })
     } finally {
       setSaving(false)
     }
@@ -145,27 +183,99 @@ export default function PerfilPage() {
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
         {/* Informações do Usuário */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Informações Pessoais</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Nome</label>
-              <div className="mt-1 text-sm text-gray-900">{user.name || 'Não informado'}</div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <div className="mt-1 text-sm text-gray-900">{user.email}</div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Função</label>
-              <div className="mt-1 text-sm text-gray-900 capitalize">{user.role}</div>
-            </div>
-            {user.tenant && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Organização</label>
-                <div className="mt-1 text-sm text-gray-900">{user.tenant.name}</div>
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Informações Pessoais</h2>
+            {!editingName && (
+              <button
+                type="button"
+                onClick={() => setEditingName(true)}
+                className="text-sm text-emerald-700 hover:text-emerald-800 font-medium"
+              >
+                Editar
+              </button>
             )}
           </div>
+          
+          {editingName ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                setSavingName(true)
+                setMessage(null)
+                try {
+                  const res = await fetch('/api/auth/me', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: userName }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) {
+                    setMessage({ type: 'error', text: data.error || 'Erro ao atualizar nome' })
+                  } else {
+                    setMessage({ type: 'success', text: 'Nome atualizado com sucesso!' })
+                    setEditingName(false)
+                    await loadUser()
+                  }
+                } catch {
+                  setMessage({ type: 'error', text: 'Erro ao atualizar nome' })
+                } finally {
+                  setSavingName(false)
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nome</label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingName}
+                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 rounded-md disabled:opacity-50"
+                >
+                  {savingName ? 'Salvando...' : 'Salvar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingName(false)
+                    setUserName(user.name || '')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nome</label>
+                <div className="mt-1 text-sm text-gray-900">{user.name || 'Não informado'}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <div className="mt-1 text-sm text-gray-900">{user.email}</div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Função</label>
+                <div className="mt-1 text-sm text-gray-900 capitalize">{user.role}</div>
+              </div>
+              {user.tenant && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Organização</label>
+                  <div className="mt-1 text-sm text-gray-900">{user.tenant.name}</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Vinculação WhatsApp */}
@@ -255,22 +365,45 @@ export default function PerfilPage() {
 
             {mode === 'empresa' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Empresa</label>
-                <select
-                  value={empresaId}
-                  onChange={(e) => setEmpresaId(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                >
-                  <option value="">Selecione uma empresa</option>
-                  {empresas.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nome_fantasia}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                {empresas.length === 0 ? (
+                  <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p className="text-sm text-yellow-800">
+                      Nenhuma empresa cadastrada. Cadastre uma empresa primeiro no registro.
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    value={empresaId}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setEmpresaId(id)
+                      const empresa = empresas.find((e) => e.id === id)
+                      if (empresa) {
+                        setSelectedEmpresa(empresa)
+                        setEmpresaForm({
+                          nome_fantasia: empresa.nome_fantasia || '',
+                          razao_social: empresa.razao_social || '',
+                          cnpj: empresa.cnpj || '',
+                        })
+                      } else {
+                        setSelectedEmpresa(null)
+                        setEmpresaForm({ nome_fantasia: '', razao_social: '', cnpj: '' })
+                      }
+                    }}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  >
+                    <option value="">Selecione uma empresa</option>
+                    {empresas.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nome_fantasia}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {user.empresa_nome_fantasia && user.empresa_id && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Atual: {user.empresa_nome_fantasia} ({user.empresa_id})
+                    Atual: {user.empresa_nome_fantasia}
                   </p>
                 )}
               </div>
@@ -285,6 +418,128 @@ export default function PerfilPage() {
             </button>
           </form>
         </div>
+
+        {/* Dados da Empresa (só aparece se estiver no modo empresa e tiver empresa selecionada) */}
+        {mode === 'empresa' && selectedEmpresa && (
+          <div className="border-t pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Dados da Empresa</h2>
+              {!editingEmpresa && (
+                <button
+                  type="button"
+                  onClick={() => setEditingEmpresa(true)}
+                  className="text-sm text-emerald-700 hover:text-emerald-800 font-medium"
+                >
+                  Editar
+                </button>
+              )}
+            </div>
+
+            {editingEmpresa ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setSavingEmpresa(true)
+                  setMessage(null)
+                  try {
+                    const res = await fetch(`/api/empresas/${selectedEmpresa.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(empresaForm),
+                    })
+                    const data = await res.json()
+                    if (!res.ok) {
+                      setMessage({ type: 'error', text: data.error || 'Erro ao atualizar empresa' })
+                    } else {
+                      setMessage({ type: 'success', text: 'Empresa atualizada com sucesso!' })
+                      setEditingEmpresa(false)
+                      await loadUser()
+                    }
+                  } catch {
+                    setMessage({ type: 'error', text: 'Erro ao atualizar empresa' })
+                  } finally {
+                    setSavingEmpresa(false)
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nome Fantasia *</label>
+                  <input
+                    type="text"
+                    value={empresaForm.nome_fantasia}
+                    onChange={(e) => setEmpresaForm({ ...empresaForm, nome_fantasia: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Razão Social</label>
+                  <input
+                    type="text"
+                    value={empresaForm.razao_social}
+                    onChange={(e) => setEmpresaForm({ ...empresaForm, razao_social: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+                  <input
+                    type="text"
+                    value={empresaForm.cnpj}
+                    onChange={(e) => setEmpresaForm({ ...empresaForm, cnpj: e.target.value })}
+                    placeholder="00.000.000/0000-00"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={savingEmpresa}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 rounded-md disabled:opacity-50"
+                  >
+                    {savingEmpresa ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmpresa(false)
+                      if (selectedEmpresa) {
+                        setEmpresaForm({
+                          nome_fantasia: selectedEmpresa.nome_fantasia || '',
+                          razao_social: selectedEmpresa.razao_social || '',
+                          cnpj: selectedEmpresa.cnpj || '',
+                        })
+                      }
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nome Fantasia</label>
+                  <div className="mt-1 text-sm text-gray-900">{selectedEmpresa.nome_fantasia}</div>
+                </div>
+                {selectedEmpresa.razao_social && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Razão Social</label>
+                    <div className="mt-1 text-sm text-gray-900">{selectedEmpresa.razao_social}</div>
+                  </div>
+                )}
+                {selectedEmpresa.cnpj && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+                    <div className="mt-1 text-sm text-gray-900">{selectedEmpresa.cnpj}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

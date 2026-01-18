@@ -139,8 +139,15 @@ async function processWhatsAppMessage(
     const tenantId = tenantInfo.tenant_id
     const userId = tenantInfo.user_id
 
+    console.log('=== WEBHOOK CONTEXTO ===')
+    console.log('TenantId:', tenantId)
+    console.log('UserId:', userId)
+    
     const sessionCtx = supabaseAdmin ? await getSessionContextFromUserId(supabaseAdmin as any, userId) : null
+    console.log('SessionContext:', sessionCtx ? { mode: sessionCtx.mode, empresa_id: sessionCtx.empresa_id, empresa_nome_fantasia: sessionCtx.empresa_nome_fantasia } : 'null')
+    
     const isEmpresaMode = sessionCtx?.mode === 'empresa'
+    console.log('IsEmpresaMode:', isEmpresaMode)
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||

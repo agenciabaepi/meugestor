@@ -94,3 +94,84 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Erro ao buscar dados' }, { status: 500 })
   }
 }
+
+/**
+ * PATCH - Atualiza dados do usuário autenticado
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createServerClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Erro de configuração' }, { status: 500 })
+    }
+
+    const body = await request.json()
+    const { name, whatsappNumber } = body
+
+    // Atualiza na tabela de perfil (users/users_meugestor)
+    const row = await getUserRowById(supabaseAdmin as any, session.user.id)
+    if (row) {
+      const updateData: any = {}
+      if (name) updateData.name = name
+      if (whatsappNumber) {
+        // Normaliza o número (remove caracteres não numéricos)
+        const normalized = whatsappNumber.replace(/\D/g, '')
+        if (normalized.length < 10) {
+          return NextResponse.json(
+            { error: 'O número do WhatsApp deve ter pelo menos 10 dígitos' },
+            { status: 400 }
+          )
+        }
+        updateData.whatsapp_number = normalized
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error } = await supabaseAdmin
+          .from(row.table)
+          .update(updateData)
+          .eq('id', session.user.id)
+
+        if (error) {
+          console.error('Erro ao atualizar perfil:', error)
+          return NextResponse.json(
+            { error: 'Erro ao atualizar dados no perfil' },
+            { status: 500 }
+          )
+        }
+      }
+    }
+
+    // Atualiza também em auth.user_metadata (fallback canônico)
+    try {
+      const admin = (supabaseAdmin as any).auth?.admin
+      if (admin?.updateUserById) {
+        const metadataUpdate: any = { ...(session.user.user_metadata || {}) }
+        if (name) metadataUpdate.name = name
+        if (whatsappNumber) {
+          metadataUpdate.whatsapp_number = whatsappNumber.replace(/\D/g, '')
+        }
+
+        if (name || whatsappNumber) {
+          await admin.updateUserById(session.user.id, {
+            user_metadata: metadataUpdate,
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('Falha ao atualizar metadata em auth.user_metadata (não bloqueante):', e)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Erro ao atualizar usuário:', error)
+    return NextResponse.json({ error: 'Erro ao atualizar dados' }, { status: 500 })
+  }
+}
