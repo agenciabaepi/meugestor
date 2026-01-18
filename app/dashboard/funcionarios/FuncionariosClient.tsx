@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Edit2, Trash2, Users, TrendingUp, CheckCircle2, Circle, ChevronDown, ChevronUp, DollarSign } from 'lucide-react'
 import type { Funcionario, Financeiro } from '@/lib/db/types'
 import { PeriodoSelector } from './PeriodoSelector'
+import { Dialog, DialogActions, useToast } from '@/app/components/ui'
 
 interface FuncionariosClientProps {
   funcionarios: Funcionario[]
@@ -21,6 +22,7 @@ interface PagamentoInfo {
 
 export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelecionado, anoSelecionado }: FuncionariosClientProps) {
   const router = useRouter()
+  const toast = useToast()
   const [funcionarios, setFuncionarios] = useState(initialFuncionarios)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPagamentoModalOpen, setIsPagamentoModalOpen] = useState(false)
@@ -28,6 +30,9 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
   const [expandedFuncionario, setExpandedFuncionario] = useState<string | null>(null)
   const [pagamentosInfo, setPagamentosInfo] = useState<Record<string, PagamentoInfo>>({})
   const [editingFuncionario, setEditingFuncionario] = useState<Funcionario | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [funcionarioToDelete, setFuncionarioToDelete] = useState<{ id: string; nome: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     nome_original: '',
@@ -132,7 +137,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     if (!selectedFuncionario) return
 
     if (!pagamentoData.valor || Number(pagamentoData.valor) <= 0) {
-      alert('Valor deve ser maior que zero')
+      toast.error('Valor inválido', 'O valor deve ser maior que zero.')
       return
     }
 
@@ -165,11 +170,11 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
         handleClosePagamentoModal()
       } else {
         const error = await response.json()
-        alert(error.error || 'Erro ao registrar pagamento')
+        toast.error('Erro ao registrar', error.error || 'Não foi possível registrar o pagamento.')
       }
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error)
-      alert('Erro ao registrar pagamento')
+      toast.error('Erro ao registrar', 'Ocorreu um erro ao tentar registrar o pagamento.')
     } finally {
       setLoading(false)
     }
@@ -214,7 +219,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     e.preventDefault()
     
     if (!formData.nome_original.trim()) {
-      alert('Nome é obrigatório')
+      toast.error('Campo obrigatório', 'O nome é obrigatório.')
       return
     }
 
@@ -244,39 +249,46 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
         handleCloseModal()
       } else {
         const error = await response.json()
-        alert(error.error || 'Erro ao salvar funcionário')
+        toast.error('Erro ao salvar', error.error || 'Não foi possível salvar o funcionário.')
       }
     } catch (error) {
       console.error('Erro ao salvar funcionário:', error)
-      alert('Erro ao salvar funcionário')
+      toast.error('Erro ao salvar', 'Ocorreu um erro ao tentar salvar o funcionário.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: string, nome: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o funcionário "${nome}"?`)) {
-      return
-    }
+  const handleDelete = (id: string, nome: string) => {
+    setFuncionarioToDelete({ id, nome })
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!funcionarioToDelete) return
 
     setLoading(true)
+    setDeleteConfirmOpen(false)
+
     try {
-      const response = await fetch(`/api/funcionarios/${id}`, {
+      const response = await fetch(`/api/funcionarios/${funcionarioToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
+        toast.success('Funcionário excluído', `"${funcionarioToDelete.nome}" foi removido com sucesso.`)
         router.refresh()
         fetchFuncionarios()
       } else {
         const error = await response.json()
-        alert(error.error || 'Erro ao excluir funcionário')
+        toast.error('Erro ao excluir', error.error || 'Não foi possível excluir o funcionário.')
       }
     } catch (error) {
       console.error('Erro ao excluir funcionário:', error)
-      alert('Erro ao excluir funcionário')
+      toast.error('Erro ao excluir', 'Ocorreu um erro ao tentar excluir o funcionário.')
     } finally {
       setLoading(false)
+      setFuncionarioToDelete(null)
     }
   }
 
@@ -1266,6 +1278,43 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
           </div>
         </div>
       )}
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Confirmar exclusão"
+        description="Esta ação não pode ser desfeita."
+        size="sm"
+      >
+        <p className="text-gray-700 mb-4">
+          Tem certeza que deseja excluir o funcionário?
+          {funcionarioToDelete && (
+            <span className="block mt-2 text-sm text-gray-500">
+              "{funcionarioToDelete.nome}"
+            </span>
+          )}
+        </p>
+
+        <DialogActions>
+          <button
+            onClick={() => {
+              setDeleteConfirmOpen(false)
+              setFuncionarioToDelete(null)
+            }}
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmDelete}
+            disabled={loading}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Excluindo...' : 'Excluir'}
+          </button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }
