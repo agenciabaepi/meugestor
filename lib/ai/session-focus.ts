@@ -25,6 +25,7 @@ export type ActiveTaskType =
   | 'register_expense'
   | 'register_revenue'
   | 'create_supplier'
+  | 'pay_employee_salary'
 
 export interface ActiveTask {
   tenantId: string

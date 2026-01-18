@@ -247,6 +247,34 @@ export async function processAction(
       }
     }
     
+    // CONTEXTO TRANSACIONAL: Se há contexto ativo de pagamento de salário e mensagem é apenas valor numérico
+    if (activeTask && activeTask.type === 'pay_employee_salary') {
+      // Detecta se a mensagem é apenas um valor numérico
+      const numericValue = extractPaymentAmount(message)
+      if (numericValue && numericValue > 0) {
+        console.log('processAction - Valor numérico detectado em contexto de pagamento de salário:', numericValue)
+        
+        // Atualiza o estado com o valor e executa
+        const updatedState: SemanticState = {
+          ...activeTask.state,
+          amount: numericValue,
+          readyToSave: true,
+        }
+        
+        const actionResult = await executeAction(updatedState, tenantId, userId, message, effectiveSessionContext)
+        
+        if (actionResult.success && isMutatingIntent(updatedState.intent)) {
+          await cleanupAfterMutation(tenantId, userId, updatedState.intent)
+        } else {
+          clearActiveTask(tenantId, userId)
+        }
+        
+        return actionResult.success
+          ? { success: true, message: actionResult.message, data: actionResult.data }
+          : { success: false, message: actionResult.message || 'Não consegui registrar o pagamento. Tente novamente.', data: actionResult.data }
+      }
+    }
+    
     // COMMIT POINT: Se há confirmação pendente e usuário confirmou/cancelou, executa imediatamente.
     if (pendingConfirmation) {
       if (isPositiveConfirm) {
@@ -1935,15 +1963,46 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    // Verifica se tem salário base cadastrado
-    if (!funcionario.salario_base || funcionario.salario_base <= 0) {
+    // Usa valor do estado se fornecido, senão busca salario_base
+    let salarioBase: number | null = null
+    
+    if (state.amount && state.amount > 0) {
+      // Valor foi fornecido (ex: resposta numérica em contexto ativo)
+      salarioBase = state.amount
+    } else if (funcionario.salario_base && funcionario.salario_base > 0) {
+      // Usa salário base cadastrado
+      salarioBase = funcionario.salario_base
+    } else {
+      // Não tem salário base → cria contexto ativo para aguardar o valor
+      const contextState: SemanticState = {
+        intent: 'pay_employee_salary',
+        domain: 'empresa',
+        employee_name: funcionario.nome_original,
+        confidence: 1,
+        readyToSave: false,
+      }
+      setActiveTask(tenantId, userId, 'pay_employee_salary', contextState)
+      await persistActiveTask(tenantId, userId, {
+        tenantId,
+        userId,
+        type: 'pay_employee_salary',
+        state: contextState,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      
       return {
-        success: false,
-        message: `Não encontrei o salário cadastrado do funcionário *${funcionario.nome_original}*. Qual é o valor?`,
+        success: true,
+        message: `Qual foi o valor do salário pago para *${funcionario.nome_original}*?`,
       }
     }
 
-    const salarioBase = funcionario.salario_base
+    if (!salarioBase || salarioBase <= 0) {
+      return {
+        success: false,
+        message: `Valor inválido. Qual foi o valor do salário pago para *${funcionario.nome_original}*?`,
+      }
+    }
 
     // Verifica se já foi pago neste mês (evita duplicação)
     
