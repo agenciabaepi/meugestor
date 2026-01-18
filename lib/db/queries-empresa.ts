@@ -43,9 +43,19 @@ export async function createFinanceiroEmpresa(
     transaction_type: transactionType,
   }
 
-  // Adiciona funcionario_id se fornecido e se a coluna existir
+  // VALIDAÇÃO CRÍTICA: Para pagamentos de salário, funcionario_id é OBRIGATÓRIO
+  // Se funcionarioId foi fornecido, DEVE ser salvo (não opcional)
   if (funcionarioId) {
     insertData.funcionario_id = funcionarioId
+    console.log('createFinanceiroEmpresa - Adicionando funcionario_id:', funcionarioId)
+  } else {
+    // Se category é "Funcionários" e funcionarioId não foi fornecido, loga aviso
+    if (category === 'Funcionários' || category === 'Trabalho e Negócios') {
+      console.warn('createFinanceiroEmpresa - AVISO: Pagamento de funcionário sem funcionario_id', {
+        category,
+        description,
+      })
+    }
   }
 
   const { data, error } = await client
@@ -1001,26 +1011,49 @@ export async function createPagamentoFuncionario(
   financeiroId: string | null,
   status: 'pago' | 'pendente' = 'pago'
 ): Promise<PagamentoFuncionario | null> {
+  // VALIDAÇÃO CRÍTICA: funcionarioId é OBRIGATÓRIO
+  if (!funcionarioId) {
+    console.error('createPagamentoFuncionario - ERRO: funcionarioId é obrigatório mas está null/undefined')
+    throw new Error('funcionarioId é obrigatório para criar pagamento de funcionário')
+  }
+
   const client = requireAdmin()
+  const insertData = {
+    tenant_id: tenantId,
+    empresa_id: empresaId,
+    funcionario_id: funcionarioId, // OBRIGATÓRIO
+    valor,
+    data_pagamento: dataPagamento,
+    status,
+    referencia,
+    financeiro_id: financeiroId,
+  }
+
+  console.log('createPagamentoFuncionario - Inserindo com funcionario_id:', funcionarioId)
+
   const { data, error } = await client
     .from('pagamentos_funcionarios')
-    .insert({
-      tenant_id: tenantId,
-      empresa_id: empresaId,
-      funcionario_id: funcionarioId,
-      valor,
-      data_pagamento: dataPagamento,
-      status,
-      referencia,
-      financeiro_id: financeiroId,
-    })
+    .insert(insertData)
     .select()
     .single()
 
   if (error) {
     console.error('Error creating pagamento_funcionario:', error)
+    console.error('Insert data:', JSON.stringify(insertData, null, 2))
     return null
   }
+
+  // VALIDAÇÃO PÓS-INSERÇÃO: Verifica se funcionario_id foi salvo
+  if (!data.funcionario_id || data.funcionario_id !== funcionarioId) {
+    console.error('createPagamentoFuncionario - ERRO CRÍTICO: funcionario_id não foi salvo corretamente', {
+      esperado: funcionarioId,
+      recebido: data.funcionario_id,
+      insert_data: insertData,
+    })
+  } else {
+    console.log('createPagamentoFuncionario - funcionario_id salvo corretamente:', data.funcionario_id)
+  }
+
   return data
 }
 

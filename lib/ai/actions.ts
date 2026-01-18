@@ -1980,8 +1980,21 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    console.log('handlePayEmployeeSalary - Funcionário encontrado:', {
-      id: funcionario.id,
+    // ============================================================
+    // VALIDAÇÃO CRÍTICA: funcionario.id DEVE EXISTIR
+    // ============================================================
+    if (!funcionario.id) {
+      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario.id está null/undefined', funcionario)
+      return {
+        success: false,
+        message: 'Erro interno: funcionário encontrado mas sem ID válido. Tente novamente.',
+      }
+    }
+
+    // Armazena funcionario_id em variável para garantir que não será perdido
+    const funcionarioId = funcionario.id
+    console.log('handlePayEmployeeSalary - Funcionário encontrado e ID armazenado:', {
+      id: funcionarioId,
       nome: funcionario.nome_original,
       salario_base: funcionario.salario_base,
     })
@@ -2038,10 +2051,11 @@ async function handlePayEmployeeSalary(
     const referencia = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
     
     // Verifica em pagamentos_funcionarios primeiro (mais confiável)
+    // Usa funcionarioId (garantido não-null)
     const pagamentosExistentes = await getPagamentosFuncionariosByReferencia(
       tenantId,
       sessionContext.empresa_id,
-      funcionario.id,
+      funcionarioId,
       referencia
     )
 
@@ -2054,8 +2068,21 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    // Registra o pagamento no financeiro primeiro
+    // ============================================================
+    // PASSO 3: REGISTRAR GASTO (VINCULADO) - funcionario_id OBRIGATÓRIO
+    // ============================================================
     const hojeISO = hoje.toISOString().split('T')[0] // YYYY-MM-DD
+    
+    // VALIDAÇÃO FINAL: funcionarioId NÃO PODE SER NULL
+    if (!funcionarioId) {
+      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionarioId é null antes de criar registro')
+      return {
+        success: false,
+        message: 'Erro interno: não foi possível identificar o funcionário. Tente novamente.',
+      }
+    }
+    
+    console.log('handlePayEmployeeSalary - Criando registro financeiro com funcionario_id:', funcionarioId)
     
     const record = await createFinanceiroEmpresa(
       tenantId,
@@ -2068,7 +2095,7 @@ async function handlePayEmployeeSalary(
       'salário', // subcategory
       {
         funcionario: {
-          id: funcionario.id,
+          id: funcionarioId,
           nome: funcionario.nome_original,
         },
         tipo: 'salario_mensal',
@@ -2077,21 +2104,42 @@ async function handlePayEmployeeSalary(
       ['funcionário', 'salário'],
       'expense',
       userId,
-      funcionario.id // funcionarioId
+      funcionarioId // funcionarioId OBRIGATÓRIO
     )
 
     if (!record) {
+      console.error('handlePayEmployeeSalary - Erro ao criar registro financeiro', {
+        funcionario_id: funcionarioId,
+        valor: salarioBase,
+      })
       return {
         success: false,
         message: 'Não consegui registrar o pagamento. Tente novamente.',
       }
     }
 
-    // Cria registro em pagamentos_funcionarios vinculado ao financeiro
+    // VALIDAÇÃO PÓS-INSERÇÃO: Verifica se funcionario_id foi salvo corretamente
+    const recordFuncionarioId = (record as any).funcionario_id
+    if (!recordFuncionarioId || recordFuncionarioId !== funcionarioId) {
+      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario_id não foi salvo corretamente', {
+        esperado: funcionarioId,
+        recebido: recordFuncionarioId,
+        record_id: record.id,
+      })
+      // Não retorna erro aqui para não bloquear o fluxo, mas loga o problema
+    } else {
+      console.log('handlePayEmployeeSalary - funcionario_id salvo corretamente:', recordFuncionarioId)
+    }
+
+    // ============================================================
+    // PASSO 4: REGISTRAR PAGAMENTO - funcionario_id OBRIGATÓRIO
+    // ============================================================
+    console.log('handlePayEmployeeSalary - Criando registro em pagamentos_funcionarios com funcionario_id:', funcionarioId)
+    
     const pagamento = await createPagamentoFuncionario(
       tenantId,
       sessionContext.empresa_id,
-      funcionario.id,
+      funcionarioId, // OBRIGATÓRIO
       salarioBase,
       hojeISO,
       referencia,
@@ -2100,10 +2148,25 @@ async function handlePayEmployeeSalary(
     )
 
     if (!pagamento) {
-      console.warn('Aviso: Pagamento financeiro criado mas registro em pagamentos_funcionarios falhou', {
-        funcionario_id: funcionario.id,
+      console.error('handlePayEmployeeSalary - ERRO: Falha ao criar pagamento_funcionario', {
+        funcionario_id: funcionarioId,
         financeiro_id: record.id,
       })
+      // Não retorna erro aqui para não bloquear, mas loga o problema
+    } else {
+      console.log('handlePayEmployeeSalary - Pagamento criado com sucesso:', {
+        pagamento_id: pagamento.id,
+        funcionario_id: pagamento.funcionario_id,
+        financeiro_id: pagamento.financeiro_id,
+      })
+      
+      // VALIDAÇÃO FINAL: Garante que funcionario_id foi salvo
+      if (!pagamento.funcionario_id || pagamento.funcionario_id !== funcionarioId) {
+        console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario_id não foi salvo em pagamentos_funcionarios', {
+          esperado: funcionarioId,
+          recebido: pagamento.funcionario_id,
+        })
+      }
     }
 
     // ============================================================
