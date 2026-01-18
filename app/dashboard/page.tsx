@@ -5,6 +5,8 @@ import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
 import { DialogDemo } from './components/DialogDemo'
 
+export const dynamic = 'force-dynamic'
+
 async function getDashboardData() {
   try {
     // Obtém tenant_id do usuário autenticado
