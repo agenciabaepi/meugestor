@@ -201,6 +201,96 @@ export async function getEmployeePaymentsByEmpresa(
   return data || []
 }
 
+export async function updateFinanceiroEmpresa(
+  id: string,
+  tenantId: string,
+  empresaId: string,
+  updates: {
+    amount?: number
+    description?: string
+    category?: string
+    subcategory?: string | null
+    date?: string
+    receiptImageUrl?: string | null
+    metadata?: Record<string, any> | null
+    tags?: string[] | null
+    transactionType?: 'expense' | 'revenue'
+  }
+): Promise<Financeiro | null> {
+  const client = requireAdmin()
+  
+  const updateData: any = {}
+  if (updates.amount !== undefined) updateData.amount = updates.amount
+  if (updates.description !== undefined) updateData.description = updates.description
+  if (updates.category !== undefined) updateData.category = updates.category
+  if (updates.subcategory !== undefined) updateData.subcategory = updates.subcategory
+  if (updates.date !== undefined) updateData.date = updates.date
+  if (updates.receiptImageUrl !== undefined) updateData.receipt_image_url = updates.receiptImageUrl
+  if (updates.metadata !== undefined) updateData.metadata = updates.metadata
+  if (updates.tags !== undefined) updateData.tags = updates.tags
+  if (updates.transactionType !== undefined) updateData.transaction_type = updates.transactionType
+  
+  const { data, error } = await client
+    .from('financeiro_empresa')
+    .update(updateData)
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating financeiro_empresa:', error)
+    return null
+  }
+  
+  return data
+}
+
+export async function deleteFinanceiroEmpresa(
+  id: string,
+  tenantId: string,
+  empresaId: string
+): Promise<boolean> {
+  const client = requireAdmin()
+  
+  const { error } = await client
+    .from('financeiro_empresa')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+  
+  if (error) {
+    console.error('Error deleting financeiro_empresa:', error)
+    return false
+  }
+  
+  return true
+}
+
+export async function getFinanceiroEmpresaById(
+  id: string,
+  tenantId: string,
+  empresaId: string
+): Promise<Financeiro | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('financeiro_empresa')
+    .select('*')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .single()
+  
+  if (error) {
+    console.error('Error fetching financeiro_empresa by id:', error)
+    return null
+  }
+  
+  return data
+}
+
 // ============================================
 // COMPROMISSOS_EMPRESA
 // ============================================

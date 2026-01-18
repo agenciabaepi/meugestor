@@ -2,8 +2,17 @@ import {
   createFinanceiro,
   getFinanceiroByTenant,
   getFinanceiroByCategory,
+  updateFinanceiro,
+  deleteFinanceiro,
+  getFinanceiroById,
 } from '../db/queries'
-import { getFinanceiroEmpresaByCategory, getFinanceiroEmpresaByEmpresa } from '../db/queries-empresa'
+import { 
+  getFinanceiroEmpresaByCategory, 
+  getFinanceiroEmpresaByEmpresa,
+  updateFinanceiroEmpresa,
+  deleteFinanceiroEmpresa,
+  getFinanceiroEmpresaById,
+} from '../db/queries-empresa'
 import { isValidAmount, isValidDate, isValidCategory } from '../utils/validation'
 import { ValidationError } from '../utils/errors'
 import type { Financeiro, SessionContext } from '../db/types'
@@ -454,4 +463,84 @@ export async function calculateTotalByCategory(
     endDate
   )
   return records.reduce((total, record) => total + Number(record.amount), 0)
+}
+
+/**
+ * Obtém um registro financeiro por ID respeitando o contexto
+ */
+export async function getFinanceiroRecordByIdForContext(
+  ctx: SessionContext,
+  id: string
+): Promise<Financeiro | null> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return null
+    return getFinanceiroEmpresaById(id, ctx.tenant_id, ctx.empresa_id)
+  }
+  return getFinanceiroById(id, ctx.tenant_id)
+}
+
+/**
+ * Atualiza um registro financeiro respeitando o contexto
+ */
+export async function updateFinanceiroRecordForContext(
+  ctx: SessionContext,
+  id: string,
+  updates: {
+    amount?: number
+    description?: string
+    category?: string
+    subcategory?: string | null
+    date?: string
+    receiptImageUrl?: string | null
+    metadata?: Record<string, any> | null
+    tags?: string[] | null
+    transactionType?: 'expense' | 'revenue'
+  }
+): Promise<Financeiro> {
+  // Validações apenas para campos fornecidos
+  if (updates.amount !== undefined && !isValidAmount(updates.amount)) {
+    throw new ValidationError('Valor deve ser maior que zero')
+  }
+  
+  if (updates.description !== undefined && (!updates.description || updates.description.trim().length === 0)) {
+    throw new ValidationError('Descrição não pode ser vazia')
+  }
+  
+  if (ctx.mode !== 'empresa' && updates.category !== undefined && !isValidCategory(updates.category)) {
+    throw new ValidationError('Categoria inválida')
+  }
+  
+  if (updates.date !== undefined && !isValidDate(updates.date)) {
+    throw new ValidationError('Data inválida')
+  }
+  
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) {
+      throw new ValidationError('Modo empresa sem empresa vinculada')
+    }
+    const record = await updateFinanceiroEmpresa(id, ctx.tenant_id, ctx.empresa_id, updates)
+    if (!record) throw new ValidationError('Erro ao atualizar registro financeiro')
+    return record
+  }
+  
+  const record = await updateFinanceiro(id, ctx.tenant_id, updates)
+  if (!record) throw new ValidationError('Erro ao atualizar registro financeiro')
+  return record
+}
+
+/**
+ * Deleta um registro financeiro respeitando o contexto
+ */
+export async function deleteFinanceiroRecordForContext(
+  ctx: SessionContext,
+  id: string
+): Promise<boolean> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) {
+      throw new ValidationError('Modo empresa sem empresa vinculada')
+    }
+    return deleteFinanceiroEmpresa(id, ctx.tenant_id, ctx.empresa_id)
+  }
+  
+  return deleteFinanceiro(id, ctx.tenant_id)
 }

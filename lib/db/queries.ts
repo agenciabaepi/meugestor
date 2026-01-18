@@ -216,6 +216,7 @@ export async function getFinanceiroByTenant(
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (userId) {
     query = query.eq('user_id', userId)
@@ -255,6 +256,7 @@ export async function getFinanceiroByTenant(
         .select('*')
         .eq('tenant_id', tenantId)
         .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
       
       if (startDate) {
         retryQuery = retryQuery.gte('date', startDate)
@@ -427,6 +429,55 @@ export async function updateFinanceiro(
   }
   
   return data
+}
+
+export async function getFinanceiroById(
+  id: string,
+  tenantId: string
+): Promise<Financeiro | null> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return null
+  }
+  const client = supabaseAdmin
+
+  const { data, error } = await client
+    .from('financeiro')
+    .select('*')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (error) {
+    console.error('Error fetching financeiro by id:', error)
+    return null
+  }
+
+  return data
+}
+
+export async function deleteFinanceiro(
+  id: string,
+  tenantId: string
+): Promise<boolean> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return false
+  }
+  const client = supabaseAdmin
+
+  const { error } = await client
+    .from('financeiro')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (error) {
+    console.error('Error deleting financeiro:', error)
+    return false
+  }
+
+  return true
 }
 
 export async function updateCompromisso(
