@@ -56,8 +56,9 @@ export async function getUserRowById(
   client: SupabaseLikeClient,
   userId: string
 ): Promise<{ table: 'users_meugestor' | 'users'; user: User } | null> {
-  const preferred: Array<'users_meugestor' | 'users'> = ['users_meugestor', 'users']
-  for (const table of preferred) {
+  const candidates: Array<{ table: 'users_meugestor' | 'users'; user: User }> = []
+  const tablesToTry: Array<'users_meugestor' | 'users'> = ['users_meugestor', 'users']
+  for (const table of tablesToTry) {
     // Estratégia robusta: tenta conjuntos de colunas do mais completo ao mínimo.
     // Isso permite funcionar em ambientes onde a tabela existe mas tem colunas diferentes.
     const columnSets = [
@@ -88,7 +89,7 @@ export async function getUserRowById(
     if (picked?.data) {
       // Preenche campos ausentes de forma segura
       const base: any = picked.data
-      let ctx = await tryGetUserSessionContext(client, userId)
+      const ctx = await tryGetUserSessionContext(client, userId)
 
       // Fallback via auth.user_metadata para colunas que não existirem (ex: whatsapp_number, name, mode, empresa_id)
       const anyClient: any = client as any
@@ -120,10 +121,34 @@ export async function getUserRowById(
         empresa_id: (base.empresa_id ?? ctx?.empresa_id ?? null) as any,
       } as User
 
-      return { table, user }
+      candidates.push({ table, user })
     }
   }
-  return null
+
+  if (candidates.length === 0) return null
+  if (candidates.length === 1) return candidates[0]
+
+  function score(u: User): number {
+    let s = 0
+    if (u.tenant_id) s += 2
+    if (u.email) s += 1
+    if (u.role) s += 1
+    if (u.name) s += 1
+    if (u.whatsapp_number) s += 3
+    if (u.updated_at) s += 1
+    if (u.mode) s += 1
+    if (u.empresa_id) s += 3
+    return s
+  }
+
+  // Escolhe a linha mais completa. Em empate, preferir 'users' (tende a ser a tabela canônica com whatsapp/mode).
+  candidates.sort((a, b) => {
+    const d = score(b.user) - score(a.user)
+    if (d !== 0) return d
+    if (a.table === b.table) return 0
+    return a.table === 'users' ? -1 : 1
+  })
+  return candidates[0]
 }
 
 export async function updateUserModeAndEmpresa(

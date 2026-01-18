@@ -51,7 +51,8 @@ export default function PerfilPage() {
       const data = await response.json()
       setUser(data.user)
       setWhatsappNumber(data.user.whatsapp_number)
-      setMode(data.user.mode === 'empresa' ? 'empresa' : 'pessoal')
+      // Se já existe empresa_id, o usuário já é "empresa" (sem precisar escolher de novo).
+      setMode(data.user.empresa_id ? 'empresa' : data.user.mode === 'empresa' ? 'empresa' : 'pessoal')
       setEmpresaId(data.user.empresa_id || '')
 
       // carrega empresas do tenant

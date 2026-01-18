@@ -79,8 +79,11 @@ export async function GET(request: NextRequest) {
         whatsapp_number: row?.user?.whatsapp_number || fallbackUser.whatsapp_number,
         role: row?.user?.role || fallbackUser.role,
         tenant: tenantData || null,
-        mode: (ctx?.mode || meta?.mode || 'pessoal') as any,
-        empresa_id: ctx?.empresa_id || meta?.empresa_id || null,
+        // Regra: empresa_id implica modo empresa (sem exigir passo extra no perfil)
+        mode: ((ctx?.empresa_id || row?.user?.empresa_id || meta?.empresa_id)
+          ? 'empresa'
+          : (ctx?.mode || row?.user?.mode || meta?.mode || 'pessoal')) as any,
+        empresa_id: ctx?.empresa_id || row?.user?.empresa_id || meta?.empresa_id || null,
         empresa_nome_fantasia: ctx?.empresa_nome_fantasia || null,
       },
       session,
