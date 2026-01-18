@@ -3,6 +3,7 @@ import { getTodayCompromissos, getCompromissosRecords } from '@/lib/services/com
 import { gerarResumoMensal } from '@/lib/services/relatorios'
 import { getAuthenticatedTenantId } from '@/lib/utils/auth'
 import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
+import { DialogDemo } from './components/DialogDemo'
 
 async function getDashboardData() {
   try {
@@ -102,10 +103,17 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
+        <div className="flex items-start justify-between mb-4">
+          <div>
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Dashboard</h1>
         <p className="text-base sm:text-lg text-gray-600">
           Visão geral das suas finanças e compromissos
         </p>
+          </div>
+          <div className="hidden lg:block shrink-0">
+            <DialogDemo />
+          </div>
+        </div>
       </div>
 
       {/* Cards de Resumo */}

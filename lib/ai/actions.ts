@@ -1931,6 +1931,9 @@ async function handleCreateEmployee(
 
 /**
  * Registra pagamento de salário de funcionário (busca salario_base automaticamente)
+ * 
+ * REGRA CRÍTICA: Sempre consulta o banco ANTES de fazer qualquer pergunta.
+ * Fluxo: CONSULTA → DECISÃO → EXECUÇÃO (não suposição)
  */
 async function handlePayEmployeeSalary(
   state: SemanticState,
@@ -1947,7 +1950,9 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    // Extrai nome do funcionário (do estado ou da mensagem)
+    // ============================================================
+    // PASSO 1: EXTRAI NOME DO FUNCIONÁRIO (do estado ou mensagem)
+    // ============================================================
     let employeeName = state.employee_name ? String(state.employee_name).trim() : null
     if (!employeeName) {
       employeeName = extractEmployeeNameFromSalaryPayment(message)
@@ -1960,26 +1965,43 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    // Busca funcionário
+    // ============================================================
+    // PASSO 2: CONSULTA O BANCO DE DADOS (OBRIGATÓRIO ANTES DE QUALQUER PERGUNTA)
+    // Busca funcionário por similaridade de nome (fuzzy search)
+    // ============================================================
+    console.log('handlePayEmployeeSalary - Consultando banco de dados para funcionário:', employeeName)
     const funcionario = await findFuncionarioByName(sessionContext, employeeName)
+    
     if (!funcionario) {
+      // Funcionário não existe no banco → informa e pergunta se deseja cadastrar
       return {
         success: false,
-        message: `Não encontrei o funcionário *${employeeName}*. Deseja cadastrá-lo primeiro?`,
+        message: `Não encontrei o funcionário *${employeeName}* no cadastro. Deseja cadastrá-lo primeiro?`,
       }
     }
 
-    // Usa valor do estado se fornecido, senão busca salario_base
+    console.log('handlePayEmployeeSalary - Funcionário encontrado:', {
+      id: funcionario.id,
+      nome: funcionario.nome_original,
+      salario_base: funcionario.salario_base,
+    })
+
+    // ============================================================
+    // PASSO 3: VERIFICA SALARIO_BASE NO BANCO (CONSULTA JÁ FEITA)
+    // ============================================================
     let salarioBase: number | null = null
     
     if (state.amount && state.amount > 0) {
-      // Valor foi fornecido (ex: resposta numérica em contexto ativo)
+      // Valor foi fornecido explicitamente (ex: resposta numérica em contexto ativo)
       salarioBase = state.amount
+      console.log('handlePayEmployeeSalary - Usando valor fornecido pelo usuário:', salarioBase)
     } else if (funcionario.salario_base && funcionario.salario_base > 0) {
-      // Usa salário base cadastrado
+      // ✅ SALARIO_BASE EXISTE NO BANCO → USA AUTOMATICAMENTE (NÃO PERGUNTA)
       salarioBase = funcionario.salario_base
+      console.log('handlePayEmployeeSalary - Usando salario_base do banco:', salarioBase)
     } else {
-      // Não tem salário base → cria contexto ativo para aguardar o valor
+      // ❌ SALARIO_BASE NÃO EXISTE → ÚNICA SITUAÇÃO ONDE PODE PERGUNTAR
+      console.log('handlePayEmployeeSalary - salario_base não encontrado, criando contexto ativo')
       const contextState: SemanticState = {
         intent: 'pay_employee_salary',
         domain: 'empresa',
@@ -1999,10 +2021,11 @@ async function handlePayEmployeeSalary(
       
       return {
         success: true,
-        message: `Qual foi o valor do salário pago para *${funcionario.nome_original}*?`,
+        message: `Não encontrei um salário cadastrado para *${funcionario.nome_original}*. Qual foi o valor pago?`,
       }
     }
 
+    // Validação final do valor
     if (!salarioBase || salarioBase <= 0) {
       return {
         success: false,
@@ -2083,13 +2106,20 @@ async function handlePayEmployeeSalary(
       })
     }
 
-    // Formata resposta final
+    // ============================================================
+    // PASSO 4: RESPOSTA FINAL (SEM PERGUNTAS)
+    // ============================================================
+    const dataPagamento = new Date(hojeISO).toLocaleDateString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    })
     const mesNome = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     const mesNomeCapitalizado = mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
 
     return {
       success: true,
-      message: `✅ Salário pago com sucesso!\n\n👤 Funcionário: *${funcionario.nome_original}*\n💰 Valor: R$ ${salarioBase.toFixed(2).replace('.', ',')}\n📅 Período: ${mesNomeCapitalizado}\n📂 Categoria: Funcionários › Salário\n\nO pagamento já foi lançado nos gastos da empresa.`,
+      message: `💰 Salário pago com sucesso!\n\n👤 Funcionário: *${funcionario.nome_original}*\n💵 Valor: R$ ${salarioBase.toFixed(2).replace('.', ',')}\n📅 Data: ${dataPagamento}\n\nO pagamento foi registrado e vinculado corretamente ao funcionário.`,
       data: { financeiro: record, pagamento },
     }
   } catch (error) {
