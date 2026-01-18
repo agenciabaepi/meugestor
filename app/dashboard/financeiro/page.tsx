@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { 
   getFinanceiroRecordsForContext, 
   getDespesasRecordsForContext,
@@ -9,8 +10,14 @@ import { getSessionContext } from '@/lib/utils/session-context'
 import { FinanceiroTabs } from './tabs'
 import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
 import { EmpresaCategoriasTabela } from './EmpresaCategoriasTabela'
+import { EmpresaFornecedoresTabela } from './EmpresaFornecedoresTabela'
+import { EmpresaFuncionariosTabela } from './EmpresaFuncionariosTabela'
+import { AddTransacaoButton } from './AddTransacaoButton'
+import { PeriodoSelector } from './PeriodoSelector'
 
-async function getFinanceiroData() {
+export const dynamic = 'force-dynamic'
+
+async function getFinanceiroData(searchParams?: { mes?: string; ano?: string }) {
   const ctx = await getSessionContext()
   
   if (!ctx) {
@@ -27,39 +34,50 @@ async function getFinanceiroData() {
       dadosPorCategoriaReceitas: [],
       dadosGraficoDespesas: [],
       dadosGraficoReceitas: [],
+      periodoAtual: { mes: 0, ano: 0 },
     }
   }
   
+  // Obtém o período selecionado ou usa o mês atual
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+  const mesSelecionado = searchParams?.mes ? parseInt(searchParams.mes) : now.getMonth() + 1
+  const anoSelecionado = searchParams?.ano ? parseInt(searchParams.ano) : now.getFullYear()
+  
+  const startOfMonth = new Date(anoSelecionado, mesSelecionado - 1, 1)
+  const endOfMonth = new Date(anoSelecionado, mesSelecionado, 0)
+  const startOfLastMonth = new Date(anoSelecionado, mesSelecionado - 2, 1)
+  const endOfLastMonth = new Date(anoSelecionado, mesSelecionado - 1, 0)
 
-  // Busca despesas e receitas separadamente
+  // Busca despesas e receitas separadamente para o período selecionado
   const despesasMes = await getDespesasRecordsForContext(
     ctx,
-    startOfMonth.toISOString().split('T')[0]
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
   )
   
   const receitasMes = await getReceitasRecordsForContext(
     ctx,
-    startOfMonth.toISOString().split('T')[0]
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
   )
   
   const todasTransacoes = await getFinanceiroRecordsForContext(
     ctx,
-    startOfMonth.toISOString().split('T')[0]
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
   )
   
   // Calcula totais
   const totalDespesas = await calculateTotalSpentForContext(
     ctx,
-    startOfMonth.toISOString().split('T')[0]
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
   )
   
   const totalReceitas = await calculateTotalRevenueForContext(
     ctx,
-    startOfMonth.toISOString().split('T')[0]
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
   )
   
   const saldo = totalReceitas - totalDespesas
@@ -99,12 +117,17 @@ async function getFinanceiroData() {
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value)
 
-  // Dados para gráfico de barras (últimos 7 dias)
+  // Dados para gráfico de barras (últimos 7 dias do mês selecionado)
+  // Pega os últimos 7 dias do período selecionado
   const ultimos7Dias = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date()
+    const date = new Date(endOfMonth)
     date.setDate(date.getDate() - (6 - i))
+    // Garante que não vai além do início do mês
+    if (date < startOfMonth) {
+      return null
+    }
     return date.toISOString().split('T')[0]
-  })
+  }).filter(Boolean) as string[]
 
   const dadosGraficoDespesas = await Promise.all(
     ultimos7Dias.map(async (date) => {
@@ -141,11 +164,17 @@ async function getFinanceiroData() {
     dadosPorCategoriaReceitas,
     dadosGraficoDespesas,
     dadosGraficoReceitas,
+    periodoAtual: { mes: mesSelecionado, ano: anoSelecionado },
   }
 }
 
-export default async function FinanceiroPage() {
-  const data = await getFinanceiroData()
+export default async function FinanceiroPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ mes?: string; ano?: string }>
+}) {
+  const params = await searchParams
+  const data = await getFinanceiroData(params)
   const ctx = await getSessionContext()
   const isEmpresa = ctx?.mode === 'empresa'
   
@@ -159,12 +188,24 @@ export default async function FinanceiroPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Financeiro</h1>
-        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-          Controle suas despesas e receitas
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Financeiro</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+            Controle suas despesas e receitas
+          </p>
+        </div>
+        <AddTransacaoButton />
       </div>
+
+      {/* Seletor de Período */}
+      <Suspense fallback={
+        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6 animate-pulse">
+          <div className="h-10 bg-gray-200 rounded w-64"></div>
+        </div>
+      }>
+        <PeriodoSelector />
+      </Suspense>
 
       {/* Donuts (Despesas/Receitas) */}
       <FinanceiroDonutTabs
@@ -231,12 +272,16 @@ export default async function FinanceiroPage() {
         </div>
       </div>
 
-      {/* Seção de Empresas: Tabela por Categoria */}
+      {/* Seção de Empresas: Tabelas por Categoria, Fornecedor e Funcionários */}
       {isEmpresa && (
-        <EmpresaCategoriasTabela
-          despesas={data.despesasMes}
-          receitas={data.receitasMes}
-        />
+        <>
+          <EmpresaCategoriasTabela
+            despesas={data.despesasMes}
+            receitas={data.receitasMes}
+          />
+          <EmpresaFornecedoresTabela despesas={data.despesasMes} />
+          <EmpresaFuncionariosTabela despesas={data.despesasMes} />
+        </>
       )}
 
       {/* Componente de Abas */}
