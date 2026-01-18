@@ -1,7 +1,14 @@
+import { Suspense } from 'react'
 import { getSessionContext } from '@/lib/utils/session-context'
 import { redirect } from 'next/navigation'
+import { getFuncionariosByEmpresa } from '@/lib/db/queries-empresa'
+import { FuncionariosClient } from './FuncionariosClient'
 
-export default async function FuncionariosPage() {
+export default async function FuncionariosPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ mes?: string; ano?: string }>
+}) {
   const ctx = await getSessionContext()
 
   // Verifica se está no modo empresa
@@ -9,11 +16,20 @@ export default async function FuncionariosPage() {
     redirect('/dashboard')
   }
 
-  // TODO: Implementar página de funcionários
+  // Obtém o período selecionado ou usa o mês atual
+  const params = searchParams instanceof Promise ? await searchParams : searchParams
+  const now = new Date()
+  const mesSelecionado = params?.mes ? parseInt(params.mes) : now.getMonth() + 1
+  const anoSelecionado = params?.ano ? parseInt(params.ano) : now.getFullYear()
+
+  // Busca funcionários
+  const funcionarios = await getFuncionariosByEmpresa(ctx.tenant_id, ctx.empresa_id)
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Funcionários</h1>
-      <p className="text-gray-600">Página em desenvolvimento.</p>
-    </div>
+    <FuncionariosClient 
+      funcionarios={funcionarios}
+      mesSelecionado={mesSelecionado}
+      anoSelecionado={anoSelecionado}
+    />
   )
 }
