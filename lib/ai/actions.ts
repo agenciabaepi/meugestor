@@ -37,6 +37,7 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { getListasByTenant, getTenantContext } from '../db/queries'
+import { getFinanceiroEmpresaByFuncionario, createFinanceiroEmpresa } from '../db/queries-empresa'
 import { supabaseAdmin } from '../db/client'
 import { getSessionContextFromUserId } from '../db/user-profile'
 import {
@@ -1945,8 +1946,6 @@ async function handlePayEmployeeSalary(
     const salarioBase = funcionario.salario_base
 
     // Verifica se já foi pago neste mês (evita duplicação)
-    const { getFinanceiroEmpresaByFuncionario } = await import('../db/queries-empresa')
-    const { getBrazilDayStartISO, getBrazilDayEndISO } = await import('../utils/date-parser')
     
     const hoje = new Date()
     const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
@@ -1979,7 +1978,6 @@ async function handlePayEmployeeSalary(
     }
 
     // Registra o pagamento no financeiro
-    const { createFinanceiroEmpresa } = await import('../db/queries-empresa')
     const hojeISO = hoje.toISOString().split('T')[0] // YYYY-MM-DD
     
     const record = await createFinanceiroEmpresa(
