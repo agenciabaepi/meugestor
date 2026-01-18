@@ -56,6 +56,20 @@ export interface Funcionario {
   updated_at: string
 }
 
+export interface PagamentoFuncionario {
+  id: string
+  tenant_id: string
+  empresa_id: string
+  funcionario_id: string
+  valor: number
+  data_pagamento: string
+  status: 'pago' | 'pendente'
+  referencia: string | null
+  financeiro_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Financeiro {
   id: string
   tenant_id: string

@@ -29,7 +29,10 @@ import { filterBySemanticCategory } from '../utils/semantic-filter'
 import { getListasByTenant } from '../db/queries'
 import { normalizeText } from '../utils/normalize-text'
 import { getListView, formatListRawResponse } from '../services/listas'
-import { getEmployeePaymentsByEmpresa } from '../db/queries-empresa'
+import { 
+  getEmployeePaymentsByEmpresa,
+  getPagamentosFuncionariosByEmpresa,
+} from '../db/queries-empresa'
 import { findFuncionarioByName } from '../services/funcionarios'
 
 function formatTimeBR(iso: string): string {
@@ -385,13 +388,14 @@ async function queryEmployeePayments(
     }
   }
 
-  // Busca pagamentos de funcionários
-  const pagamentos = await getEmployeePaymentsByEmpresa(
+  // Busca pagamentos de funcionários da tabela pagamentos_funcionarios
+  const pagamentos = await getPagamentosFuncionariosByEmpresa(
     sessionContext.tenant_id,
     sessionContext.empresa_id,
+    funcionarioId || undefined,
+    'pago', // apenas pagos
     startDate,
-    endDate,
-    funcionarioId
+    endDate
   )
 
   if (pagamentos.length === 0) {
@@ -407,30 +411,45 @@ async function queryEmployeePayments(
     }
   }
 
+  // Busca nomes dos funcionários para exibição
+  const { getFuncionarioByNormalizedName } = await import('../db/queries-empresa')
+  const funcionariosMap = new Map<string, string>()
+  
   // Agrupa por funcionário
   const porFuncionario: Record<string, { nome: string; total: number; pagamentos: any[]; ultimaData: string }> = {}
   
   for (const pagamento of pagamentos) {
-    const metadata = pagamento.metadata || {}
-    const funcionarioMeta = metadata.funcionario || {}
-    const funcionarioIdPag = funcionarioMeta.id || null
-    const funcionarioNome = funcionarioMeta.nome || 'Funcionário'
+    const funcionarioIdPag = pagamento.funcionario_id
     
-    if (!porFuncionario[funcionarioIdPag || 'unknown']) {
-      porFuncionario[funcionarioIdPag || 'unknown'] = {
+    // Busca nome do funcionário se ainda não tiver
+    if (!funcionariosMap.has(funcionarioIdPag)) {
+      // Tenta buscar do banco (precisa de uma query que busque por ID)
+      const { getFuncionariosByEmpresa } = await import('../db/queries-empresa')
+      const funcionarios = await getFuncionariosByEmpresa(
+        sessionContext.tenant_id,
+        sessionContext.empresa_id
+      )
+      const funcionario = funcionarios.find(f => f.id === funcionarioIdPag)
+      funcionariosMap.set(funcionarioIdPag, funcionario?.nome_original || 'Funcionário')
+    }
+    
+    const funcionarioNome = funcionariosMap.get(funcionarioIdPag) || 'Funcionário'
+    
+    if (!porFuncionario[funcionarioIdPag]) {
+      porFuncionario[funcionarioIdPag] = {
         nome: funcionarioNome,
         total: 0,
         pagamentos: [],
-        ultimaData: pagamento.date,
+        ultimaData: pagamento.data_pagamento,
       }
     }
     
-    const grupo = porFuncionario[funcionarioIdPag || 'unknown']
-    grupo.total += Number(pagamento.amount)
+    const grupo = porFuncionario[funcionarioIdPag]
+    grupo.total += Number(pagamento.valor)
     grupo.pagamentos.push(pagamento)
     // Atualiza última data (mais recente)
-    if (new Date(pagamento.date) > new Date(grupo.ultimaData)) {
-      grupo.ultimaData = pagamento.date
+    if (new Date(pagamento.data_pagamento) > new Date(grupo.ultimaData)) {
+      grupo.ultimaData = pagamento.data_pagamento
     }
   }
 
@@ -441,9 +460,10 @@ async function queryEmployeePayments(
   if (state.employee_name && funcionarios.length === 1) {
     const func = funcionarios[0]
     const ultimaData = new Date(func.ultimaData).toLocaleDateString('pt-BR')
+    const quantidadePagamentos = func.pagamentos.length
     return {
       success: true,
-      message: `✅ Sim. Você já pagou *${func.nome}* ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}:\n• Total: R$ ${func.total.toFixed(2)}\n• Último pagamento: ${ultimaData}`,
+      message: `✅ Sim. Você já pagou *${func.nome}* ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}:\n• Total: R$ ${func.total.toFixed(2).replace('.', ',')}\n• Pagamentos: ${quantidadePagamentos}\n• Último pagamento: ${ultimaData}`,
       data: { funcionario: func, pagamentos: func.pagamentos },
     }
   }
@@ -456,7 +476,7 @@ async function queryEmployeePayments(
   
   for (const func of funcionarios) {
     response += `👤 ${func.nome}\n`
-    response += `• Total pago: R$ ${func.total.toFixed(2)}\n`
+    response += `• Total pago: R$ ${func.total.toFixed(2).replace('.', ',')}\n`
     response += `• Pagamentos: ${func.pagamentos.length}\n\n`
   }
   

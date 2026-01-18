@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './client'
-import type { Compromisso, Financeiro, Fornecedor, Funcionario, Lista, ListaItem, ListaItemStatus, TenantContext } from './types'
+import type { Compromisso, Financeiro, Fornecedor, Funcionario, Lista, ListaItem, ListaItemStatus, TenantContext, PagamentoFuncionario } from './types'
 
 function requireAdmin() {
   if (!supabaseAdmin) {
@@ -985,4 +985,106 @@ export async function deleteFuncionario(
     return false
   }
   return true
+}
+
+// ============================================
+// PAGAMENTOS_FUNCIONARIOS
+// ============================================
+
+export async function createPagamentoFuncionario(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId: string,
+  valor: number,
+  dataPagamento: string,
+  referencia: string | null,
+  financeiroId: string | null,
+  status: 'pago' | 'pendente' = 'pago'
+): Promise<PagamentoFuncionario | null> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('pagamentos_funcionarios')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      funcionario_id: funcionarioId,
+      valor,
+      data_pagamento: dataPagamento,
+      status,
+      referencia,
+      financeiro_id: financeiroId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating pagamento_funcionario:', error)
+    return null
+  }
+  return data
+}
+
+export async function getPagamentosFuncionariosByEmpresa(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId?: string,
+  status?: 'pago' | 'pendente',
+  startDate?: string,
+  endDate?: string
+): Promise<PagamentoFuncionario[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('pagamentos_funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .order('data_pagamento', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (funcionarioId) {
+    query = query.eq('funcionario_id', funcionarioId)
+  }
+
+  if (status) {
+    query = query.eq('status', status)
+  }
+
+  if (startDate) {
+    query = query.gte('data_pagamento', startDate)
+  }
+
+  if (endDate) {
+    query = query.lte('data_pagamento', endDate)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching pagamentos_funcionarios:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getPagamentosFuncionariosByReferencia(
+  tenantId: string,
+  empresaId: string,
+  funcionarioId: string,
+  referencia: string
+): Promise<PagamentoFuncionario[]> {
+  const client = requireAdmin()
+  const { data, error } = await client
+    .from('pagamentos_funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('funcionario_id', funcionarioId)
+    .eq('referencia', referencia)
+    .eq('status', 'pago')
+    .order('data_pagamento', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching pagamentos_funcionarios by referencia:', error)
+    return []
+  }
+  return data || []
 }

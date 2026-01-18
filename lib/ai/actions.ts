@@ -37,7 +37,13 @@ import { getFinanceiroRecords } from '../services/financeiro'
 import { getTodayCompromissos } from '../services/compromissos'
 import { ValidationError } from '../utils/errors'
 import { getListasByTenant, getTenantContext } from '../db/queries'
-import { getFinanceiroEmpresaByFuncionario, createFinanceiroEmpresa } from '../db/queries-empresa'
+import { 
+  getFinanceiroEmpresaByFuncionario, 
+  createFinanceiroEmpresa,
+  createPagamentoFuncionario,
+  getPagamentosFuncionariosByReferencia,
+  getPagamentosFuncionariosByEmpresa,
+} from '../db/queries-empresa'
 import { supabaseAdmin } from '../db/client'
 import { getSessionContextFromUserId } from '../db/user-profile'
 import {
@@ -2005,38 +2011,27 @@ async function handlePayEmployeeSalary(
     }
 
     // Verifica se já foi pago neste mês (evita duplicação)
-    
     const hoje = new Date()
-    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+    const referencia = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
     
-    const startDate = primeiroDiaMes.toISOString()
-    const endDate = ultimoDiaMes.toISOString()
-    
-    const pagamentosMes = await getFinanceiroEmpresaByFuncionario(
+    // Verifica em pagamentos_funcionarios primeiro (mais confiável)
+    const pagamentosExistentes = await getPagamentosFuncionariosByReferencia(
       tenantId,
       sessionContext.empresa_id,
       funcionario.id,
-      startDate,
-      endDate
+      referencia
     )
 
-    // Verifica se já existe pagamento no mês atual
-    if (pagamentosMes.length > 0) {
-      const ultimoPagamento = pagamentosMes[0]
-      const dataPagamento = new Date(ultimoPagamento.date)
-      const mesPagamento = dataPagamento.getMonth()
-      const anoPagamento = dataPagamento.getFullYear()
-      
-      if (mesPagamento === hoje.getMonth() && anoPagamento === hoje.getFullYear()) {
-        return {
-          success: true,
-          message: `ℹ️ O salário de *${funcionario.nome_original}* já foi registrado neste mês (${dataPagamento.toLocaleDateString('pt-BR')}).`,
-        }
+    if (pagamentosExistentes.length > 0) {
+      const ultimoPagamento = pagamentosExistentes[0]
+      const dataPagamento = new Date(ultimoPagamento.data_pagamento)
+      return {
+        success: true,
+        message: `ℹ️ O salário de *${funcionario.nome_original}* já foi registrado neste mês (${dataPagamento.toLocaleDateString('pt-BR')}).`,
       }
     }
 
-    // Registra o pagamento no financeiro
+    // Registra o pagamento no financeiro primeiro
     const hojeISO = hoje.toISOString().split('T')[0] // YYYY-MM-DD
     
     const record = await createFinanceiroEmpresa(
@@ -2054,7 +2049,7 @@ async function handlePayEmployeeSalary(
           nome: funcionario.nome_original,
         },
         tipo: 'salario_mensal',
-        periodo: `${hoje.getMonth() + 1}/${hoje.getFullYear()}`,
+        periodo: referencia,
       },
       ['funcionário', 'salário'],
       'expense',
@@ -2069,6 +2064,25 @@ async function handlePayEmployeeSalary(
       }
     }
 
+    // Cria registro em pagamentos_funcionarios vinculado ao financeiro
+    const pagamento = await createPagamentoFuncionario(
+      tenantId,
+      sessionContext.empresa_id,
+      funcionario.id,
+      salarioBase,
+      hojeISO,
+      referencia,
+      record.id, // financeiro_id
+      'pago'
+    )
+
+    if (!pagamento) {
+      console.warn('Aviso: Pagamento financeiro criado mas registro em pagamentos_funcionarios falhou', {
+        funcionario_id: funcionario.id,
+        financeiro_id: record.id,
+      })
+    }
+
     // Formata resposta final
     const mesNome = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
     const mesNomeCapitalizado = mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
@@ -2076,7 +2090,7 @@ async function handlePayEmployeeSalary(
     return {
       success: true,
       message: `✅ Salário pago com sucesso!\n\n👤 Funcionário: *${funcionario.nome_original}*\n💰 Valor: R$ ${salarioBase.toFixed(2).replace('.', ',')}\n📅 Período: ${mesNomeCapitalizado}\n📂 Categoria: Funcionários › Salário\n\nO pagamento já foi lançado nos gastos da empresa.`,
-      data: record,
+      data: { financeiro: record, pagamento },
     }
   } catch (error) {
     if (error instanceof ValidationError) {
