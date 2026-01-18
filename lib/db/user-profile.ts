@@ -56,9 +56,11 @@ export async function getUserRowById(
   client: SupabaseLikeClient,
   userId: string
 ): Promise<{ table: 'users_meugestor' | 'users'; user: User } | null> {
+  console.log('[getUserRowById] Buscando usuário:', userId)
   const candidates: Array<{ table: 'users_meugestor' | 'users'; user: User }> = []
   const tablesToTry: Array<'users_meugestor' | 'users'> = ['users_meugestor', 'users']
   for (const table of tablesToTry) {
+    console.log('[getUserRowById] Tentando tabela:', table)
     // Estratégia robusta: tenta conjuntos de colunas do mais completo ao mínimo.
     // Isso permite funcionar em ambientes onde a tabela existe mas tem colunas diferentes.
     const columnSets = [
@@ -75,15 +77,21 @@ export async function getUserRowById(
         break
       }
       if (res.error && isMissingRelationError(res.error)) {
+        console.log('[getUserRowById] Tabela não existe:', table)
         picked = null
         break
       }
       if (res.error && isMissingColumnError(res.error)) {
+        console.log('[getUserRowById] Coluna não existe, tentando próximo conjunto')
         // tenta próximo conjunto
         continue
       }
-      // outro erro (RLS etc) — aborta
-      if (res.error) return null
+      // outro erro (RLS etc) — loga mas continua tentando
+      if (res.error) {
+        console.warn('[getUserRowById] Erro ao buscar na tabela', table, ':', res.error.message)
+        // Não retorna null imediatamente, continua tentando outras tabelas
+        continue
+      }
     }
 
     if (picked?.data) {
@@ -125,8 +133,14 @@ export async function getUserRowById(
     }
   }
 
-  if (candidates.length === 0) return null
-  if (candidates.length === 1) return candidates[0]
+  if (candidates.length === 0) {
+    console.warn('[getUserRowById] Nenhum candidato encontrado para userId:', userId)
+    return null
+  }
+  if (candidates.length === 1) {
+    console.log('[getUserRowById] Candidato único encontrado:', candidates[0].table)
+    return candidates[0]
+  }
 
   function score(u: User): number {
     let s = 0
@@ -156,57 +170,157 @@ export async function updateUserModeAndEmpresa(
   userId: string,
   params: { mode: AppMode; empresaId: string | null }
 ): Promise<boolean> {
-  const preferred: Array<'users_meugestor' | 'users'> = ['users_meugestor', 'users']
-  for (const table of preferred) {
+  console.log('[updateUserModeAndEmpresa] Atualizando contexto:', { userId, mode: params.mode, empresaId: params.empresaId })
+  
+  // Primeiro, busca tenant_id e a tabela onde o usuário existe
+  const row = await getUserRowById(client, userId)
+  if (!row) {
+    console.warn('[updateUserModeAndEmpresa] Usuário não encontrado:', userId)
+    return false
+  }
+
+  const tenantId = row.user.tenant_id
+  if (!tenantId) {
+    console.warn('[updateUserModeAndEmpresa] Tenant ID não encontrado para usuário:', userId)
+    return false
+  }
+
+  const table = row.table
+  let updatedInTable = false
+  let tableError: any = null
+
+  // Tenta atualizar na tabela de perfil (users/users_meugestor)
+  try {
+    // IMPORTANTE: Se mode='empresa' e empresaId é null, isso viola a constraint
+    // Mas o endpoint já valida isso antes de chamar esta função
+    const updateData: any = { mode: params.mode }
+    if (params.mode === 'empresa' && params.empresaId) {
+      updateData.empresa_id = params.empresaId
+    } else if (params.mode === 'pessoal') {
+      updateData.empresa_id = null
+    }
+
     const { data, error } = await client
       .from(table)
-      .update({ mode: params.mode, empresa_id: params.empresaId })
+      .update(updateData)
       .eq('id', userId)
       .select('id')
 
-    if (!error) {
-      // Se a tabela existe mas não tinha o userId, data vem vazio; tenta próxima.
-      if (Array.isArray(data) && data.length === 0) continue
-      return true
-    }
-
-    // Se as colunas não existem, não é fatal: o contexto pode ser persistido via user_session_context.
-    if (error && isMissingColumnError(error)) {
-      // tenta apenas garantir user_session_context (com tenant_id vindo do user row)
-      try {
-        const { data: u } = await client.from(table).select('tenant_id').eq('id', userId).single()
-        if (u?.tenant_id) {
-          const up = await client
-            .from('user_session_context')
-            .upsert(
-              { user_id: userId, tenant_id: u.tenant_id, mode: params.mode, empresa_id: params.empresaId },
-              { onConflict: 'user_id' }
-            )
-          if (!up.error) return true
-        }
-      } catch {
-        // ignore
+    if (!error && data && Array.isArray(data) && data.length > 0) {
+      console.log('[updateUserModeAndEmpresa] Atualizado com sucesso na tabela:', table)
+      updatedInTable = true
+    } else if (error) {
+      tableError = error
+      if (isMissingColumnError(error)) {
+        console.warn('[updateUserModeAndEmpresa] Colunas mode/empresa_id não existem na tabela:', table)
+      } else {
+        console.error('[updateUserModeAndEmpresa] Erro ao atualizar tabela:', error.code, error.message)
       }
-      continue
     }
-
-    if (error && !isMissingRelationError(error)) return false
+  } catch (e) {
+    console.error('[updateUserModeAndEmpresa] Exceção ao atualizar tabela:', e)
+    tableError = e
   }
-  return false
+
+  // SEMPRE tenta salvar em user_session_context (mesmo que tenha conseguido atualizar na tabela)
+  // Isso garante persistência mesmo se as colunas não existirem na tabela principal
+  let updatedInContext = false
+  try {
+    const { error: ctxError } = await client
+      .from('user_session_context')
+      .upsert(
+        {
+          user_id: userId,
+          tenant_id: tenantId,
+          mode: params.mode,
+          empresa_id: params.mode === 'empresa' ? params.empresaId : null,
+        },
+        { onConflict: 'user_id' }
+      )
+    
+    if (!ctxError) {
+      console.log('[updateUserModeAndEmpresa] ✅ Atualizado com sucesso em user_session_context')
+      updatedInContext = true
+    } else if (isMissingRelationError(ctxError)) {
+      console.warn('[updateUserModeAndEmpresa] Tabela user_session_context não existe (migration não aplicada?)')
+    } else {
+      console.error('[updateUserModeAndEmpresa] Erro ao atualizar user_session_context:', ctxError.code, ctxError.message)
+    }
+  } catch (e) {
+    console.error('[updateUserModeAndEmpresa] Exceção ao atualizar user_session_context:', e)
+  }
+
+  // Retorna true se atualizou em pelo menos um lugar
+  // Prioriza user_session_context pois é mais confiável
+  const success = updatedInTable || updatedInContext
+  
+  if (success) {
+    console.log('[updateUserModeAndEmpresa] ✅ Contexto atualizado com sucesso')
+  } else {
+    console.error('[updateUserModeAndEmpresa] ❌ Falha ao atualizar contexto em ambos os lugares', { tableError })
+  }
+  
+  return success
 }
 
 export async function getSessionContextFromUserId(
   client: SupabaseLikeClient,
   userId: string
 ): Promise<SessionContext | null> {
+  console.log('[getSessionContextFromUserId] Iniciando busca de contexto para userId:', userId)
+
+  // 1) Prioridade: user_session_context (quando existir) — independe da tabela de perfil
+  const ctxRow = await tryGetUserSessionContext(client, userId)
+  if (ctxRow?.tenant_id) {
+    const mode: AppMode = ctxRow.empresa_id ? 'empresa' : ctxRow.mode === 'empresa' ? 'empresa' : 'pessoal'
+    const ctx: SessionContext = {
+      tenant_id: ctxRow.tenant_id,
+      user_id: userId,
+      mode,
+      empresa_id: ctxRow.empresa_id ?? null,
+    }
+    if (ctx.mode === 'empresa' && ctx.empresa_id) {
+      try {
+        const { data, error } = await client
+          .from('empresas')
+          .select('nome_fantasia')
+          .eq('id', ctx.empresa_id)
+          .eq('tenant_id', ctx.tenant_id)
+          .maybeSingle()
+        if (!error && data) ctx.empresa_nome_fantasia = data.nome_fantasia ?? null
+      } catch {
+        // ignore
+      }
+    }
+    console.log('[getSessionContextFromUserId] Contexto vindo de user_session_context:', {
+      tenant_id: ctx.tenant_id,
+      mode: ctx.mode,
+      empresa_id: ctx.empresa_id,
+    })
+    return ctx
+  }
+
+  // 2) Fallback: tabela de perfil (users/users_meugestor)
   const row = await getUserRowById(client, userId)
-  if (!row) return null
+  if (!row) {
+    console.warn('[getSessionContextFromUserId] getUserRowById retornou null para userId:', userId)
+    return null
+  }
+
+  console.log('[getSessionContextFromUserId] Usuário encontrado:', {
+    table: row.table,
+    tenant_id: row.user.tenant_id,
+    mode: row.user.mode,
+    empresa_id: row.user.empresa_id,
+  })
 
   // Regra: se já existe empresa_id, o contexto deve ser empresa (mesmo que mode esteja default/errado).
   const inferredMode: AppMode =
     row.user.empresa_id ? 'empresa' : row.user.mode === 'empresa' ? 'empresa' : 'pessoal'
   const mode: AppMode = inferredMode
   const empresaId = (row.user.empresa_id ?? null) as string | null
+  
+  console.log('[getSessionContextFromUserId] Modo inferido:', { inferredMode, mode, empresaId })
 
   // Fallback: se não há colunas/tabela e client tem admin API, tenta ler auth.user_metadata
   // (isso permite "reconhecer modo empresa" mesmo sem migrations aplicadas)
@@ -268,6 +382,7 @@ export async function getSessionContextFromUserId(
   // tenta inferir automaticamente quando houver exatamente 1 empresa.
   // Isso evita o caso "sou empresa mas o bot não reconhece".
   if (!finalEmpresaId) {
+    console.log('[getSessionContextFromUserId] Tentando inferir empresa do tenant:', row.user.tenant_id)
     try {
       const { data: empresas, error } = await client
         .from('empresas')
@@ -275,7 +390,11 @@ export async function getSessionContextFromUserId(
         .eq('tenant_id', row.user.tenant_id)
         .limit(2)
 
+      console.log('[getSessionContextFromUserId] Empresas no tenant:', { empresas, error })
+
       if (!error && Array.isArray(empresas) && empresas.length === 1) {
+        console.log('[getSessionContextFromUserId] Inferindo modo empresa automaticamente da única empresa:', empresas[0].id)
+        
         finalMode = 'empresa'
         finalEmpresaId = empresas[0].id
         ;(row.user as any).mode = 'empresa'
@@ -283,9 +402,14 @@ export async function getSessionContextFromUserId(
 
         // Best-effort: persiste no perfil (se colunas existirem)
         try {
-          await client.from(row.table).update({ mode: 'empresa', empresa_id: finalEmpresaId }).eq('id', userId)
-        } catch {
-          // ignore
+          const updResult = await client.from(row.table).update({ mode: 'empresa', empresa_id: finalEmpresaId }).eq('id', userId)
+          if (updResult.error) {
+            console.warn('[getSessionContextFromUserId] Falha ao atualizar perfil:', updResult.error)
+          } else {
+            console.log('[getSessionContextFromUserId] Perfil atualizado com sucesso')
+          }
+        } catch (e) {
+          console.warn('[getSessionContextFromUserId] Exceção ao atualizar perfil:', e)
         }
 
         // Best-effort: persiste no user_session_context (se existir)
@@ -302,13 +426,18 @@ export async function getSessionContextFromUserId(
               { onConflict: 'user_id' }
             )
           if (up?.error && isMissingRelationError(up.error)) {
-            // ignore
+            console.warn('[getSessionContextFromUserId] Tabela user_session_context não existe')
+          } else if (up?.error) {
+            console.warn('[getSessionContextFromUserId] Falha ao atualizar user_session_context:', up.error)
+          } else {
+            console.log('[getSessionContextFromUserId] user_session_context atualizado com sucesso')
           }
-        } catch {
-          // ignore
+        } catch (e) {
+          console.warn('[getSessionContextFromUserId] Exceção ao atualizar user_session_context:', e)
         }
       }
-    } catch {
+    } catch (e) {
+      console.warn('[getSessionContextFromUserId] Erro ao buscar empresas do tenant:', e)
       // tolera ambientes sem a tabela ainda
     }
   }
@@ -328,11 +457,21 @@ export async function getSessionContextFromUserId(
         .eq('id', ctx.empresa_id)
         .eq('tenant_id', row.user.tenant_id)
         .single()
-      if (!error && data) ctx.empresa_nome_fantasia = data.nome_fantasia ?? null
-    } catch {
+      if (!error && data) {
+        ctx.empresa_nome_fantasia = data.nome_fantasia ?? null
+        console.log('[getSessionContextFromUserId] Nome fantasia da empresa:', data.nome_fantasia)
+      }
+    } catch (e) {
+      console.warn('[getSessionContextFromUserId] Erro ao buscar nome fantasia da empresa:', e)
       // tolera ambientes sem a tabela ainda
     }
   }
+
+  console.log('[getSessionContextFromUserId] Contexto final retornado:', {
+    mode: ctx.mode,
+    empresa_id: ctx.empresa_id,
+    empresa_nome_fantasia: ctx.empresa_nome_fantasia,
+  })
 
   return ctx
 }

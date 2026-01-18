@@ -143,9 +143,11 @@ export async function processAction(
     
     // Garante SessionContext (não depender só do webhook)
     // Isso evita o caso "sou empresa mas o bot não reconhece" quando mode/empresa_id ainda não está persistido no perfil.
-    const effectiveSessionContext: SessionContext | null =
-      sessionContext ||
-      (supabaseAdmin ? await getSessionContextFromUserId(supabaseAdmin as any, userId) : null)
+    const effectiveSessionContext: SessionContext =
+      (sessionContext ||
+        (supabaseAdmin ? await getSessionContextFromUserId(supabaseAdmin as any, userId) : null) ||
+        // Último fallback: nunca deixar null (evita mensagem "não identifiquei contexto")
+        { tenant_id: tenantId, user_id: userId, mode: 'pessoal', empresa_id: null }) as SessionContext
 
     // Busca contexto recente para o GPT entender a conversa completa
     const { getRecentConversations } = await import('../db/queries')
