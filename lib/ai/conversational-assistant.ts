@@ -196,9 +196,20 @@ REGRA CRÍTICA - NOVO DOMÍNIO "listas":
  - Perguntas SOBRE AS LISTAS (contagem/nomes) devem ser query (NÃO chat):
    - "quantas listas de compras eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: "compras"
    - "quais listas eu tenho?" → intent: "query", domain: "listas", queryType: "listas", list_type: null (todas)
- - Perguntas SOBRE ITENS DE UMA LISTA devem virar query (NÃO query de listas):
-   - "quais itens tem na lista do mercado?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "mercado"
-   - "quantos itens tenho na lista de películas de iphone?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "películas de iphone"
+- Perguntas SOBRE ITENS DE UMA LISTA devem virar query (NÃO query de listas):
+  - "quais itens tem na lista do mercado?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "mercado"
+  - "quantos itens tenho na lista de películas de iphone?" → intent: "query", domain: "listas", queryType: "lista_itens", list_name: "películas de iphone"
+
+REGRA CRÍTICA - CONSULTAS DE FUNCIONÁRIOS (MODO EMPRESA):
+- Perguntas sobre pagamentos de funcionários devem ser query (NÃO chat):
+  - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês" (se não mencionado, assume este mês)
+  - "quem eu paguei este mês?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
+  - "pagamentos de funcionários" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
+  - "salários pagos" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
+  - "já paguei o Pedro?" → intent: "query", domain: "empresa", queryType: "employee_payments", employee_name: "Pedro", periodo: "mês"
+  - "quanto paguei para funcionários este ano?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "ano"
+- REGRA DE PERÍODO: Se período não for mencionado, SEMPRE assume "mês" (este mês).
+- Funcionário específico: Se mencionar nome de funcionário, use employee_name.
 
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
@@ -254,11 +265,12 @@ ${activeTaskContext}
 Responda APENAS com JSON no formato:
 {
   "intent": "register_expense" | "register_revenue" | "create_supplier" | "create_employee" | "create_appointment" | "update_expense" | "update_revenue" | "update_appointment" | "cancel_appointment" | "create_list" | "add_list_item" | "remove_list_item" | "mark_item_done" | "show_list" | "query" | "report" | "chat" | "confirm" | "cancel",
-  "domain": "financeiro" | "agenda" | "listas" | "geral" | null,
+  "domain": "financeiro" | "agenda" | "listas" | "empresa" | "geral" | null,
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
-  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | null,
+  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | "employee_payments" | null,
+  "employee_name": string | null,
   "amount": number | null,
   "title": string | null,
   "scheduled_at": string (apenas horário, ex: "15:00") | null,
@@ -347,6 +359,8 @@ REGRAS IMPORTANTES:
       item_name: parsed.item_name ?? null,
       quantidade: parsed.quantidade ?? null,
       unidade: parsed.unidade ?? null,
+      supplier_name: parsed.supplier_name ?? null,
+      employee_name: parsed.employee_name ?? null,
       confidence: parsed.confidence ?? 0.5,
       needsClarification: parsed.needsClarification ?? false,
       clarificationMessage: parsed.clarificationMessage ?? null,

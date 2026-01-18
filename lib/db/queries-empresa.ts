@@ -111,6 +111,50 @@ export async function getFinanceiroEmpresaByCategory(
   return data || []
 }
 
+/**
+ * Busca pagamentos de funcionários agrupados por funcionário.
+ * Retorna gastos da categoria "Funcionários" filtrados por período.
+ */
+export async function getEmployeePaymentsByEmpresa(
+  tenantId: string,
+  empresaId: string,
+  startDate?: string,
+  endDate?: string,
+  funcionarioId?: string | null
+): Promise<Financeiro[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('financeiro_empresa')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('category', 'Funcionários')
+    .eq('transaction_type', 'expense')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (startDate) query = query.gte('date', startDate)
+  if (endDate) query = query.lte('date', endDate)
+  
+  // Filtra por funcionario_id se especificado (via metadata)
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching employee payments:', error)
+    return []
+  }
+  
+  // Filtra por metadata.funcionario.id se funcionarioId foi passado
+  if (funcionarioId && data) {
+    return data.filter((gasto: any) => {
+      const metadata = gasto.metadata || {}
+      const funcionarioMeta = metadata.funcionario || {}
+      return funcionarioMeta.id === funcionarioId
+    })
+  }
+  
+  return data || []
+}
+
 // ============================================
 // COMPROMISSOS_EMPRESA
 // ============================================

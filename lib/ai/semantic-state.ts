@@ -32,7 +32,7 @@ export interface SemanticState {
   periodo?: 'hoje' | 'ontem' | 'amanhã' | 'semana' | 'mês' | 'ano' | null
   categoria?: string | null
   subcategoria?: string | null
-  queryType?: 'gasto' | 'compromissos' | 'categoria' | 'agenda' | 'listas' | 'lista_itens' | null
+  queryType?: 'gasto' | 'compromissos' | 'categoria' | 'agenda' | 'listas' | 'lista_itens' | 'employee_payments' | null
   amount?: number | null
   title?: string | null
   scheduled_at?: string | null

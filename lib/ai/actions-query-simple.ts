@@ -5,6 +5,7 @@
 
 import { SemanticState } from './semantic-state'
 import { ActionResult } from './actions'
+import type { SessionContext } from '../db/types'
 import { 
   getDespesasRecords, 
   getReceitasRecords 
@@ -28,6 +29,8 @@ import { filterBySemanticCategory } from '../utils/semantic-filter'
 import { getListasByTenant } from '../db/queries'
 import { normalizeText } from '../utils/normalize-text'
 import { getListView, formatListRawResponse } from '../services/listas'
+import { getEmployeePaymentsByEmpresa } from '../db/queries-empresa'
+import { findFuncionarioByName } from '../services/funcionarios'
 
 function formatTimeBR(iso: string): string {
   const parts = new Intl.DateTimeFormat('pt-BR', {
@@ -355,12 +358,125 @@ async function queryListaItens(
 }
 
 /**
+ * Consulta pagamentos de funcionários (modo empresa)
+ */
+async function queryEmployeePayments(
+  state: SemanticState,
+  tenantId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+    return {
+      success: true,
+      message: 'Consultas de funcionários só estão disponíveis no modo empresa.',
+    }
+  }
+
+  // Período: se não mencionado, assume "este mês"
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
+
+  // Busca funcionário específico se mencionado
+  let funcionarioId: string | null = null
+  if (state.employee_name) {
+    const funcionario = await findFuncionarioByName(sessionContext, state.employee_name)
+    if (funcionario) {
+      funcionarioId = funcionario.id
+    }
+  }
+
+  // Busca pagamentos de funcionários
+  const pagamentos = await getEmployeePaymentsByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    startDate,
+    endDate,
+    funcionarioId
+  )
+
+  if (pagamentos.length === 0) {
+    if (state.employee_name) {
+      return {
+        success: true,
+        message: `⚠️ Você ainda não registrou pagamentos para *${state.employee_name}* neste período.`,
+      }
+    }
+    return {
+      success: true,
+      message: `📊 Não há pagamentos de funcionários registrados ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}.`,
+    }
+  }
+
+  // Agrupa por funcionário
+  const porFuncionario: Record<string, { nome: string; total: number; pagamentos: any[]; ultimaData: string }> = {}
+  
+  for (const pagamento of pagamentos) {
+    const metadata = pagamento.metadata || {}
+    const funcionarioMeta = metadata.funcionario || {}
+    const funcionarioIdPag = funcionarioMeta.id || null
+    const funcionarioNome = funcionarioMeta.nome || 'Funcionário'
+    
+    if (!porFuncionario[funcionarioIdPag || 'unknown']) {
+      porFuncionario[funcionarioIdPag || 'unknown'] = {
+        nome: funcionarioNome,
+        total: 0,
+        pagamentos: [],
+        ultimaData: pagamento.date,
+      }
+    }
+    
+    const grupo = porFuncionario[funcionarioIdPag || 'unknown']
+    grupo.total += Number(pagamento.amount)
+    grupo.pagamentos.push(pagamento)
+    // Atualiza última data (mais recente)
+    if (new Date(pagamento.date) > new Date(grupo.ultimaData)) {
+      grupo.ultimaData = pagamento.date
+    }
+  }
+
+  const funcionarios = Object.values(porFuncionario)
+  const totalGeral = funcionarios.reduce((sum, f) => sum + f.total, 0)
+
+  // Se foi pergunta específica sobre um funcionário
+  if (state.employee_name && funcionarios.length === 1) {
+    const func = funcionarios[0]
+    const ultimaData = new Date(func.ultimaData).toLocaleDateString('pt-BR')
+    return {
+      success: true,
+      message: `✅ Sim. Você já pagou *${func.nome}* ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}:\n• Total: R$ ${func.total.toFixed(2)}\n• Último pagamento: ${ultimaData}`,
+      data: { funcionario: func, pagamentos: func.pagamentos },
+    }
+  }
+
+  // Relatório agregado (todos os funcionários)
+  let response = `📊 *Pagamentos de Funcionários (${periodoTexto})*\n\n`
+  
+  // Ordena por total (maior primeiro)
+  funcionarios.sort((a, b) => b.total - a.total)
+  
+  for (const func of funcionarios) {
+    response += `👤 ${func.nome}\n`
+    response += `• Total pago: R$ ${func.total.toFixed(2)}\n`
+    response += `• Pagamentos: ${func.pagamentos.length}\n\n`
+  }
+  
+  response += `💰 *Total geral:* R$ ${totalGeral.toFixed(2)}`
+
+  return {
+    success: true,
+    message: response,
+    data: { funcionarios, totalGeral, periodo: periodoTexto },
+  }
+}
+
+/**
  * Função principal simplificada
  */
 export async function handleQuerySimple(
   state: SemanticState,
   tenantId: string,
-  userId: string
+  userId: string,
+  sessionContext?: SessionContext | null
 ): Promise<ActionResult> {
   // Validação rígida
   if (!state.queryType) {
@@ -392,6 +508,10 @@ export async function handleQuerySimple(
 
   if (state.queryType === 'lista_itens' && state.domain === 'listas') {
     return await queryListaItens(state, tenantId)
+  }
+
+  if (state.queryType === 'employee_payments' && state.domain === 'empresa') {
+    return await queryEmployeePayments(state, tenantId, sessionContext || null)
   }
   
   return {

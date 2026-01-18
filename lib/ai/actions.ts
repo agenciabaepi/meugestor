@@ -59,6 +59,7 @@ import {
 import {
   ensureFuncionarioByNameForContext,
   extractEmployeeNameFromPaymentText,
+  extractEmployeeNameFromCreateCommand,
 } from '../services/funcionarios'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
@@ -301,10 +302,30 @@ export async function processAction(
     }
     
     // =========================================================
-    // DETECÇÃO DETERMINÍSTICA (SEM IA) — FORNECEDORES (MODO EMPRESA)
-    // Regra de ouro: se o usuário pedir explicitamente para cadastrar/criar fornecedor,
+    // DETECÇÃO DETERMINÍSTICA (SEM IA) — FORNECEDORES E FUNCIONÁRIOS (MODO EMPRESA)
+    // Regra de ouro: se o usuário pedir explicitamente para cadastrar/criar,
     // deve executar IMEDIATAMENTE, sem perguntas e sem desvio de fluxo.
     // =========================================================
+    
+    // Prioridade 1: Detecção de funcionário (antes de fornecedor para evitar conflito)
+    const employeeFromCmd = extractEmployeeNameFromCreateCommand(message)
+    if (employeeFromCmd) {
+      const forced: SemanticState = {
+        intent: 'create_employee',
+        domain: 'empresa',
+        employee_name: employeeFromCmd,
+        confidence: 1,
+        readyToSave: true,
+      }
+
+      const result = await executeAction(forced, tenantId, userId, message, effectiveSessionContext)
+      if (result.success && isMutatingIntent(forced.intent)) {
+        await cleanupAfterMutation(tenantId, userId, forced.intent)
+      }
+      return result
+    }
+
+    // Prioridade 2: Detecção de fornecedor
     const supplierFromCmd = extractSupplierNameFromCreateCommand(message)
     if (supplierFromCmd) {
       const forced: SemanticState = {
@@ -594,7 +615,7 @@ async function executeAction(
       return await handleCreateSupplier(semanticState, tenantId, userId, sessionContext)
 
     case 'create_employee':
-      return await handleCreateEmployee(semanticState, tenantId, userId, sessionContext)
+      return await handleCreateEmployee(semanticState, tenantId, userId, message, sessionContext)
 
     case 'update_expense':
     case 'update_revenue':
@@ -693,7 +714,7 @@ async function executeAction(
         }
         
         const { handleQuerySimple } = await import('./actions-query-simple')
-        return await handleQuerySimple(semanticState, tenantId, userId)
+        return await handleQuerySimple(semanticState, tenantId, userId, sessionContext)
 
       case 'chat':
         // Mensagens conversacionais simples - retorna false para usar fallback conversacional
@@ -1757,10 +1778,22 @@ async function handleCreateEmployee(
   state: SemanticState,
   tenantId: string,
   userId: string,
+  message: string,
   sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   try {
-    const name = state.employee_name ? String(state.employee_name).trim() : ''
+    // Tenta extrair nome do estado semântico ou da mensagem original (determinístico)
+    let name = state.employee_name ? String(state.employee_name).trim() : ''
+    
+    // Se não veio do estado, tenta extrair da mensagem diretamente (regra de ouro)
+    if (!name) {
+      const extracted = extractEmployeeNameFromCreateCommand(message)
+      if (extracted) {
+        name = extracted
+      }
+    }
+    
+    // Se ainda não tem nome, aí sim pergunta (apenas 1 vez)
     if (!name) {
       return { success: true, message: 'Qual o nome do funcionário?' }
     }
