@@ -480,7 +480,7 @@ async function queryEmployeePayments(
     response += `• Pagamentos: ${func.pagamentos.length}\n\n`
   }
   
-  response += `💰 *Total geral:* R$ ${totalGeral.toFixed(2)}`
+  response += `💰 *Total geral:* R$ ${totalGeral.toFixed(2).replace('.', ',')}`
 
   return {
     success: true,
