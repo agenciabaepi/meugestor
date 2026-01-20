@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:quiet": "node scripts/suppress-watchpack-warnings.js",
-    "dev:turbo": "next dev --turbo",
-    "build": "next build --webpack",
+    "dev:turbo": "node scripts/next-dev.js --turbo",
+    "dev:webpack": "node scripts/next-dev.js --webpack",
+    "build": "next build",
+    "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",

@@ -15,22 +15,13 @@ const nextConfig = {
     unoptimized: false,
   },
   
-  // Configurações do Turbopack para evitar problemas de leitura de diretórios
-  turbopack: {
-    // Limitar o escopo do Turbopack ao diretório do projeto
-    resolveAlias: {
-      // Evitar resolver módulos fora do projeto
-    },
-  },
-  // Configurações do webpack (usado quando --turbo não é usado)
+  // Root do projeto para output tracing
+  outputFileTracingRoot: projectRoot,
+  
+  // Configuração do webpack (desabilita Turbopack que está causando problemas)
   webpack: (config, { isServer, dev }) => {
     // Configurar o contexto do webpack para o diretório do projeto
     config.context = projectRoot
-    
-    // Desabilitar cache do webpack em desenvolvimento para evitar erros de ENOENT
-    if (dev) {
-      config.cache = false
-    }
     
     // Ignorar diretórios que podem causar problemas
     config.watchOptions = {
@@ -51,9 +42,6 @@ const nextConfig = {
     
     return config
   },
-  
-  // Define o root do projeto para evitar aviso de múltiplos lockfiles
-  outputFileTracingRoot: projectRoot,
 }
 
 module.exports = nextConfig
