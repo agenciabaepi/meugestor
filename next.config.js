@@ -23,16 +23,19 @@ const nextConfig = {
     },
   },
   // Configurações do webpack (usado quando --turbo não é usado)
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     // Configurar o contexto do webpack para o diretório do projeto
-    // Isso é fundamental para limitar o escopo do watch
     config.context = projectRoot
+    
+    // Desabilitar cache do webpack em desenvolvimento para evitar erros de ENOENT
+    if (dev) {
+      config.cache = false
+    }
     
     // Ignorar diretórios que podem causar problemas
     config.watchOptions = {
       ...config.watchOptions,
       ignored: [
-        // Ignorar diretórios comuns dentro do projeto
         '**/node_modules/**',
         '**/.git/**',
         '**/.next/**',
@@ -40,27 +43,14 @@ const nextConfig = {
         '**/build/**',
         '**/.DS_Store',
         '**/Thumbs.db',
-        // Ignorar diretórios grandes comuns
-        '**/Library/**',
-        '**/Desktop/**',
-        '**/Downloads/**',
-        '**/Movies/**',
-        '**/Music/**',
-        '**/Pictures/**',
       ],
-      // Agregar timeout para evitar muitos eventos
       aggregateTimeout: 500,
-      // Não usar polling (mais rápido)
       poll: false,
-      // Ignorar permissões de arquivo
       followSymlinks: false,
     }
     
     return config
   },
-  // Configuração adicional para limitar o escopo
-  // Limitar o output file tracing ao diretório do projeto
-  outputFileTracingRoot: projectRoot,
 }
 
 module.exports = nextConfig
