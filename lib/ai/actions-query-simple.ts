@@ -32,6 +32,7 @@ import { getListView, formatListRawResponse } from '../services/listas'
 import { 
   getEmployeePaymentsByEmpresa,
   getPagamentosFuncionariosByEmpresa,
+  getFuncionariosByEmpresa,
 } from '../db/queries-empresa'
 import { findFuncionarioByName } from '../services/funcionarios'
 
@@ -76,16 +77,15 @@ function formatCompromissoLine(compromisso: any, now: Date): string {
 function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDate: string; endDate?: string; periodoTexto: string } {
   const now = getNowInBrazil()
   
-  // REGRA CRÍTICA: Se período é null/undefined aqui, significa que:
-  // 1. GPT não retornou período
-  // 2. inheritContext não conseguiu herdar (sem contexto anterior)
-  // 3. Nesse caso, NÃO usar default agressivo - retornar erro ou pedir esclarecimento
-  // Mas para não quebrar, usamos default apenas como último recurso
+  // REGRA CRÍTICA (conforme bot.md): Se período não informado, assume "mês" (mês atual)
+  // Isso é especialmente importante para consultas de funcionários
   if (!periodo) {
-    console.warn('getDateRangeFromPeriodo - Período não especificado e sem contexto para herdar, usando default (este mês)')
+    console.log('getDateRangeFromPeriodo - Período não especificado, usando default (este mês) conforme bot.md')
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     return {
       startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: endOfMonth.toISOString(),
       periodoTexto: 'este mês'
     }
   }
@@ -490,6 +490,264 @@ async function queryEmployeePayments(
 }
 
 /**
+ * Consulta: Quantos funcionários eu tenho? (conforme bot.md)
+ */
+async function queryFuncionariosCount(
+  state: SemanticState,
+  tenantId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+    return {
+      success: true,
+      message: 'Consultas de funcionários só estão disponíveis no modo empresa.',
+    }
+  }
+
+  const funcionarios = await getFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    true, // apenas ativos
+    1000 // limite alto
+  )
+
+  const total = funcionarios.length
+  const nomes = funcionarios.map(f => f.nome_original || f.nome).sort()
+
+  let response = `👥 *Total de Funcionários: ${total}*\n\n`
+  
+  if (nomes.length > 0) {
+    response += `*Funcionários:*\n`
+    nomes.forEach((nome, idx) => {
+      response += `${idx + 1}. ${nome}\n`
+    })
+  } else {
+    response += `Nenhum funcionário cadastrado.`
+  }
+
+  return {
+    success: true,
+    message: response,
+    data: { total, funcionarios, nomes },
+  }
+}
+
+/**
+ * Consulta: Quais funcionários eu já paguei? (conforme bot.md)
+ */
+async function queryFuncionariosPagos(
+  state: SemanticState,
+  tenantId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+    return {
+      success: true,
+      message: 'Consultas de funcionários só estão disponíveis no modo empresa.',
+    }
+  }
+
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
+
+  // Busca funcionário específico se mencionado
+  let funcionarioId: string | null = null
+  if (state.employee_name) {
+    const funcionario = await findFuncionarioByName(sessionContext, state.employee_name)
+    if (funcionario) {
+      funcionarioId = funcionario.id
+    }
+  }
+
+  // Busca pagamentos do período
+  const pagamentos = await getPagamentosFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    funcionarioId || undefined,
+    'pago',
+    startDate,
+    endDate
+  )
+
+  if (pagamentos.length === 0) {
+    if (state.employee_name) {
+      return {
+        success: true,
+        message: `⚠️ Você ainda não registrou pagamentos para *${state.employee_name}* ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}.`,
+      }
+    }
+    return {
+      success: true,
+      message: `📊 Não há funcionários pagos ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}.`,
+    }
+  }
+
+  // Busca todos os funcionários para mapear IDs
+  const todosFuncionarios = await getFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id
+  )
+  const funcionariosMap = new Map(todosFuncionarios.map(f => [f.id, f.nome_original || f.nome]))
+
+  // Agrupa por funcionário
+  const porFuncionario: Record<string, { nome: string; total: number; pagamentos: number }> = {}
+  
+  for (const pagamento of pagamentos) {
+    const funcionarioIdPag = pagamento.funcionario_id
+    const nome = funcionariosMap.get(funcionarioIdPag) || 'Funcionário'
+    
+    if (!porFuncionario[funcionarioIdPag]) {
+      porFuncionario[funcionarioIdPag] = {
+        nome,
+        total: 0,
+        pagamentos: 0,
+      }
+    }
+    
+    porFuncionario[funcionarioIdPag].total += Number(pagamento.valor)
+    porFuncionario[funcionarioIdPag].pagamentos += 1
+  }
+
+  const funcionarios = Object.values(porFuncionario)
+  funcionarios.sort((a, b) => a.nome.localeCompare(b.nome))
+
+  let response = `✅ *Funcionários Pagos (${periodoTexto})*\n\n`
+  
+  for (const func of funcionarios) {
+    response += `👤 ${func.nome}\n`
+    response += `• Total: R$ ${func.total.toFixed(2).replace('.', ',')}\n`
+    response += `• Pagamentos: ${func.pagamentos}\n\n`
+  }
+
+  return {
+    success: true,
+    message: response,
+    data: { funcionarios, periodo: periodoTexto },
+  }
+}
+
+/**
+ * Consulta: Falta quantos funcionários para pagar? / Quem eu ainda não paguei? (conforme bot.md)
+ */
+async function queryFuncionariosPendentes(
+  state: SemanticState,
+  tenantId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+    return {
+      success: true,
+      message: 'Consultas de funcionários só estão disponíveis no modo empresa.',
+    }
+  }
+
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
+
+  // Busca TODOS os funcionários ativos
+  const todosFuncionarios = await getFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    true, // apenas ativos
+    1000
+  )
+
+  // Busca funcionários que JÁ FORAM PAGOS no período
+  const pagamentos = await getPagamentosFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    undefined, // todos
+    'pago',
+    startDate,
+    endDate
+  )
+
+  const funcionariosPagosIds = new Set(pagamentos.map(p => p.funcionario_id))
+
+  // Calcula quem NÃO foi pago
+  const funcionariosPendentes = todosFuncionarios.filter(
+    f => !funcionariosPagosIds.has(f.id)
+  )
+
+  const totalPendentes = funcionariosPendentes.length
+  const totalFuncionarios = todosFuncionarios.length
+  const totalPagos = totalFuncionarios - totalPendentes
+
+  let response = `📋 *Funcionários Pendentes (${periodoTexto})*\n\n`
+  response += `⏳ Faltam pagar: *${totalPendentes}* de ${totalFuncionarios} funcionários\n\n`
+
+  if (totalPendentes > 0) {
+    response += `*Funcionários que ainda não foram pagos:*\n`
+    funcionariosPendentes
+      .map(f => f.nome_original || f.nome)
+      .sort()
+      .forEach((nome, idx) => {
+        response += `${idx + 1}. ${nome}\n`
+      })
+  } else {
+    response += `✅ Todos os funcionários já foram pagos!`
+  }
+
+  return {
+    success: true,
+    message: response,
+    data: { 
+      totalPendentes, 
+      totalFuncionarios, 
+      totalPagos,
+      funcionariosPendentes: funcionariosPendentes.map(f => f.nome_original || f.nome),
+      periodo: periodoTexto 
+    },
+  }
+}
+
+/**
+ * Consulta: Quanto eu já paguei de salário esse mês? (conforme bot.md)
+ */
+async function querySalariosTotal(
+  state: SemanticState,
+  tenantId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  if (!sessionContext || sessionContext.mode !== 'empresa' || !sessionContext.empresa_id) {
+    return {
+      success: true,
+      message: 'Consultas de funcionários só estão disponíveis no modo empresa.',
+    }
+  }
+
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
+
+  // Busca TODOS os pagamentos do período
+  const pagamentos = await getPagamentosFuncionariosByEmpresa(
+    sessionContext.tenant_id,
+    sessionContext.empresa_id,
+    undefined, // todos
+    'pago',
+    startDate,
+    endDate
+  )
+
+  // Soma total de salários pagos
+  const total = pagamentos.reduce((sum, p) => sum + Number(p.valor), 0)
+  const quantidadePagamentos = pagamentos.length
+
+  let response = `💰 *Total de Salários Pagos (${periodoTexto})*\n\n`
+  response += `💵 Total: R$ ${total.toFixed(2).replace('.', ',')}\n`
+  response += `📊 Pagamentos: ${quantidadePagamentos}`
+
+  return {
+    success: true,
+    message: response,
+    data: { total, quantidadePagamentos, periodo: periodoTexto },
+  }
+}
+
+/**
  * Função principal simplificada
  */
 export async function handleQuerySimple(
@@ -532,6 +790,23 @@ export async function handleQuerySimple(
 
   if (state.queryType === 'employee_payments' && state.domain === 'empresa') {
     return await queryEmployeePayments(state, tenantId, sessionContext || null)
+  }
+
+  // NOVAS CONSULTAS DE FUNCIONÁRIOS (conforme bot.md)
+  if (state.queryType === 'funcionarios_count' && state.domain === 'empresa') {
+    return await queryFuncionariosCount(state, tenantId, sessionContext || null)
+  }
+
+  if (state.queryType === 'funcionarios_pagos' && state.domain === 'empresa') {
+    return await queryFuncionariosPagos(state, tenantId, sessionContext || null)
+  }
+
+  if (state.queryType === 'funcionarios_pendentes' && state.domain === 'empresa') {
+    return await queryFuncionariosPendentes(state, tenantId, sessionContext || null)
+  }
+
+  if (state.queryType === 'salarios_total' && state.domain === 'empresa') {
+    return await querySalariosTotal(state, tenantId, sessionContext || null)
   }
   
   return {

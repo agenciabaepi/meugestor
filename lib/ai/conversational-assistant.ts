@@ -221,12 +221,17 @@ REGISTRO SEM VALOR - BUSCA SALÁRIO AUTOMÁTICO (pay_employee_salary + readyToSa
 - REGRA: Se contém VERBO DE AÇÃO (paguei, já paguei, marca como pago) + FUNCIONÁRIO + SEM VALOR → pay_employee_salary com readyToSave: true
 - O sistema busca o salario_base do funcionário automaticamente e registra
 
-CONSULTA (query + queryType: "employee_payments"):
-  - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
-  - "quem eu paguei este mês?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "mês"
-  - "já paguei o Pedro?" → intent: "query", domain: "empresa", queryType: "employee_payments", employee_name: "Pedro", periodo: "mês"
-  - "quanto paguei para funcionários este ano?" → intent: "query", domain: "empresa", queryType: "employee_payments", periodo: "ano"
-- REGRA: Se contém APENAS PERGUNTA (sem verbo de ação) → query com queryType: "employee_payments"
+CONSULTAS DE FUNCIONÁRIOS (query + queryType específico):
+  - "quantos funcionários eu tenho?" → intent: "query", domain: "empresa", queryType: "funcionarios_count"
+  - "quais funcionários eu já paguei?" → intent: "query", domain: "empresa", queryType: "funcionarios_pagos", periodo: "mês" (default se não informado)
+  - "quem eu paguei este mês?" → intent: "query", domain: "empresa", queryType: "funcionarios_pagos", periodo: "mês"
+  - "falta quantos funcionários para pagar esse mês?" → intent: "query", domain: "empresa", queryType: "funcionarios_pendentes", periodo: "mês"
+  - "quem eu ainda não paguei?" → intent: "query", domain: "empresa", queryType: "funcionarios_pendentes", periodo: "mês" (default se não informado)
+  - "quanto eu já paguei de salário esse mês?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "mês" (default se não informado)
+  - "já paguei o Pedro?" → intent: "query", domain: "empresa", queryType: "funcionarios_pagos", employee_name: "Pedro", periodo: "mês" (default se não informado)
+  - "quanto paguei para funcionários este ano?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "ano"
+- REGRA: Se contém APENAS PERGUNTA (sem verbo de ação) → query com queryType específico
+- REGRA CRÍTICA: Se período não informado, assumir "mês" (mês atual) para todas as consultas de funcionários
 
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
@@ -287,7 +292,7 @@ Responda APENAS com JSON no formato:
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
-  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | "employee_payments" | null,
+  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | "employee_payments" | "funcionarios_count" | "funcionarios_pagos" | "funcionarios_pendentes" | "salarios_total" | null,
   "employee_name": string | null,
   "amount": number | null,
   "title": string | null,
