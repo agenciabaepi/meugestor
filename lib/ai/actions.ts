@@ -477,7 +477,7 @@ export async function processAction(
       }
     }
     
-    // Se é conversa casual, usa fallback conversacional
+    // Se é conversa casual, usa handler determinístico (SEM IA para gerar texto)
     if (semanticState.intent === 'chat') {
       // Se existe ação ativa, não deixa cair em chat fora de contexto
       if (activeTask) {
@@ -487,10 +487,8 @@ export async function processAction(
           message: buildKeepFocusMessage(activeTask),
         }
       }
-      return {
-        success: false, // Indica para usar processMessage
-        message: 'Mensagem conversacional',
-      }
+      // Handler determinístico para chat (sem usar IA para gerar texto)
+      return await handleChat(message, tenantId, userId, effectiveSessionContext)
     }
     
     // Validação rígida: verifica se estado é válido (chat já retornou acima)
@@ -651,6 +649,57 @@ async function resolveListNameFromContext(
 /**
  * Executa ação baseada no estado semântico
  */
+/**
+ * Handler determinístico para conversas casuais (chat)
+ * NÃO usa IA para gerar texto - apenas respostas fixas baseadas em padrões
+ */
+async function handleChat(
+  message: string,
+  tenantId: string,
+  userId: string,
+  sessionContext: SessionContext | null
+): Promise<ActionResult> {
+  const lowerMessage = message.toLowerCase().trim()
+  
+  // Respostas determinísticas para saudações
+  if (/\b(oi|olá|ola|bom dia|boa tarde|boa noite|hey|e aí)\b/.test(lowerMessage)) {
+    return {
+      success: true,
+      message: 'Olá! Como posso ajudar? Você pode registrar gastos, agendar compromissos, consultar informações ou gerenciar listas.',
+    }
+  }
+  
+  // Respostas para agradecimentos
+  if (/\b(obrigado|obrigada|valeu|agradeço|thanks)\b/.test(lowerMessage)) {
+    return {
+      success: true,
+      message: 'De nada! Estou aqui sempre que precisar. 😊',
+    }
+  }
+  
+  // Respostas para despedidas
+  if (/\b(tchau|até|até logo|até mais|bye|falou)\b/.test(lowerMessage)) {
+    return {
+      success: true,
+      message: 'Até logo! Qualquer coisa é só chamar.',
+    }
+  }
+  
+  // Respostas para perguntas sobre funcionalidades
+  if (/\b(o que|quais|como|funciona|pode|consegue|faz)\b/.test(lowerMessage)) {
+    return {
+      success: true,
+      message: 'Posso ajudar você a:\n\n💰 Registrar gastos e receitas\n📅 Agendar compromissos\n📋 Gerenciar listas de compras\n📊 Consultar relatórios financeiros\n\nO que você gostaria de fazer?',
+    }
+  }
+  
+  // Resposta padrão para outras conversas
+  return {
+    success: true,
+    message: 'Não entendi completamente. Você pode:\n\n• Registrar gastos: "gastei 50 no mercado"\n• Agendar: "tenho reunião amanhã às 15h"\n• Consultar: "quanto gastei este mês?"\n• Listas: "adiciona leite na lista do mercado"\n\nComo posso ajudar?',
+  }
+}
+
 async function executeAction(
   semanticState: SemanticState,
   tenantId: string,
@@ -700,6 +749,9 @@ async function executeAction(
 
     case 'create_supplier':
       return await handleCreateSupplier(semanticState, tenantId, userId, sessionContext)
+
+    case 'chat':
+      return await handleChat(message, tenantId, userId, sessionContext)
 
     case 'create_employee':
       return await handleCreateEmployee(semanticState, tenantId, userId, message, sessionContext)

@@ -9,7 +9,6 @@ import {
 } from '@/lib/modules/whatsapp'
 import { getOrCreateTenantByWhatsApp as getTenantByWhatsApp } from '@/lib/modules/auth'
 import { createConversation, getRecentConversations } from '@/lib/db/queries'
-import { processMessage } from '@/lib/ai/conversation'
 import { processAction } from '@/lib/ai/actions'
 import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
@@ -260,32 +259,17 @@ async function processWhatsAppMessage(
           console.error('Webhook - Stack trace:', error instanceof Error ? error.stack : 'N/A')
           console.error('Webhook - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
           
-          // Tenta usar fallback conversacional antes de enviar erro genérico
-          try {
-            console.log('Webhook - Tentando fallback conversacional após erro...')
-            const recentMessages = await getRecentConversations(tenantId, 5, userId)
-            const aiResponse = await processMessage(message.text.body, {
-              tenantId: tenantId,
-              userId: userId,
-              recentMessages,
-            })
-            
-            await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant', userId)
-            return
-          } catch (aiError) {
-            console.error('Webhook - Erro também no fallback conversacional:', aiError)
-            // Se o fallback também falhar, envia mensagem de erro
-            const errorMessage = error instanceof Error 
-              ? `Erro: ${error.message}` 
-              : 'Erro desconhecido ao processar'
-            
-            await sendTextMessage(
-              from, 
-              `Desculpe, ocorreu um erro ao processar sua mensagem.\n\n${errorMessage}\n\nTente novamente em alguns instantes.`
-            )
-            return
-          }
+          // Envia mensagem de erro determinística (sem usar IA para gerar texto)
+          const errorMessage = error instanceof Error 
+            ? `Erro: ${error.message}` 
+            : 'Erro desconhecido ao processar'
+          
+          await sendTextMessage(
+            from, 
+            `Desculpe, ocorreu um erro ao processar sua mensagem.\n\n${errorMessage}\n\nTente novamente em alguns instantes.`
+          )
+          await createConversation(tenantId, `Erro: ${errorMessage}`, 'assistant', userId)
+          return
         }
         
         // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
@@ -293,36 +277,13 @@ async function processWhatsAppMessage(
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant', userId)
         } else if (!actionResult.success) {
-          // Se a ação falhou, tenta processar com IA para dar uma resposta mais útil
-          // Isso ajuda com perguntas simples que não foram identificadas como ações
-          try {
-            const recentMessages = await getRecentConversations(tenantId, 5, userId)
-            const aiResponse = await processMessage(message.text.body, {
-              tenantId: tenantId,
-              userId: userId,
-              recentMessages,
-            })
-            
-            await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant', userId)
-          } catch (aiError) {
-            // Se a IA também falhar, envia mensagem de erro
-            console.error('Erro ao processar com IA:', aiError)
-            await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender. Pode reformular sua pergunta?')
-            await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant', userId)
-          }
+          // Se a ação falhou, retorna mensagem determinística do backend
+          await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender. Pode reformular sua pergunta?')
+          await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant', userId)
         } else {
-          // Processa com IA para gerar resposta conversacional
-          const recentMessages = await getRecentConversations(tenantId, 5, userId)
-          const aiResponse = await processMessage(message.text.body, {
-            tenantId: tenantId,
-            userId: userId,
-            recentMessages,
-          })
-          
-          // Envia resposta
-          await sendTextMessage(from, aiResponse)
-          await createConversation(tenantId, aiResponse, 'assistant', userId)
+          // Se não há mensagem (caso raro), envia resposta padrão determinística
+          await sendTextMessage(from, actionResult.message || 'Mensagem recebida. Como posso ajudar?')
+          await createConversation(tenantId, actionResult.message || 'Mensagem recebida', 'assistant', userId)
         }
         
         console.log(`Mensagem processada de ${from} para tenant ${tenantId}${userId ? ` (usuário: ${userId})` : ''}`)
@@ -350,31 +311,13 @@ async function processWhatsAppMessage(
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant', userId)
         } else if (!actionResult.success) {
-          // Se a ação falhou, tenta processar com IA
-          try {
-            const recentMessages = await getRecentConversations(tenantId, 5, userId)
-            const aiResponse = await processMessage(audioResult.text, {
-              tenantId: tenantId,
-              userId: userId,
-              recentMessages,
-            })
-            
-            await sendTextMessage(from, aiResponse)
-            await createConversation(tenantId, aiResponse, 'assistant', userId)
-          } catch (aiError) {
-            console.error('Erro ao processar áudio com IA:', aiError)
-            await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender o áudio. Pode repetir?')
-            await createConversation(tenantId, actionResult.message || 'Erro ao processar áudio', 'assistant', userId)
-          }
+          // Se a ação falhou, retorna mensagem determinística do backend
+          await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender o áudio. Pode repetir?')
+          await createConversation(tenantId, actionResult.message || 'Erro ao processar áudio', 'assistant', userId)
         } else {
-          const recentMessages = await getRecentConversations(tenantId, 5, userId)
-          const aiResponse = await processMessage(audioResult.text, {
-            tenantId: tenantId,
-            userId: userId,
-            recentMessages,
-          })
-          await sendTextMessage(from, aiResponse)
-          await createConversation(tenantId, aiResponse, 'assistant', userId)
+          // Se não há mensagem (caso raro), envia resposta padrão determinística
+          await sendTextMessage(from, actionResult.message || 'Mensagem recebida. Como posso ajudar?')
+          await createConversation(tenantId, actionResult.message || 'Mensagem recebida', 'assistant', userId)
         }
       } else {
         await sendTextMessage(
