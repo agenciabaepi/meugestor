@@ -150,23 +150,32 @@ async function queryCompromissos(
   tenantId: string,
   userId: string
 ): Promise<ActionResult> {
-  const { periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual) para consultas
+  const periodo = state.periodo || 'mês'
+  const { periodoTexto } = getDateRangeFromPeriodo(periodo)
+  
+  console.log('queryCompromissos - Consultando banco:', {
+    tenantId,
+    userId,
+    periodo,
+    periodoTexto
+  })
   
   let compromissos: any[] = []
   const now = getNowInBrazil()
   
-  if (state.periodo === 'hoje') {
+  if (periodo === 'hoje') {
     // Para relatório: inclui cancelados para marcar com ❌ riscado
     const start = getBrazilDayStartISO(0, now)
     const end = getBrazilDayEndISO(0, now)
     compromissos = await getCompromissosRecords(tenantId, start, end, userId, true)
-  } else if (state.periodo === 'amanhã') {
+  } else if (periodo === 'amanhã') {
     // Range correto: amanhã no Brasil (00:00 -> 23:59:59.999)
     const start = getTomorrowStartISOInBrazil()
     const end = getTomorrowEndISOInBrazil()
     compromissos = await getCompromissosRecords(tenantId, start, end, userId, true)
   } else {
-    const { startDate, endDate } = getDateRangeFromPeriodo(state.periodo || null)
+    const { startDate, endDate } = getDateRangeFromPeriodo(periodo)
     compromissos = await getCompromissosRecords(
       tenantId,
       startDate,
@@ -176,15 +185,21 @@ async function queryCompromissos(
     )
   }
   
+  console.log('queryCompromissos - Registros encontrados:', {
+    total: compromissos.length,
+    periodo: periodoTexto
+  })
+  
   compromissos.sort((a, b) => 
     new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
   )
   
   if (compromissos.length === 0) {
+    // REGRA CRÍTICA (bot.md): Se não encontrou, informa mas confirma que consultou o banco
     return {
       success: true,
       message: `📅 Você não tem compromissos ${periodoTexto}.`,
-      data: { compromissos: [], periodo: periodoTexto }
+      data: { compromissos: [], periodo: periodoTexto, consultouBanco: true }
     }
   }
   
