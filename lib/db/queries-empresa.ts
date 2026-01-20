@@ -145,6 +145,39 @@ export async function getFinanceiroEmpresaByFuncionario(
   return data || []
 }
 
+export async function getFinanceiroEmpresaNaoPago(
+  tenantId: string,
+  empresaId: string,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('financeiro_empresa')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('transaction_type', 'expense')
+    .eq('pago', false)
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  if (startDate) query = query.gte('date', startDate)
+  if (endDate) query = query.lte('date', endDate)
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching financeiro_empresa não pago:', error)
+    return []
+  }
+  return data || []
+}
+
 export async function getFinanceiroEmpresaByCategory(
   tenantId: string,
   empresaId: string,

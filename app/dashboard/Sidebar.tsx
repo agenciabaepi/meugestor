@@ -12,6 +12,7 @@ import {
   ListChecks,
   Building2,
   Users,
+  CreditCard,
 } from 'lucide-react'
 import LogoutButton from './LogoutButton'
 import type { SessionContext } from '@/lib/db/types'
@@ -27,6 +28,12 @@ const menuItems = [
     href: '/dashboard/financeiro',
     label: 'Financeiro',
     icon: Wallet,
+    showAlways: true,
+  },
+  {
+    href: '/dashboard/contas-a-pagar',
+    label: 'Contas a Pagar',
+    icon: CreditCard,
     showAlways: true,
   },
   {

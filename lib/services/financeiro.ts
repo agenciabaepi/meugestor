@@ -272,6 +272,31 @@ export async function getReceitasRecordsForContext(
 }
 
 /**
+ * Obtém apenas despesas não pagas (contas a pagar)
+ */
+export async function getContasAPagarForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) return []
+    // Busca despesas não pagas da empresa
+    const { getFinanceiroEmpresaNaoPago } = await import('../db/queries-empresa')
+    return getFinanceiroEmpresaNaoPago(
+      ctx.tenant_id,
+      ctx.empresa_id,
+      startDate,
+      endDate,
+      userId || null
+    )
+  }
+  const { getFinanceiroNaoPago } = await import('../db/queries')
+  return getFinanceiroNaoPago(ctx.tenant_id, startDate, endDate, userId || null)
+}
+
+/**
  * Obtém registros financeiros por categoria
  */
 export async function getFinanceiroByCategoryRecords(
