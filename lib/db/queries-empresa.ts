@@ -1083,10 +1083,14 @@ export async function getPagamentosFuncionariosByEmpresa(
   }
 
   if (startDate) {
+    // Filtra por data_pagamento >= startDate
+    // startDate pode ser ISO string ou date string (YYYY-MM-DD)
     query = query.gte('data_pagamento', startDate)
   }
 
   if (endDate) {
+    // Filtra por data_pagamento <= endDate
+    // endDate pode ser ISO string ou date string (YYYY-MM-DD)
     query = query.lte('data_pagamento', endDate)
   }
 

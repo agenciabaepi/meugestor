@@ -590,6 +590,12 @@ async function queryFuncionariosPagos(
   )
   const funcionariosMap = new Map(todosFuncionarios.map(f => [f.id, f.nome_original]))
 
+  console.log('queryFuncionariosPagos - Debug:', {
+    totalFuncionarios: todosFuncionarios.length,
+    totalPagamentos: pagamentos.length,
+    periodo: { startDate, endDate, periodoTexto }
+  })
+
   // Agrupa por funcionário
   const porFuncionario: Record<string, { nome: string; total: number; pagamentos: number }> = {}
   
@@ -664,7 +670,29 @@ async function queryFuncionariosPendentes(
     endDate
   )
 
-  const funcionariosPagosIds = new Set(pagamentos.map(p => p.funcionario_id))
+  // DEBUG: Log para verificar pagamentos encontrados
+  console.log('queryFuncionariosPendentes - Pagamentos encontrados:', {
+    total: pagamentos.length,
+    pagamentos: pagamentos.map(p => ({
+      funcionario_id: p.funcionario_id,
+      data_pagamento: p.data_pagamento,
+      referencia: p.referencia,
+      valor: p.valor
+    })),
+    startDate,
+    endDate
+  })
+
+  // CRÍTICO: Filtra apenas pagamentos com funcionario_id válido (não null)
+  // E remove duplicatas (um funcionário pode ter múltiplos pagamentos no período)
+  const funcionariosPagosIds = new Set(
+    pagamentos
+      .filter(p => p.funcionario_id && p.funcionario_id.trim() !== '') // Remove null/undefined/vazio
+      .map(p => p.funcionario_id)
+  )
+
+  console.log('queryFuncionariosPendentes - Funcionários pagos (IDs):', Array.from(funcionariosPagosIds))
+  console.log('queryFuncionariosPendentes - Total funcionários ativos:', todosFuncionarios.length)
 
   // Calcula quem NÃO foi pago
   const funcionariosPendentes = todosFuncionarios.filter(
