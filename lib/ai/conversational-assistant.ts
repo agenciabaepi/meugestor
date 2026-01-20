@@ -228,10 +228,13 @@ CONSULTAS DE FUNCIONÁRIOS (query + queryType específico):
   - "falta quantos funcionários para pagar esse mês?" → intent: "query", domain: "empresa", queryType: "funcionarios_pendentes", periodo: "mês"
   - "quem eu ainda não paguei?" → intent: "query", domain: "empresa", queryType: "funcionarios_pendentes", periodo: "mês" (default se não informado)
   - "quanto eu já paguei de salário esse mês?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "mês" (default se não informado)
+  - "paguei algum salário esse mês?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "mês" (default se não informado)
+  - "paguei algum salario esse mes?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "mês" (default se não informado)
   - "já paguei o Pedro?" → intent: "query", domain: "empresa", queryType: "funcionarios_pagos", employee_name: "Pedro", periodo: "mês" (default se não informado)
   - "quanto paguei para funcionários este ano?" → intent: "query", domain: "empresa", queryType: "salarios_total", periodo: "ano"
 - REGRA: Se contém APENAS PERGUNTA (sem verbo de ação) → query com queryType específico
 - REGRA CRÍTICA: Se período não informado, assumir "mês" (mês atual) para todas as consultas de funcionários
+- REGRA: Perguntas sobre "paguei algum salário" ou "paguei salários" → queryType: "salarios_total" (retorna total e quantidade)
 
 CONSULTAS DE RECEITAS (query + queryType: "receita"):
   - "quanto recebi esse mês?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "mês" (default se não informado)
