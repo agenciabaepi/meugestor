@@ -33,6 +33,7 @@ import { getListView, formatListRawResponse } from '../services/listas'
 import { 
   getEmployeePaymentsByEmpresa,
   getPagamentosFuncionariosByEmpresa,
+  getPagamentosFuncionariosByReferencia,
   getFuncionariosByEmpresa,
 } from '../db/queries-empresa'
 import { findFuncionarioByName } from '../services/funcionarios'
@@ -625,25 +626,52 @@ async function queryFuncionariosPagos(
   }
 
   // Busca pagamentos do período
-  let pagamentos = await getPagamentosFuncionariosByEmpresa(
-    sessionContext.tenant_id,
-    sessionContext.empresa_id,
-    funcionarioId || undefined,
-    'pago',
-    startDate,
-    endDate
-  )
-
-  // CRÍTICO: Se temos referencia e período é mês, filtra também por referencia para garantir
-  // Isso resolve o problema de pagamentos não serem encontrados quando data_pagamento está em formato diferente
-  if (referenciaMes && (periodo === 'mês' || !periodo)) {
-    const pagamentosPorReferencia = pagamentos.filter(p => p.referencia === referenciaMes)
-    if (pagamentosPorReferencia.length > 0) {
-      console.log(`queryFuncionariosPagos - Usando filtro por referencia: ${referenciaMes} (encontrados ${pagamentosPorReferencia.length} pagamentos)`)
-      pagamentos = pagamentosPorReferencia
-    } else {
-      console.log(`queryFuncionariosPagos - Nenhum pagamento encontrado com referencia ${referenciaMes}, usando filtro por data`)
+  // CRÍTICO: Para consultas de mês, usar referencia é mais confiável que data_pagamento
+  // Se temos referencia e período é mês, busca diretamente por referencia
+  let pagamentos: any[] = []
+  
+  if (referenciaMes && (periodo === 'mês' || !periodo) && !funcionarioId) {
+    // Busca TODOS os pagamentos do mês por referencia (mais confiável)
+    // Primeiro busca todos os funcionários para iterar
+    const todosFuncionarios = await getFuncionariosByEmpresa(
+      sessionContext.tenant_id,
+      sessionContext.empresa_id,
+      true,
+      1000
+    )
+    
+    // Para cada funcionário, busca pagamentos por referencia
+    for (const func of todosFuncionarios) {
+      const pagamentosFunc = await getPagamentosFuncionariosByReferencia(
+        sessionContext.tenant_id,
+        sessionContext.empresa_id,
+        func.id,
+        referenciaMes
+      )
+      pagamentos.push(...pagamentosFunc)
     }
+    
+    console.log(`queryFuncionariosPagos - Buscando por referencia ${referenciaMes}: encontrados ${pagamentos.length} pagamentos`)
+  } else if (referenciaMes && (periodo === 'mês' || !periodo) && funcionarioId) {
+    // Funcionário específico: busca por referencia
+    pagamentos = await getPagamentosFuncionariosByReferencia(
+      sessionContext.tenant_id,
+      sessionContext.empresa_id,
+      funcionarioId,
+      referenciaMes
+    )
+    console.log(`queryFuncionariosPagos - Buscando por referencia ${referenciaMes} para funcionário ${funcionarioId}: encontrados ${pagamentos.length} pagamentos`)
+  } else {
+    // Outros períodos: usa filtro por data
+    pagamentos = await getPagamentosFuncionariosByEmpresa(
+      sessionContext.tenant_id,
+      sessionContext.empresa_id,
+      funcionarioId || undefined,
+      'pago',
+      startDate,
+      endDate
+    )
+    console.log(`queryFuncionariosPagos - Buscando por data (${startDate} a ${endDate}): encontrados ${pagamentos.length} pagamentos`)
   }
 
   if (pagamentos.length === 0) {
