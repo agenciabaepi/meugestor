@@ -233,6 +233,17 @@ CONSULTAS DE FUNCIONÁRIOS (query + queryType específico):
 - REGRA: Se contém APENAS PERGUNTA (sem verbo de ação) → query com queryType específico
 - REGRA CRÍTICA: Se período não informado, assumir "mês" (mês atual) para todas as consultas de funcionários
 
+CONSULTAS DE RECEITAS (query + queryType: "receita"):
+  - "quanto recebi esse mês?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "mês" (default se não informado)
+  - "quantas receitas eu tive esse mês?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "mês" (default se não informado)
+  - "quanto eu recebi hoje?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "hoje"
+  - "quanto recebi ontem?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "ontem"
+  - "quanto recebi este ano?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "ano"
+  - "e quantas receitas?" → intent: "query", domain: "financeiro", queryType: "receita", periodo: "mês" (herda do contexto anterior)
+- REGRA: Perguntas sobre receitas/entradas → query com queryType: "receita"
+- REGRA CRÍTICA: Se período não informado, assumir "mês" (mês atual) para consultas de receita
+- REGRA: NUNCA perguntar se o usuário quer quantidade ou valor total - sempre retornar ambos (total e quantidade de registros)
+
 FOLLOW-UP (OBRIGATÓRIO):
 - Mensagens curtas como "adiciona arroz", "remove leite", "marca como comprado", "o que falta comprar?"
   devem ser tratadas como continuação da última lista ativa.
@@ -292,7 +303,7 @@ Responda APENAS com JSON no formato:
   "periodo": "hoje" | "ontem" | "amanhã" | "semana" | "mês" | "ano" | null,
   "categoria": string | null,
   "subcategoria": string | null,
-  "queryType": "gasto" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | "employee_payments" | "funcionarios_count" | "funcionarios_pagos" | "funcionarios_pendentes" | "salarios_total" | null,
+  "queryType": "gasto" | "receita" | "compromissos" | "categoria" | "agenda" | "listas" | "lista_itens" | "employee_payments" | "funcionarios_count" | "funcionarios_pagos" | "funcionarios_pendentes" | "salarios_total" | null,
   "employee_name": string | null,
   "amount": number | null,
   "title": string | null,

@@ -9,7 +9,8 @@ import type { SessionContext } from '../db/types'
 import { 
   getDespesasRecords, 
   getReceitasRecords,
-  getDespesasRecordsForContext
+  getDespesasRecordsForContext,
+  getReceitasRecordsForContext
 } from '../services/financeiro'
 import { 
   getCompromissosRecords, 
@@ -215,6 +216,138 @@ async function queryCompromissos(
     success: true,
     message: response,
     data: { compromissos, periodo: periodoTexto }
+  }
+}
+
+/**
+ * Consulta receitas baseado no estado semântico
+ * REGRA CRÍTICA (bot.md): SEMPRE consulta banco, nunca responde sem consultar
+ */
+async function queryReceitas(
+  state: SemanticState,
+  tenantId: string,
+  userId: string,
+  sessionContext?: SessionContext | null
+): Promise<ActionResult> {
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
+  
+  console.log('queryReceitas - Consultando banco:', {
+    tenantId,
+    userId,
+    mode: sessionContext?.mode || 'pessoal',
+    empresa_id: sessionContext?.empresa_id || null,
+    periodo,
+    startDate,
+    endDate,
+    categoria: state.categoria
+  })
+  
+  // CRÍTICO: Usa getReceitasRecordsForContext para respeitar modo (pessoal vs empresa)
+  // Se não tiver sessionContext, usa modo pessoal como fallback
+  let registros: any[]
+  if (sessionContext) {
+    registros = await getReceitasRecordsForContext(sessionContext, startDate, endDate, userId)
+  } else {
+    // Fallback: modo pessoal
+    registros = await getReceitasRecords(tenantId, startDate, endDate, userId)
+  }
+  
+  console.log('queryReceitas - Registros encontrados:', {
+    total: registros.length,
+    periodo: periodoTexto,
+    mode: sessionContext?.mode || 'pessoal'
+  })
+  
+  // FILTRO SEMÂNTICO: Se tem categoria/subcategoria, usa filtro semântico
+  let registrosFiltrados = registros
+  if (state.categoria || state.subcategoria) {
+    const searchTerm = state.subcategoria || state.categoria || ''
+    registrosFiltrados = filterBySemanticCategory(registros, searchTerm)
+    
+    console.log('queryReceitas - Filtro semântico aplicado:', {
+      categoria: state.categoria,
+      subcategoria: state.subcategoria,
+      searchTerm,
+      totalRegistros: registros.length,
+      registrosFiltrados: registrosFiltrados.length,
+      periodo: state.periodo
+    })
+    
+    // Se não encontrou nada com filtro semântico, tenta busca direta por categoria
+    if (registrosFiltrados.length === 0 && state.categoria) {
+      console.log('queryReceitas - Filtro semântico não encontrou resultados, tentando busca direta por categoria')
+      registrosFiltrados = registros.filter(r => 
+        r.category.toLowerCase() === state.categoria!.toLowerCase() ||
+        (r.subcategory && r.subcategory.toLowerCase() === state.categoria!.toLowerCase())
+      )
+    }
+  }
+  
+  const total = registrosFiltrados.reduce((sum, r) => sum + Number(r.amount), 0)
+  
+  console.log('queryReceitas - Resultado final:', {
+    totalRegistros: registros.length,
+    registrosFiltrados: registrosFiltrados.length,
+    total,
+    periodo: periodoTexto,
+    categoria: state.categoria
+  })
+  
+  if (registrosFiltrados.length === 0) {
+    // REGRA CRÍTICA (bot.md): Se não encontrou, informa mas confirma que consultou o banco
+    return {
+      success: true,
+      message: `💰 Você não teve receitas ${state.categoria ? `em ${state.categoria} ` : ''}${periodoTexto}.`,
+      data: { registros: [], total: 0, consultouBanco: true }
+    }
+  }
+  
+  // Para períodos curtos (hoje, ontem), mostra detalhes
+  if (state.periodo === 'hoje' || state.periodo === 'ontem') {
+    let response = `💰 Suas receitas ${periodoTexto}:\n\n`
+    response += `Total: R$ ${total.toFixed(2)}\n`
+    response += `Registros: ${registrosFiltrados.length}\n\n`
+    response += `Detalhes:\n${registrosFiltrados.map(r => 
+      `• ${r.description} - R$ ${Number(r.amount).toFixed(2)} (${r.category}${r.subcategory ? ` - ${r.subcategory}` : ''})`
+    ).join('\n')}`
+    
+    return {
+      success: true,
+      message: response,
+      data: { registros: registrosFiltrados, total }
+    }
+  }
+  
+  // Para períodos maiores, mostra resumo por categoria
+  const porCategoria: Record<string, number> = {}
+  registrosFiltrados.forEach(r => {
+    porCategoria[r.category] = (porCategoria[r.category] || 0) + Number(r.amount)
+  })
+  
+  let response = `📊 Suas receitas ${state.categoria ? `em ${state.categoria} ` : ''}(${periodoTexto}):\n\n`
+  response += `💰 Total: R$ ${total.toFixed(2)}\n`
+  response += `📝 Registros: ${registrosFiltrados.length}\n\n`
+  
+  if (Object.keys(porCategoria).length > 0) {
+    response += `Por categoria:\n`
+    Object.entries(porCategoria)
+      .sort(([, a], [, b]) => b - a)
+      .forEach(([cat, valor]) => {
+        response += `• ${cat}: R$ ${valor.toFixed(2)}\n`
+      })
+    response += `\n`
+  }
+  
+  response += `Últimas receitas:\n${registrosFiltrados.slice(0, 5).map(r => 
+    `• ${r.description} - R$ ${Number(r.amount).toFixed(2)} (${r.category}${r.subcategory ? ` - ${r.subcategory}` : ''})`
+  ).join('\n')}`
+  
+  return {
+    success: true,
+    message: response,
+    data: { registros: registrosFiltrados, total }
   }
 }
 
@@ -936,6 +1069,10 @@ export async function handleQuerySimple(
   
   if (state.queryType === 'gasto' && state.domain === 'financeiro') {
     return await queryGastos(state, tenantId, userId, sessionContext || null)
+  }
+
+  if (state.queryType === 'receita' && state.domain === 'financeiro') {
+    return await queryReceitas(state, tenantId, userId, sessionContext || null)
   }
 
   if (state.queryType === 'listas' && state.domain === 'listas') {
