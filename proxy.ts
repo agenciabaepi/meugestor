@@ -114,7 +114,7 @@ function hasActiveSession(req: NextRequest) {
   return expiresAt > nowSeconds
 }
 
-export async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl
 
   // Permite preflight/CORS sem autenticação (ex: webhooks)
