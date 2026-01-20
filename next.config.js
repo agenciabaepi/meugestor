@@ -2,9 +2,15 @@
 const path = require('path')
 
 const projectRoot = path.resolve(__dirname)
+const isVercel = !!process.env.VERCEL
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Em alguns ambientes (macOS) a pasta `.next` pode ser limpa/alterada por processos externos,
+  // causando ENOENT em dev. Usamos um distDir dedicado para estabilizar.
+  // Na Vercel, o builder espera o output padrão em `.next`, então mantemos o default lá.
+  distDir: isVercel ? '.next' : '.next-cache',
+
   // Transpilar recharts para compatibilidade com React 19
   transpilePackages: ['recharts'],
   
@@ -15,33 +21,14 @@ const nextConfig = {
     unoptimized: false,
   },
   
-  // Root do projeto para output tracing
-  outputFileTracingRoot: projectRoot,
-  
-  // Configuração do webpack (desabilita Turbopack que está causando problemas)
-  webpack: (config, { isServer, dev }) => {
-    // Configurar o contexto do webpack para o diretório do projeto
-    config.context = projectRoot
-    
-    // Ignorar diretórios que podem causar problemas
-    config.watchOptions = {
-      ...config.watchOptions,
-      ignored: [
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/.next/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/.DS_Store',
-        '**/Thumbs.db',
-      ],
-      aggregateTimeout: 500,
-      poll: false,
-      followSymlinks: false,
-    }
-    
-    return config
+  // Mantém o escopo do Next no diretório do projeto (evita "workspace root" errado)
+  // e evita varredura acidental de diretórios enormes fora do projeto.
+  turbopack: {
+    root: projectRoot,
   },
+
+  // Root do projeto para output tracing (deve bater com turbopack.root)
+  outputFileTracingRoot: projectRoot,
 }
 
 module.exports = nextConfig

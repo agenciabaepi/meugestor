@@ -13,6 +13,7 @@ const net = require('net')
 const path = require('path')
 
 const projectRoot = path.resolve(__dirname, '..')
+const distDir = '.next-cache'
 const userArgs = process.argv.slice(2)
 
 const wantsTurbo = userArgs.includes('--turbo')
@@ -20,10 +21,10 @@ const wantsWebpack = userArgs.includes('--webpack')
 const noClean = userArgs.includes('--no-clean')
 
 const nextArgs = ['dev']
-// Usa webpack por padrão (mais estável). Turbopack pode ser ativado com --turbo.
-if (wantsTurbo) nextArgs.push('--turbo')
-else if (wantsWebpack) nextArgs.push('--webpack')
-else nextArgs.push('--webpack') // Padrão: webpack (mais estável que Turbopack)
+// No Next.js 16 o padrão é Turbopack. Mantemos webpack só como opção.
+if (wantsWebpack) nextArgs.push('--webpack')
+else if (wantsTurbo) nextArgs.push('--turbo')
+else nextArgs.push('--turbo')
 
 const passthroughArgs = userArgs.filter(
   (a) => a !== '--turbo' && a !== '--webpack' && a !== '--no-clean'
@@ -120,59 +121,40 @@ async function main() {
   }
 
   if (!noClean && !process.env.KEEP_NEXT_CACHE) {
-    const nextDir = path.join(projectRoot, '.next')
+    const nextDir = path.join(projectRoot, distDir)
     try {
       fs.rmSync(nextDir, { recursive: true, force: true })
       // eslint-disable-next-line no-console
-      console.log('[dev] cache .next limpo')
+      console.log(`[dev] cache ${distDir} limpo`)
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.warn('[dev] não foi possível limpar .next:', err?.message || err)
+      console.warn(`[dev] não foi possível limpar ${distDir}:`, err?.message || err)
     }
   }
 
   // Workaround (macOS/Next 16): em alguns ambientes o Next/Turbopack tenta persistir
-  // artefatos antes de criar a árvore de diretórios dentro de `.next/`, causando ENOENT.
+  // artefatos antes de criar a árvore de diretórios dentro do distDir, causando ENOENT.
   // Criamos as pastas básicas para garantir que os writes iniciais não falhem.
   try {
     const dirs = [
-      '.next',
-      '.next/cache',
-      '.next/cache/turbopack',
-      '.next/cache/webpack',
-      '.next/cache/webpack/client-development',
-      '.next/cache/webpack/server-development',
-      '.next/dev',
-      '.next/dev/server',
-      '.next/dev/static',
-      '.next/dev/static/development',
+      distDir,
+      `${distDir}/cache`,
+      `${distDir}/cache/turbopack`,
+      `${distDir}/cache/webpack`,
+      `${distDir}/cache/webpack/client-development`,
+      `${distDir}/cache/webpack/server-development`,
+      `${distDir}/cache/webpack/client-development-fallback`,
+      `${distDir}/dev`,
+      `${distDir}/dev/server`,
+      `${distDir}/dev/static`,
+      `${distDir}/dev/static/development`,
     ]
     for (const rel of dirs) {
       fs.mkdirSync(path.join(projectRoot, rel), { recursive: true })
     }
-    
-    // Cria arquivos de manifesto vazios para evitar erros MODULE_NOT_FOUND iniciais
-    // O Next.js vai sobrescrever esses arquivos durante a compilação
-    const manifestFiles = [
-      '.next/dev/server/middleware-manifest.json',
-      '.next/dev/server/next-font-manifest.json',
-      '.next/dev/server/pages-manifest.json',
-      '.next/dev/server/app-paths-manifest.json',
-      '.next/dev/server/routes-manifest.json',
-    ]
-    for (const rel of manifestFiles) {
-      const fullPath = path.join(projectRoot, rel)
-      const dir = path.dirname(fullPath)
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true })
-      }
-      if (!fs.existsSync(fullPath)) {
-        fs.writeFileSync(fullPath, JSON.stringify({}), 'utf8')
-      }
-    }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('[dev] não foi possível preparar pastas em .next:', err?.message || err)
+    console.warn(`[dev] não foi possível preparar pastas em ${distDir}:`, err?.message || err)
   }
 
   const nextBinName = process.platform === 'win32' ? 'next.cmd' : 'next'

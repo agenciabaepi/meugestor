@@ -4,7 +4,7 @@
   "description": "SaaS Multitenant - Assistente Inteligente via WhatsApp",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "node scripts/next-dev.js",
     "dev:quiet": "node scripts/suppress-watchpack-warnings.js",
     "dev:turbo": "node scripts/next-dev.js --turbo",
     "dev:webpack": "node scripts/next-dev.js --webpack",

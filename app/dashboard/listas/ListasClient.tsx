@@ -141,6 +141,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
   }
 
   async function deleteList(listId: string, listName: string) {
+    // TODO: Implementar Dialog de confirmação
     const ok = window.confirm(`Apagar a lista "${listName}"?`)
     if (!ok) return
     setLoading(true)

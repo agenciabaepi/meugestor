@@ -21,8 +21,8 @@ const filterWatchpackWarnings = (data) => {
     .join('\n')
 }
 
-// Iniciar o Next.js
-const nextProcess = spawn('next', ['dev', '--webpack'], {
+// Iniciar o Next.js (via bootstrap estável)
+const nextProcess = spawn('node', ['scripts/next-dev.js'], {
   cwd: path.resolve(__dirname, '..'),
   stdio: ['inherit', 'pipe', 'pipe'],
   shell: true,

@@ -11,6 +11,7 @@ import {
   User,
   ListChecks,
   Building2,
+  Users,
 } from 'lucide-react'
 import LogoutButton from './LogoutButton'
 import type { SessionContext } from '@/lib/db/types'
@@ -44,6 +45,12 @@ const menuItems = [
     href: '/dashboard/fornecedores',
     label: 'Fornecedores',
     icon: Building2,
+    showAlways: false, // Apenas para empresas
+  },
+  {
+    href: '/dashboard/funcionarios',
+    label: 'Funcionários',
+    icon: Users,
     showAlways: false, // Apenas para empresas
   },
   {

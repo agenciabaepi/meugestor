@@ -546,6 +546,14 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
                       >
                         <Edit2 className="w-5 h-5" />
                       </button>
+                      <button
+                        onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
+                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir"
+                        disabled={loading}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
                 </div>

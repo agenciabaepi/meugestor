@@ -9,6 +9,7 @@ import {
   BarChart3,
   ListChecks,
   Building2,
+  Users,
 } from 'lucide-react'
 import type { SessionContext } from '@/lib/db/types'
 
@@ -41,6 +42,12 @@ const navItems = [
     href: '/dashboard/fornecedores',
     label: 'Fornecedores',
     icon: Building2,
+    showAlways: false, // Apenas para empresas
+  },
+  {
+    href: '/dashboard/funcionarios',
+    label: 'Funcionários',
+    icon: Users,
     showAlways: false, // Apenas para empresas
   },
   {
