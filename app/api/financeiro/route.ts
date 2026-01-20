@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       tags,
       metadata,
       receiptImageUrl,
+      pago,
     } = body
 
     // Validações básicas
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
         tags: Array.isArray(tags) ? tags : null,
         metadata: metadata || null,
         receiptImageUrl: receiptImageUrl || null,
+        pago: transactionType === 'expense' ? (pago !== undefined ? Boolean(pago) : true) : true,
       })
 
       return NextResponse.json({ success: true, data: record }, { status: 201 })

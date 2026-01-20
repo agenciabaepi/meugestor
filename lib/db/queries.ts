@@ -126,7 +126,8 @@ export async function createFinanceiro(
   metadata?: Record<string, any> | null,
   tags?: string[] | null,
   transactionType: 'expense' | 'revenue' = 'expense',
-  userId?: string | null
+  userId?: string | null,
+  pago?: boolean
 ): Promise<Financeiro | null> {
   // Usa supabaseAdmin para bypass RLS (chamado do servidor/webhook)
   if (!supabaseAdmin) {
@@ -134,6 +135,9 @@ export async function createFinanceiro(
     return null
   }
   const client = supabaseAdmin
+  
+  // Para receitas, sempre pago = true. Para despesas, usa o valor fornecido ou true por padrão
+  const pagoValue = transactionType === 'revenue' ? true : (pago !== undefined ? pago : true)
   
   // Prepara dados para inserção
   const insertData: any = {
@@ -148,6 +152,7 @@ export async function createFinanceiro(
     metadata: metadata || {},
     tags: tags || [],
     transaction_type: transactionType,
+    pago: pagoValue,
   }
   
   console.log('createFinanceiro - Inserindo dados:', JSON.stringify(insertData, null, 2))
@@ -397,6 +402,7 @@ export async function updateFinanceiro(
     metadata?: Record<string, any> | null
     tags?: string[] | null
     transactionType?: 'expense' | 'revenue'
+    pago?: boolean
   }
 ): Promise<Financeiro | null> {
   if (!supabaseAdmin) {
@@ -414,6 +420,7 @@ export async function updateFinanceiro(
   if (updates.metadata !== undefined) updateData.metadata = updates.metadata
   if (updates.tags !== undefined) updateData.tags = updates.tags
   if (updates.transactionType !== undefined) updateData.transaction_type = updates.transactionType
+  if (updates.pago !== undefined) updateData.pago = updates.pago
   
   const { data, error } = await supabaseAdmin
     .from('financeiro')

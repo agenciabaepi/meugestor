@@ -155,18 +155,8 @@ export async function POST(request: NextRequest) {
       sessionExpiresAt: data.session.expires_at,
     })
 
-    // IMPORTANTE: O Supabase deve salvar a sessão automaticamente via setItem no storage
-    // Mas vamos garantir que a sessão está configurada corretamente
-    await supabase.auth.setSession(data.session)
-
-    // Verifica se a sessão foi salva
-    const { data: { session: savedSession } } = await supabase.auth.getSession()
-    
-    if (!savedSession) {
-      console.error('AVISO: Sessão não foi salva após setSession')
-    } else {
-      console.log('Sessão confirmada como salva')
-    }
+    // O signInWithPassword já persiste a sessão no storage configurado (cookies).
+    // Evita chamar setSession novamente para não gerar rotação/concorrência de refresh token.
 
     // Retorna dados do usuário
     // IMPORTANTE: Inclui refresh_token para manter a sessão ativa

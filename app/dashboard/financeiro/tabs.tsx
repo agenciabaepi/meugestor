@@ -212,17 +212,37 @@ export function FinanceiroTabs({
                       isReceita ? 'bg-green-500' : 'bg-red-500'
                     }`} />
 
-                    {/* Conteúdo - Link para edição */}
-                    <Link
-                      href={`/dashboard/financeiro/${transacao.id}`}
-                      className="flex-1 min-w-0"
+                    {/* Conteúdo - linha clicável (evita <a> dentro de <a>) */}
+                    <div
+                      role="link"
+                      tabIndex={0}
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => router.push(`/dashboard/financeiro/${transacao.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          router.push(`/dashboard/financeiro/${transacao.id}`)
+                        }
+                      }}
                     >
                       {/* Primeira linha: Descrição e Valor */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {transacao.description}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {transacao.description}
+                            </p>
+                            {/* Badge de status de pagamento (apenas para despesas) */}
+                            {!isReceita && (
+                              <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                transacao.pago !== false
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {transacao.pago !== false ? '✓ Pago' : '⏳ Pendente'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="shrink-0">
                           <p className={`font-semibold text-sm whitespace-nowrap ${
@@ -253,13 +273,16 @@ export function FinanceiroTabs({
                         {funcionarioId && funcionariosInfo[funcionarioId] && (
                           <>
                             <span className="text-gray-300">•</span>
-                            <Link
-                              href="/dashboard/funcionarios"
+                            <button
+                              type="button"
                               className="text-emerald-600 font-medium hover:text-emerald-700 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push('/dashboard/funcionarios')
+                              }}
                             >
                               👤 {funcionariosInfo[funcionarioId].nome}
-                            </Link>
+                            </button>
                           </>
                         )}
                         {transacao.tags && transacao.tags.length > 0 && (
@@ -272,7 +295,7 @@ export function FinanceiroTabs({
                           </>
                         )}
                       </div>
-                    </Link>
+                    </div>
 
                     {/* Botões de Ação */}
                     <div className="flex items-center gap-2 shrink-0">

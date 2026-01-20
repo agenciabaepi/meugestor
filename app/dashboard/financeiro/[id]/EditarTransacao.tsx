@@ -24,6 +24,7 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
     subcategory: transacao.subcategory || '',
     date: transacao.date || '',
     transactionType: (transacao as any).transaction_type || 'expense',
+    pago: transacao.pago !== undefined ? transacao.pago : true,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -234,6 +235,25 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             />
           </div>
+
+          {/* Status de Pagamento (apenas para despesas) */}
+          {!isReceita && (
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                id="pago"
+                checked={formData.pago}
+                onChange={(e) => setFormData({ ...formData, pago: e.target.checked })}
+                className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+              />
+              <label htmlFor="pago" className="text-sm font-medium text-gray-700 cursor-pointer flex-1">
+                Marcar como pago
+              </label>
+              {!formData.pago && (
+                <span className="text-xs text-orange-600 font-medium">(Pendente de pagamento)</span>
+              )}
+            </div>
+          )}
 
           {/* Botões */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">

@@ -25,9 +25,14 @@ export async function createFinanceiroEmpresa(
   tags?: string[] | null,
   transactionType: 'expense' | 'revenue' = 'expense',
   userId?: string | null,
-  funcionarioId?: string | null
+  funcionarioId?: string | null,
+  pago?: boolean
 ): Promise<Financeiro | null> {
   const client = requireAdmin()
+  
+  // Para receitas, sempre pago = true. Para despesas, usa o valor fornecido ou true por padrão
+  const pagoValue = transactionType === 'revenue' ? true : (pago !== undefined ? pago : true)
+  
   const insertData: any = {
     tenant_id: tenantId,
     empresa_id: empresaId,
@@ -41,6 +46,7 @@ export async function createFinanceiroEmpresa(
     metadata: metadata || {},
     tags: tags || [],
     transaction_type: transactionType,
+    pago: pagoValue,
   }
 
   // VALIDAÇÃO CRÍTICA: Para pagamentos de salário, funcionario_id é OBRIGATÓRIO
@@ -225,6 +231,7 @@ export async function updateFinanceiroEmpresa(
     metadata?: Record<string, any> | null
     tags?: string[] | null
     transactionType?: 'expense' | 'revenue'
+    pago?: boolean
   }
 ): Promise<Financeiro | null> {
   const client = requireAdmin()
@@ -239,6 +246,7 @@ export async function updateFinanceiroEmpresa(
   if (updates.metadata !== undefined) updateData.metadata = updates.metadata
   if (updates.tags !== undefined) updateData.tags = updates.tags
   if (updates.transactionType !== undefined) updateData.transaction_type = updates.transactionType
+  if (updates.pago !== undefined) updateData.pago = updates.pago
   
   const { data, error } = await client
     .from('financeiro_empresa')
@@ -777,6 +785,8 @@ export async function createFornecedor(
   nomeNormalizado: string,
   telefone?: string | null,
   email?: string | null,
+  endereco?: string | null,
+  cnpj?: string | null,
   observacao?: string | null
 ): Promise<Fornecedor | null> {
   const client = requireAdmin()
@@ -789,6 +799,8 @@ export async function createFornecedor(
       nome_normalizado: nomeNormalizado,
       telefone: telefone || null,
       email: email || null,
+      endereco: endereco || null,
+      cnpj: cnpj || null,
       observacao: observacao || null,
     })
     .select()
@@ -799,6 +811,81 @@ export async function createFornecedor(
     return null
   }
   return data
+}
+
+export async function updateFornecedor(
+  tenantId: string,
+  empresaId: string,
+  fornecedorId: string,
+  updates: {
+    nome?: string
+    nomeNormalizado?: string
+    telefone?: string | null
+    email?: string | null
+    endereco?: string | null
+    cnpj?: string | null
+    observacao?: string | null
+  }
+): Promise<Fornecedor | null> {
+  const client = requireAdmin()
+  const updateData: any = {}
+  
+  if (updates.nome !== undefined) {
+    updateData.nome = updates.nome
+  }
+  if (updates.nomeNormalizado !== undefined) {
+    updateData.nome_normalizado = updates.nomeNormalizado
+  }
+  if (updates.telefone !== undefined) {
+    updateData.telefone = updates.telefone || null
+  }
+  if (updates.email !== undefined) {
+    updateData.email = updates.email || null
+  }
+  if (updates.endereco !== undefined) {
+    updateData.endereco = updates.endereco || null
+  }
+  if (updates.cnpj !== undefined) {
+    updateData.cnpj = updates.cnpj || null
+  }
+  if (updates.observacao !== undefined) {
+    updateData.observacao = updates.observacao || null
+  }
+
+  const { data, error } = await client
+    .from('fornecedores')
+    .update(updateData)
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('id', fornecedorId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating fornecedor:', error)
+    return null
+  }
+  return data
+}
+
+export async function deleteFornecedor(
+  tenantId: string,
+  empresaId: string,
+  fornecedorId: string
+): Promise<boolean> {
+  const client = requireAdmin()
+  const { error } = await client
+    .from('fornecedores')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('id', fornecedorId)
+
+  if (error) {
+    console.error('Error deleting fornecedor:', error)
+    return false
+  }
+  return true
 }
 
 // ============================================

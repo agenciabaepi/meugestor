@@ -49,9 +49,15 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { amount, description, category, subcategory, date, tags, transactionType } = body
+    const { amount, description, category, subcategory, date, tags, transactionType, pago } = body
 
-    const updated = await updateFinanceiroRecordForContext(ctx, id, {
+    // Para despesas: usa o valor de pago se fornecido, caso contrário mantém true
+    // Para receitas: sempre true (receitas são sempre consideradas recebidas)
+    const pagoValue = transactionType === 'expense' 
+      ? (pago !== undefined ? Boolean(pago) : undefined) 
+      : true
+
+    const updatePayload: any = {
       amount,
       description,
       category,
@@ -59,7 +65,14 @@ export async function PUT(
       date,
       tags,
       transactionType,
-    })
+    }
+
+    // Só inclui pago se foi fornecido explicitamente ou se for receita
+    if (pagoValue !== undefined) {
+      updatePayload.pago = pagoValue
+    }
+
+    const updated = await updateFinanceiroRecordForContext(ctx, id, updatePayload)
 
     return NextResponse.json(updated)
   } catch (error: any) {

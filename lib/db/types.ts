@@ -38,6 +38,8 @@ export interface Fornecedor {
   nome_normalizado: string | null
   telefone: string | null
   email: string | null
+  endereco: string | null
+  cnpj: string | null
   observacao: string | null
   created_at: string
 }
@@ -83,6 +85,7 @@ export interface Financeiro {
   metadata: Record<string, any> | null
   tags: string[] | null
   transaction_type: 'expense' | 'revenue'
+  pago: boolean
   created_at: string
 }
 

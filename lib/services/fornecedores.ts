@@ -31,7 +31,7 @@ export async function ensureFornecedorByNameForContext(
   const existing = await getFornecedorByNormalizedName(ctx.tenant_id, ctx.empresa_id, nomeNormalizado)
   if (existing) return { fornecedor: existing, created: false }
 
-  const created = await createFornecedor(ctx.tenant_id, ctx.empresa_id, nome, nomeNormalizado)
+  const created = await createFornecedor(ctx.tenant_id, ctx.empresa_id, nome, nomeNormalizado, null, null, null, null)
   if (!created) throw new ValidationError('Erro ao cadastrar fornecedor')
 
   return { fornecedor: created, created: true }

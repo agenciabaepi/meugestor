@@ -28,6 +28,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     category: '',
     date: new Date().toISOString().split('T')[0],
     subcategory: '',
+    pago: true, // Por padrão, considera como pago
   })
 
   // Busca categorias ao abrir o modal
@@ -76,6 +77,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           date: formData.date,
           subcategory: formData.subcategory || null,
           transactionType: tipo,
+          pago: tipo === 'expense' ? formData.pago : true, // Receitas sempre são pagas
         }),
       })
 
@@ -90,6 +92,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           category: categorias[0]?.nome || '',
           date: new Date().toISOString().split('T')[0],
           subcategory: '',
+          pago: true,
         })
       } else {
         const error = await response.json()
@@ -215,6 +218,25 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
               />
             </div>
+
+            {/* Status de Pagamento (apenas para despesas) */}
+            {tipo === 'expense' && (
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="pago"
+                  checked={formData.pago}
+                  onChange={(e) => setFormData({ ...formData, pago: e.target.checked })}
+                  className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+                />
+                <label htmlFor="pago" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Marcar como pago
+                </label>
+                {!formData.pago && (
+                  <span className="text-xs text-orange-600 font-medium">(Pendente de pagamento)</span>
+                )}
+              </div>
+            )}
 
             {/* Botões */}
             <div className="flex gap-3 pt-4">

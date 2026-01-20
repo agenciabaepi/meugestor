@@ -29,6 +29,7 @@ export interface CreateFinanceiroInput {
   metadata?: Record<string, any> | null
   tags?: string[] | null
   transactionType?: 'expense' | 'revenue'
+  pago?: boolean
 }
 
 /**
@@ -66,7 +67,8 @@ export async function createFinanceiroRecord(
     input.metadata,
     input.tags,
     input.transactionType || 'expense',
-    input.userId || null
+    input.userId || null,
+    input.pago
   )
 
   if (!record) {
@@ -118,7 +120,9 @@ export async function createFinanceiroRecordForContext(
       input.metadata,
       input.tags,
       input.transactionType || 'expense',
-      input.userId || null
+      input.userId || null,
+      undefined, // funcionarioId
+      input.pago
     )
     if (!record) throw new ValidationError('Erro ao criar registro financeiro')
     return record
@@ -135,7 +139,8 @@ export async function createFinanceiroRecordForContext(
     input.metadata,
     input.tags,
     input.transactionType || 'expense',
-    input.userId || null
+    input.userId || null,
+    input.pago
   )
   if (!record) throw new ValidationError('Erro ao criar registro financeiro')
   return record
@@ -157,6 +162,7 @@ export async function updateFinanceiroRecord(
     metadata?: Record<string, any> | null
     tags?: string[] | null
     transactionType?: 'expense' | 'revenue'
+    pago?: boolean
   }
 ): Promise<Financeiro> {
   // Validações apenas para campos fornecidos
@@ -495,6 +501,7 @@ export async function updateFinanceiroRecordForContext(
     metadata?: Record<string, any> | null
     tags?: string[] | null
     transactionType?: 'expense' | 'revenue'
+    pago?: boolean
   }
 ): Promise<Financeiro> {
   // Validações apenas para campos fornecidos

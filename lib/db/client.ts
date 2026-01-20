@@ -88,9 +88,15 @@ export function createBrowserClient() {
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
+      /**
+       * IMPORTANTE:
+       * Este app usa sessão via cookies no servidor (Route Handlers + proxy),
+       * então manter uma sessão paralela no localStorage (com refresh automático)
+       * pode causar "Invalid Refresh Token: Already Used" (rotação concorrente / token fora de sync).
+       */
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
     },
   })
 }
