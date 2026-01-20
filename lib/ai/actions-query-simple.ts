@@ -1013,15 +1013,62 @@ async function querySalariosTotal(
   const periodo = state.periodo || 'mês'
   const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
 
+  // Para consultas de mês, usar referencia é mais confiável que data_pagamento
+  const now = getNowInBrazil()
+  const referenciaMes = periodo === 'mês' || !periodo 
+    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+    : null
+
   // Busca TODOS os pagamentos do período
-  const pagamentos = await getPagamentosFuncionariosByEmpresa(
-    sessionContext.tenant_id,
-    sessionContext.empresa_id,
-    undefined, // todos
-    'pago',
-    startDate,
-    endDate
-  )
+  // CRÍTICO: Para consultas de mês, usar referencia é mais confiável
+  let pagamentos: any[] = []
+  
+  if (referenciaMes && (periodo === 'mês' || !periodo)) {
+    // Busca TODOS os funcionários para iterar e buscar por referencia
+    const todosFuncionarios = await getFuncionariosByEmpresa(
+      sessionContext.tenant_id,
+      sessionContext.empresa_id,
+      true,
+      1000
+    )
+    
+    // Para cada funcionário, busca pagamentos por referencia
+    for (const func of todosFuncionarios) {
+      const pagamentosFunc = await getPagamentosFuncionariosByReferencia(
+        sessionContext.tenant_id,
+        sessionContext.empresa_id,
+        func.id,
+        referenciaMes
+      )
+      pagamentos.push(...pagamentosFunc)
+    }
+    
+    console.log(`querySalariosTotal - Buscando por referencia ${referenciaMes}: encontrados ${pagamentos.length} pagamentos`)
+  } else {
+    // Outros períodos: usa filtro por data
+    pagamentos = await getPagamentosFuncionariosByEmpresa(
+      sessionContext.tenant_id,
+      sessionContext.empresa_id,
+      undefined, // todos
+      'pago',
+      startDate,
+      endDate
+    )
+    console.log(`querySalariosTotal - Buscando por data (${startDate} a ${endDate}): encontrados ${pagamentos.length} pagamentos`)
+  }
+
+  console.log('querySalariosTotal - Debug:', {
+    periodo: { startDate, endDate, periodoTexto, referenciaMes },
+    totalPagamentos: pagamentos.length,
+    pagamentosDetalhes: pagamentos.map(p => ({
+      id: p.id,
+      funcionario_id: p.funcionario_id,
+      valor: p.valor,
+      data_pagamento: p.data_pagamento,
+      referencia: p.referencia,
+      status: p.status
+    }))
+  })
 
   // Soma total de salários pagos
   const total = pagamentos.reduce((sum, p) => sum + Number(p.valor), 0)
