@@ -51,6 +51,9 @@ const nextConfig = {
     
     return config
   },
+  
+  // Define o root do projeto para evitar aviso de múltiplos lockfiles
+  outputFileTracingRoot: projectRoot,
 }
 
 module.exports = nextConfig
