@@ -8,7 +8,8 @@ import { ActionResult } from './actions'
 import type { SessionContext } from '../db/types'
 import { 
   getDespesasRecords, 
-  getReceitasRecords 
+  getReceitasRecords,
+  getDespesasRecordsForContext
 } from '../services/financeiro'
 import { 
   getCompromissosRecords, 
@@ -203,16 +204,44 @@ async function queryCompromissos(
 
 /**
  * Consulta gastos baseado no estado semântico
+ * REGRA CRÍTICA (bot.md): SEMPRE consulta banco, nunca responde sem consultar
  */
 async function queryGastos(
   state: SemanticState,
   tenantId: string,
-  userId: string
+  userId: string,
+  sessionContext?: SessionContext | null
 ): Promise<ActionResult> {
-  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(state.periodo || null)
+  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
+  const periodo = state.periodo || 'mês'
+  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
   
-  // Busca apenas despesas
-  const registros = await getDespesasRecords(tenantId, startDate, endDate, userId)
+  console.log('queryGastos - Consultando banco:', {
+    tenantId,
+    userId,
+    mode: sessionContext?.mode || 'pessoal',
+    empresa_id: sessionContext?.empresa_id || null,
+    periodo,
+    startDate,
+    endDate,
+    categoria: state.categoria
+  })
+  
+  // CRÍTICO: Usa getDespesasRecordsForContext para respeitar modo (pessoal vs empresa)
+  // Se não tiver sessionContext, usa modo pessoal como fallback
+  let registros: any[]
+  if (sessionContext) {
+    registros = await getDespesasRecordsForContext(sessionContext, startDate, endDate, userId)
+  } else {
+    // Fallback: modo pessoal
+    registros = await getDespesasRecords(tenantId, startDate, endDate, userId)
+  }
+  
+  console.log('queryGastos - Registros encontrados:', {
+    total: registros.length,
+    periodo: periodoTexto,
+    mode: sessionContext?.mode || 'pessoal'
+  })
   
   // FILTRO SEMÂNTICO: Se tem categoria/subcategoria, usa filtro semântico
   // Isso resolve o problema de "mercado" não encontrar "supermercado"
@@ -245,11 +274,20 @@ async function queryGastos(
   
   const total = registrosFiltrados.reduce((sum, r) => sum + Number(r.amount), 0)
   
+  console.log('queryGastos - Resultado final:', {
+    totalRegistros: registros.length,
+    registrosFiltrados: registrosFiltrados.length,
+    total,
+    periodo: periodoTexto,
+    categoria: state.categoria
+  })
+  
   if (registrosFiltrados.length === 0) {
+    // REGRA CRÍTICA (bot.md): Se não encontrou, informa mas confirma que consultou o banco
     return {
       success: true,
       message: `💰 Você não teve despesas ${state.categoria ? `em ${state.categoria} ` : ''}${periodoTexto}.`,
-      data: { registros: [], total: 0 }
+      data: { registros: [], total: 0, consultouBanco: true }
     }
   }
   
@@ -826,7 +864,7 @@ export async function handleQuerySimple(
   }
   
   if (state.queryType === 'gasto' && state.domain === 'financeiro') {
-    return await queryGastos(state, tenantId, userId)
+    return await queryGastos(state, tenantId, userId, sessionContext || null)
   }
 
   if (state.queryType === 'listas' && state.domain === 'listas') {
