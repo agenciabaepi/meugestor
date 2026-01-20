@@ -512,7 +512,7 @@ async function queryFuncionariosCount(
   )
 
   const total = funcionarios.length
-  const nomes = funcionarios.map(f => f.nome_original || f.nome).sort()
+  const nomes = funcionarios.map(f => f.nome_original).sort()
 
   let response = `👥 *Total de Funcionários: ${total}*\n\n`
   
@@ -588,7 +588,7 @@ async function queryFuncionariosPagos(
     sessionContext.tenant_id,
     sessionContext.empresa_id
   )
-  const funcionariosMap = new Map(todosFuncionarios.map(f => [f.id, f.nome_original || f.nome]))
+  const funcionariosMap = new Map(todosFuncionarios.map(f => [f.id, f.nome_original]))
 
   // Agrupa por funcionário
   const porFuncionario: Record<string, { nome: string; total: number; pagamentos: number }> = {}
@@ -681,7 +681,7 @@ async function queryFuncionariosPendentes(
   if (totalPendentes > 0) {
     response += `*Funcionários que ainda não foram pagos:*\n`
     funcionariosPendentes
-      .map(f => f.nome_original || f.nome)
+      .map(f => f.nome_original)
       .sort()
       .forEach((nome, idx) => {
         response += `${idx + 1}. ${nome}\n`
@@ -697,7 +697,7 @@ async function queryFuncionariosPendentes(
       totalPendentes, 
       totalFuncionarios, 
       totalPagos,
-      funcionariosPendentes: funcionariosPendentes.map(f => f.nome_original || f.nome),
+      funcionariosPendentes: funcionariosPendentes.map(f => f.nome_original),
       periodo: periodoTexto 
     },
   }
