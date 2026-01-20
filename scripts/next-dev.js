@@ -140,6 +140,8 @@ async function main() {
       '.next/cache',
       '.next/cache/turbopack',
       '.next/cache/webpack',
+      '.next/cache/webpack/client-development',
+      '.next/cache/webpack/server-development',
       '.next/dev',
       '.next/dev/server',
       '.next/dev/static',
@@ -147,6 +149,26 @@ async function main() {
     ]
     for (const rel of dirs) {
       fs.mkdirSync(path.join(projectRoot, rel), { recursive: true })
+    }
+    
+    // Cria arquivos de manifesto vazios para evitar erros MODULE_NOT_FOUND iniciais
+    // O Next.js vai sobrescrever esses arquivos durante a compilação
+    const manifestFiles = [
+      '.next/dev/server/middleware-manifest.json',
+      '.next/dev/server/next-font-manifest.json',
+      '.next/dev/server/pages-manifest.json',
+      '.next/dev/server/app-paths-manifest.json',
+      '.next/dev/server/routes-manifest.json',
+    ]
+    for (const rel of manifestFiles) {
+      const fullPath = path.join(projectRoot, rel)
+      const dir = path.dirname(fullPath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+      if (!fs.existsSync(fullPath)) {
+        fs.writeFileSync(fullPath, JSON.stringify({}), 'utf8')
+      }
     }
   } catch (err) {
     // eslint-disable-next-line no-console
