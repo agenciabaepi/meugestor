@@ -1085,13 +1085,19 @@ export async function getPagamentosFuncionariosByEmpresa(
   if (startDate) {
     // Filtra por data_pagamento >= startDate
     // startDate pode ser ISO string ou date string (YYYY-MM-DD)
-    query = query.gte('data_pagamento', startDate)
+    // Converte para formato de data se necessário
+    const startDateFormatted = startDate.includes('T') ? startDate : `${startDate}T00:00:00.000Z`
+    query = query.gte('data_pagamento', startDateFormatted)
   }
 
   if (endDate) {
     // Filtra por data_pagamento <= endDate
     // endDate pode ser ISO string ou date string (YYYY-MM-DD)
-    query = query.lte('data_pagamento', endDate)
+    // Se endDate já é ISO completo, usa direto; senão adiciona horário final do dia
+    const endDateFormatted = endDate.includes('T') 
+      ? endDate 
+      : `${endDate}T23:59:59.999Z`
+    query = query.lte('data_pagamento', endDateFormatted)
   }
 
   const { data, error } = await query

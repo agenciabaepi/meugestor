@@ -123,15 +123,19 @@ function getDateRangeFromPeriodo(periodo: string | null | undefined): { startDat
     }
     case 'mês': {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
       return {
         startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endOfMonth.toISOString(),
         periodoTexto: 'este mês'
       }
     }
     default:
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
       return {
         startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endOfMonth.toISOString(),
         periodoTexto: 'este mês'
       }
   }
