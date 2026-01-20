@@ -608,6 +608,13 @@ async function queryFuncionariosPagos(
   const periodo = state.periodo || 'mês'
   const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
 
+  // Para consultas de mês, também podemos usar referencia (formato "01/2026")
+  // Isso é mais confiável que data_pagamento para filtrar por mês
+  const now = getNowInBrazil()
+  const referenciaMes = periodo === 'mês' || !periodo 
+    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+    : null
+
   // Busca funcionário específico se mencionado
   let funcionarioId: string | null = null
   if (state.employee_name) {
@@ -618,7 +625,7 @@ async function queryFuncionariosPagos(
   }
 
   // Busca pagamentos do período
-  const pagamentos = await getPagamentosFuncionariosByEmpresa(
+  let pagamentos = await getPagamentosFuncionariosByEmpresa(
     sessionContext.tenant_id,
     sessionContext.empresa_id,
     funcionarioId || undefined,
@@ -626,6 +633,18 @@ async function queryFuncionariosPagos(
     startDate,
     endDate
   )
+
+  // CRÍTICO: Se temos referencia e período é mês, filtra também por referencia para garantir
+  // Isso resolve o problema de pagamentos não serem encontrados quando data_pagamento está em formato diferente
+  if (referenciaMes && (periodo === 'mês' || !periodo)) {
+    const pagamentosPorReferencia = pagamentos.filter(p => p.referencia === referenciaMes)
+    if (pagamentosPorReferencia.length > 0) {
+      console.log(`queryFuncionariosPagos - Usando filtro por referencia: ${referenciaMes} (encontrados ${pagamentosPorReferencia.length} pagamentos)`)
+      pagamentos = pagamentosPorReferencia
+    } else {
+      console.log(`queryFuncionariosPagos - Nenhum pagamento encontrado com referencia ${referenciaMes}, usando filtro por data`)
+    }
+  }
 
   if (pagamentos.length === 0) {
     if (state.employee_name) {
@@ -650,7 +669,16 @@ async function queryFuncionariosPagos(
   console.log('queryFuncionariosPagos - Debug:', {
     totalFuncionarios: todosFuncionarios.length,
     totalPagamentos: pagamentos.length,
-    periodo: { startDate, endDate, periodoTexto }
+    periodo: { startDate, endDate, periodoTexto, referenciaMes },
+    funcionarioId: funcionarioId || 'todos',
+    pagamentosDetalhes: pagamentos.map(p => ({
+      id: p.id,
+      funcionario_id: p.funcionario_id,
+      valor: p.valor,
+      data_pagamento: p.data_pagamento,
+      referencia: p.referencia,
+      status: p.status
+    }))
   })
 
   // Agrupa por funcionário
