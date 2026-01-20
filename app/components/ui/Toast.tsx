@@ -74,8 +74,10 @@ export function ToastItem({ toast, onClose }: ToastProps) {
         ${config.bgColor} ${config.borderColor} border
         min-w-[320px] max-w-md
         transform transition-all duration-300 ease-out
-        animate-in slide-in-from-right-full
       `}
+      style={{
+        animation: 'slide-in-from-right 0.3s ease-out forwards',
+      }}
       role="alert"
       aria-live="polite"
     >
