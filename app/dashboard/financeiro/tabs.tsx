@@ -7,6 +7,7 @@ import { Edit2, Trash2 } from 'lucide-react'
 import { Charts } from './charts'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface FinanceiroTabsProps {
   despesas: Financeiro[]
@@ -248,7 +249,7 @@ export function FinanceiroTabs({
                           <p className={`font-semibold text-sm whitespace-nowrap ${
                             isReceita ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {isReceita ? '+' : '-'}R$ {Number(transacao.amount).toFixed(2)}
+                            {isReceita ? '+' : '-'}{formatCurrency(Number(transacao.amount))}
                           </p>
                         </div>
                       </div>

@@ -49,7 +49,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { nome_original, cargo, salario_base, tipo, ativo } = body
+    const { nome_original, cargo, salario_base, tipo, ativo, remuneracao_tipo, remuneracao_valor, remuneracao_regra } = body
 
     const updates: any = {}
     if (nome_original !== undefined) {
@@ -59,6 +59,9 @@ export async function PATCH(
     if (cargo !== undefined) updates.cargo = cargo || null
     if (salario_base !== undefined) updates.salario_base = salario_base ? Number(salario_base) : null
     if (tipo !== undefined) updates.tipo = tipo || null
+    if (remuneracao_tipo !== undefined) updates.remuneracao_tipo = remuneracao_tipo || null
+    if (remuneracao_valor !== undefined) updates.remuneracao_valor = remuneracao_valor !== null ? Number(remuneracao_valor) : null
+    if (remuneracao_regra !== undefined) updates.remuneracao_regra = remuneracao_regra || null
     if (ativo !== undefined) updates.ativo = Boolean(ativo)
 
     const funcionario = await updateFuncionario(

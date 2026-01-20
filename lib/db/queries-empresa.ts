@@ -1039,7 +1039,10 @@ export async function createFuncionario(
   nomeNormalizado: string,
   cargo?: string | null,
   salarioBase?: number | null,
-  tipo?: 'fixo' | 'freelancer' | 'temporario' | null
+  tipo?: 'fixo' | 'freelancer' | 'temporario' | null,
+  remuneracaoTipo?: 'mensal' | 'quinzenal' | 'diaria' | null,
+  remuneracaoValor?: number | null,
+  remuneracaoRegra?: Record<string, any> | null
 ): Promise<Funcionario | null> {
   const client = requireAdmin()
   const { data, error } = await client
@@ -1052,6 +1055,9 @@ export async function createFuncionario(
       cargo: cargo || null,
       salario_base: salarioBase || null,
       tipo: tipo || null,
+      remuneracao_tipo: remuneracaoTipo || undefined,
+      remuneracao_valor: remuneracaoValor ?? undefined,
+      remuneracao_regra: remuneracaoRegra ?? undefined,
       ativo: true,
     })
     .select()
@@ -1074,6 +1080,9 @@ export async function updateFuncionario(
     cargo?: string | null
     salario_base?: number | null
     tipo?: 'fixo' | 'freelancer' | 'temporario' | null
+    remuneracao_tipo?: 'mensal' | 'quinzenal' | 'diaria' | null
+    remuneracao_valor?: number | null
+    remuneracao_regra?: Record<string, any> | null
     ativo?: boolean
   }
 ): Promise<Funcionario | null> {
@@ -1129,6 +1138,11 @@ export async function createPagamentoFuncionario(
   dataPagamento: string,
   referencia: string | null,
   financeiroId: string | null,
+  remuneracaoTipo: 'mensal' | 'quinzenal' | 'diaria',
+  competenciaAno: number,
+  competenciaMes: number,
+  competenciaQuinzena: 1 | 2 | null,
+  quantidadeDias: number | null,
   status: 'pago' | 'pendente' = 'pago'
 ): Promise<PagamentoFuncionario | null> {
   // VALIDAÇÃO CRÍTICA: funcionarioId é OBRIGATÓRIO
@@ -1147,6 +1161,11 @@ export async function createPagamentoFuncionario(
     status,
     referencia,
     financeiro_id: financeiroId,
+    remuneracao_tipo: remuneracaoTipo,
+    competencia_ano: competenciaAno,
+    competencia_mes: competenciaMes,
+    competencia_quinzena: competenciaQuinzena,
+    quantidade_dias: quantidadeDias,
   }
 
   console.log('createPagamentoFuncionario - Inserindo com funcionario_id:', funcionarioId)
@@ -1247,6 +1266,37 @@ export async function getPagamentosFuncionariosByReferencia(
 
   if (error) {
     console.error('Error fetching pagamentos_funcionarios by referencia:', error)
+    return []
+  }
+  return data || []
+}
+
+export async function getPagamentosFuncionariosByCompetencia(
+  tenantId: string,
+  empresaId: string,
+  competenciaAno: number,
+  competenciaMes: number,
+  funcionarioId?: string
+): Promise<PagamentoFuncionario[]> {
+  const client = requireAdmin()
+  let query = client
+    .from('pagamentos_funcionarios')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('status', 'pago')
+    .eq('competencia_ano', competenciaAno)
+    .eq('competencia_mes', competenciaMes)
+    .order('data_pagamento', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (funcionarioId) {
+    query = query.eq('funcionario_id', funcionarioId)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching pagamentos_funcionarios by competencia:', error)
     return []
   }
   return data || []

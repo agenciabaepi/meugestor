@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 function isPublicPath(pathname: string) {
   // Páginas públicas
@@ -31,87 +35,12 @@ function isPublicPath(pathname: string) {
   return false
 }
 
-type CookieLike = { name: string; value: string }
-
-function tryParseSessionCookieValue(raw: string): { expires_at?: number } | null {
-  const candidates: string[] = []
-
-  // 1) raw
-  candidates.push(raw)
-
-  // 2) URL-decoded
-  try {
-    candidates.push(decodeURIComponent(raw))
-  } catch {
-    // ignore
+function assertSupabaseEnv() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Supabase não configurado. Verifique NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    )
   }
-
-  // 3) base64 decoded (best-effort)
-  try {
-    if (typeof atob === 'function' && /^[A-Za-z0-9+/=]+$/.test(raw) && raw.length % 4 === 0) {
-      candidates.push(atob(raw))
-    }
-  } catch {
-    // ignore
-  }
-
-  for (const value of candidates) {
-    try {
-      const parsed = JSON.parse(value)
-      if (parsed && typeof parsed === 'object') return parsed
-    } catch {
-      // ignore
-    }
-  }
-
-  return null
-}
-
-function getSupabaseAuthCookieValue(req: NextRequest): string | null {
-  const all = req.cookies.getAll()
-
-  // Supabase costuma usar: sb-<project-ref>-auth-token (às vezes chunked: .0, .1, ...)
-  const authCookies = all.filter((c) => c.name.includes('auth-token'))
-  if (authCookies.length === 0) return null
-
-  // Se estiver "chunked", junta na ordem (.0, .1, ...)
-  const byBase = new Map<string, CookieLike[]>()
-  for (const c of authCookies) {
-    const base = c.name.replace(/\.\d+$/, '')
-    const arr = byBase.get(base) ?? []
-    arr.push({ name: c.name, value: c.value })
-    byBase.set(base, arr)
-  }
-
-  // Pega o maior conjunto (mais provável ser o correto)
-  const best = Array.from(byBase.values()).sort((a, b) => b.length - a.length)[0]
-  if (!best) return null
-
-  if (best.length === 1) return best[0].value
-
-  return best
-    .slice()
-    .sort((a, b) => {
-      const ai = Number(a.name.match(/\.(\d+)$/)?.[1] ?? 0)
-      const bi = Number(b.name.match(/\.(\d+)$/)?.[1] ?? 0)
-      return ai - bi
-    })
-    .map((c) => c.value)
-    .join('')
-}
-
-function hasActiveSession(req: NextRequest) {
-  const raw = getSupabaseAuthCookieValue(req)
-  if (!raw) return false
-
-  const parsed = tryParseSessionCookieValue(raw)
-  if (!parsed) return true // fallback: existe cookie, consideramos sessão presente
-
-  const expiresAt = typeof parsed.expires_at === 'number' ? parsed.expires_at : null
-  if (!expiresAt) return true
-
-  const nowSeconds = Math.floor(Date.now() / 1000)
-  return expiresAt > nowSeconds
 }
 
 export default async function proxy(req: NextRequest) {
@@ -120,17 +49,49 @@ export default async function proxy(req: NextRequest) {
   // Permite preflight/CORS sem autenticação (ex: webhooks)
   if (req.method === 'OPTIONS') return NextResponse.next()
 
-  const authenticated = hasActiveSession(req)
+  // Cria response "mutável" para permitir set-cookie.
+  const res = NextResponse.next()
+
+  let authenticated = false
+  try {
+    assertSupabaseEnv()
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll().map((c) => ({ name: c.name, value: c.value }))
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, {
+              ...options,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            })
+          })
+        },
+      },
+    })
+
+    // Importante: getUser() força refresh quando necessário e escreve cookies via setAll.
+    const { data, error } = await supabase.auth.getUser()
+    authenticated = !error && !!data.user
+  } catch {
+    authenticated = false
+  }
 
   // Se já está logado, evita ficar preso em login/register
   if (authenticated && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+    const redirectRes = NextResponse.redirect(new URL('/dashboard', req.url))
+    // mantém cookies atualizados
+    res.cookies.getAll().forEach((c) => redirectRes.cookies.set(c))
+    return redirectRes
   }
 
   // Nunca bloqueia rotas públicas
-  if (isPublicPath(pathname)) return NextResponse.next()
+  if (isPublicPath(pathname)) return res
 
-  if (authenticated) return NextResponse.next()
+  if (authenticated) return res
 
   // APIs: responde 401 (não redireciona)
   if (pathname.startsWith('/api/')) {
@@ -140,7 +101,9 @@ export default async function proxy(req: NextRequest) {
   // Páginas: redireciona para login, preservando o destino
   const loginUrl = new URL('/login', req.url)
   loginUrl.searchParams.set('redirect', `${pathname}${search}`)
-  return NextResponse.redirect(loginUrl)
+  const redirectRes = NextResponse.redirect(loginUrl)
+  res.cookies.getAll().forEach((c) => redirectRes.cookies.set(c))
+  return redirectRes
 }
 
 export const config = {

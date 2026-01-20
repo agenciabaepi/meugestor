@@ -2,6 +2,7 @@
 
 import type { Financeiro } from '@/lib/db/types'
 import Link from 'next/link'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface FornecedorAgrupado {
   fornecedor: {
@@ -58,27 +59,23 @@ export function EmpresaFornecedoresTabela({
       return b.gastos - a.gastos
     })
 
-  // Conta despesas sem fornecedor
-  const despesasSemFornecedor = despesas.filter((d) => {
+  // Filtra apenas despesas que têm fornecedor para calcular o total
+  const despesasComFornecedor = despesas.filter((d) => {
     const metadata = d.metadata || {}
     const fornecedor = metadata.fornecedor as { nome: string } | undefined
-    return !fornecedor || !fornecedor.nome
+    return fornecedor && fornecedor.nome
   })
 
-  const totalSemFornecedor = despesasSemFornecedor.reduce(
-    (sum, d) => sum + Number(d.amount || 0),
-    0
-  )
-
-  if (fornecedores.length === 0 && despesasSemFornecedor.length === 0) {
+  if (fornecedores.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm sm:shadow p-6 text-center">
-        <p className="text-gray-500">Nenhum gasto registrado este mês.</p>
+        <p className="text-gray-500">Nenhum gasto com fornecedor registrado este mês.</p>
       </div>
     )
   }
 
-  const totalGeral = fornecedores.reduce((sum, f) => sum + f.gastos, 0) + totalSemFornecedor
+  // Total apenas dos gastos com fornecedor
+  const totalGeral = fornecedores.reduce((sum, f) => sum + f.gastos, 0)
 
   return (
     <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden">
@@ -140,7 +137,7 @@ export function EmpresaFornecedoresTabela({
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                     <span className="text-sm font-semibold text-red-600">
-                      R$ {forn.gastos.toFixed(2)}
+                      {formatCurrency(forn.gastos)}
                     </span>
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
@@ -164,54 +161,6 @@ export function EmpresaFornecedoresTabela({
                 </tr>
               )
             })}
-
-            {/* Linha para despesas sem fornecedor */}
-            {despesasSemFornecedor.length > 0 && (
-              <tr className="hover:bg-gray-50 transition-colors bg-gray-50/50">
-                <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">❓</span>
-                    <div>
-                      <div className="text-sm font-medium text-gray-600 italic">
-                        Sem fornecedor
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {despesasSemFornecedor.length}{' '}
-                        {despesasSemFornecedor.length === 1 ? 'gasto' : 'gastos'}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
-                  <span className="text-sm font-semibold text-gray-600">
-                    R$ {totalSemFornecedor.toFixed(2)}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
-                  <span className="text-sm text-gray-500">
-                    {despesasSemFornecedor.length}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gray-400 h-2 rounded-full transition-all"
-                        style={{
-                          width: `${Math.min((totalSemFornecedor / totalGeral) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500 w-12 text-right">
-                      {totalGeral > 0
-                        ? ((totalSemFornecedor / totalGeral) * 100).toFixed(1)
-                        : '0.0'}
-                      %
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            )}
           </tbody>
           <tfoot className="bg-gray-50">
             <tr>
@@ -220,12 +169,12 @@ export function EmpresaFornecedoresTabela({
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                 <span className="text-sm font-semibold text-red-600">
-                  R$ {totalGeral.toFixed(2)}
+                  {formatCurrency(totalGeral)}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
                 <span className="text-sm font-semibold text-gray-900">
-                  {despesas.length}
+                  {fornecedores.reduce((sum, f) => sum + f.registros.length, 0)}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">

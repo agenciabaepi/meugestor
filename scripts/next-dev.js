@@ -72,20 +72,35 @@ function parseDesiredPort(args) {
 }
 
 function isPortAvailable(port) {
-  return new Promise((resolve) => {
-    const server = net
-      .createServer()
-      .once('error', (err) => {
-        if (err && err.code === 'EADDRINUSE') return resolve(false)
-        return resolve(true)
-      })
-      .once('listening', () => {
-        server.close(() => resolve(true))
-      })
+  const tryListen = (host) =>
+    new Promise((resolve) => {
+      const server = net
+        .createServer()
+        .once('error', (err) => {
+          if (err && err.code === 'EADDRINUSE') return resolve(false)
+          return resolve(true)
+        })
+        .once('listening', () => {
+          server.close(() => resolve(true))
+        })
+      server.listen(port, host)
+    })
 
-    // Bind apenas no loopback para não pegar permissão/firewall
-    server.listen(port, '127.0.0.1')
-  })
+  // Alguns processos escutam em IPv6/0.0.0.0 e não colidem com 127.0.0.1 no macOS.
+  // Testamos em 127.0.0.1 e ::1 para evitar falso-positivo.
+  return Promise.all([tryListen('127.0.0.1'), tryListen('::1')]).then(
+    ([v4, v6]) => v4 && v6
+  )
+}
+
+function isPidAlive(pid) {
+  if (!pid || typeof pid !== 'number') return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function main() {
@@ -120,10 +135,40 @@ async function main() {
     process.exit(1)
   }
 
+  // Impede dois `next dev` usando o MESMO distDir (isso corrompe o cache e gera ENOENT/SST).
+  // O lock fica FORA do distDir, para não ser apagado no clean.
+  const lockFile = path.join(projectRoot, `${distDir}.dev.lock`)
+  try {
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: Date.now() }), {
+      flag: 'wx',
+    })
+  } catch {
+    try {
+      const raw = fs.readFileSync(lockFile, 'utf8')
+      const parsed = JSON.parse(raw)
+      const otherPid = Number(parsed?.pid)
+      if (isPidAlive(otherPid)) {
+        // eslint-disable-next-line no-console
+        console.error(
+          [
+            `[dev] Já existe um dev server rodando para este projeto (PID ${otherPid}).`,
+            `[dev] Feche o terminal antigo antes de iniciar outro (isso evita corrupção do ${distDir}).`,
+          ].join('\n')
+        )
+        process.exit(1)
+      }
+      // Stale lock: sobrescreve
+      fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: Date.now() }))
+    } catch {
+      // não conseguiu ler/parsear: tenta sobrescrever
+      fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: Date.now() }))
+    }
+  }
+
   if (!noClean && !process.env.KEEP_NEXT_CACHE) {
     const nextDir = path.join(projectRoot, distDir)
     try {
-      fs.rmSync(nextDir, { recursive: true, force: true })
+      fs.rmSync(nextDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       // eslint-disable-next-line no-console
       console.log(`[dev] cache ${distDir} limpo`)
     } catch (err) {
@@ -170,10 +215,25 @@ async function main() {
     env: process.env,
   })
 
-  child.on('exit', (code) => process.exit(code ?? 0))
+  const cleanupLock = () => {
+    try {
+      // remove lock only if it's ours
+      const raw = fs.readFileSync(lockFile, 'utf8')
+      const parsed = JSON.parse(raw)
+      if (Number(parsed?.pid) === process.pid) fs.rmSync(lockFile, { force: true })
+    } catch {
+      // ignore
+    }
+  }
+
+  child.on('exit', (code) => {
+    cleanupLock()
+    process.exit(code ?? 0)
+  })
   child.on('error', (err) => {
     // eslint-disable-next-line no-console
     console.error('[dev] falha ao iniciar next:', err)
+    cleanupLock()
     process.exit(1)
   })
 }

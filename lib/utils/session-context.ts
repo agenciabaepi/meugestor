@@ -14,13 +14,14 @@ import { supabaseAdmin } from '@/lib/db/client'
 export async function getSessionContext(): Promise<SessionContext | null> {
   try {
     const supabase = await createServerClient()
+    // getUser() valida via Supabase Auth e também pode forçar refresh quando necessário
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession()
+    } = await supabase.auth.getUser()
 
-    if (error || !session?.user?.id) {
-      console.warn('[getSessionContext] Sem sessão ou erro:', error?.message)
+    if (error || !user?.id) {
+      console.warn('[getSessionContext] Sem usuário ou erro:', error?.message)
       return null
     }
 
@@ -31,13 +32,13 @@ export async function getSessionContext(): Promise<SessionContext | null> {
       return null
     }
 
-    const ctx = await getSessionContextFromUserId(client, session.user.id)
+    const ctx = await getSessionContextFromUserId(client, user.id)
     if (!ctx) {
-      console.warn('[getSessionContext] Contexto não encontrado para userId:', session.user.id)
+      console.warn('[getSessionContext] Contexto não encontrado para userId:', user.id)
       // Retorna contexto mínimo baseado apenas na sessão
       return {
         tenant_id: '', // vazio se não encontrou
-        user_id: session.user.id,
+        user_id: user.id,
         mode: 'pessoal',
         empresa_id: null,
       }

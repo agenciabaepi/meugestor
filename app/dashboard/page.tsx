@@ -1,25 +1,37 @@
-import { getFinanceiroRecords, calculateTotalSpent } from '@/lib/services/financeiro'
+import { 
+  getFinanceiroRecordsForContext,
+  getDespesasRecordsForContext,
+  getReceitasRecordsForContext,
+  calculateTotalSpentForContext,
+  calculateTotalRevenueForContext,
+} from '@/lib/services/financeiro'
 import { getTodayCompromissos, getCompromissosRecords } from '@/lib/services/compromissos'
 import { gerarResumoMensal } from '@/lib/services/relatorios'
-import { getAuthenticatedTenantId } from '@/lib/utils/auth'
-import { Wallet, FileText, Calendar, Clock } from 'lucide-react'
-import { DialogDemo } from './components/DialogDemo'
+import { calcularCaixa } from '@/lib/services/caixa'
+import { getSessionContext } from '@/lib/utils/session-context'
+import { Wallet, FileText, Calendar, Clock, TrendingUp, TrendingDown, Banknote } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils/format-currency'
+import { DashboardChart } from './components/DashboardChart'
 
 export const dynamic = 'force-dynamic'
 
 async function getDashboardData() {
   try {
-    // Obtém tenant_id do usuário autenticado
-    const tenantId = await getAuthenticatedTenantId()
+    const ctx = await getSessionContext()
     
-    if (!tenantId) {
-      // Retorna dados vazios se não houver tenant
+    if (!ctx) {
       return {
-        totalMes: 0,
+        totalDespesas: 0,
+        totalReceitas: 0,
+        saldo: 0,
+        caixa: 0,
         gastosRecentes: [],
+        receitasRecentes: [],
         gastosMes: 0,
+        receitasMes: 0,
         hoje: 0,
         proximos: [],
+        dadosGrafico: [],
         resumo: {
           total: 0,
           porCategoria: {},
@@ -31,24 +43,79 @@ async function getDashboardData() {
     
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     
     // Busca dados financeiros com tratamento de erro
-    let totalMes = 0
+    let totalDespesas = 0
+    let totalReceitas = 0
     let gastosRecentes: any[] = []
+    let receitasRecentes: any[] = []
     let gastosMes: any[] = []
+    let receitasMes: any[] = []
+    let dadosGrafico: Array<{ date: string; despesas: number; receitas: number }> = []
     
     try {
-      totalMes = await calculateTotalSpent(
-        tenantId,
-        startOfMonth.toISOString().split('T')[0]
+      totalDespesas = await calculateTotalSpentForContext(
+        ctx,
+        startOfMonth.toISOString().split('T')[0],
+        endOfMonth.toISOString().split('T')[0]
       )
-      gastosRecentes = await getFinanceiroRecords(tenantId)
-      gastosMes = await getFinanceiroRecords(
-        tenantId,
-        startOfMonth.toISOString().split('T')[0]
+      totalReceitas = await calculateTotalRevenueForContext(
+        ctx,
+        startOfMonth.toISOString().split('T')[0],
+        endOfMonth.toISOString().split('T')[0]
+      )
+      
+      gastosMes = await getDespesasRecordsForContext(
+        ctx,
+        startOfMonth.toISOString().split('T')[0],
+        endOfMonth.toISOString().split('T')[0]
+      )
+      receitasMes = await getReceitasRecordsForContext(
+        ctx,
+        startOfMonth.toISOString().split('T')[0],
+        endOfMonth.toISOString().split('T')[0]
+      )
+      
+      // Busca registros recentes (últimos 5)
+      const todasTransacoes = await getFinanceiroRecordsForContext(ctx)
+      gastosRecentes = todasTransacoes
+        .filter((t: any) => (t.transaction_type || 'expense') === 'expense')
+        .slice(0, 5)
+      receitasRecentes = todasTransacoes
+        .filter((t: any) => (t.transaction_type || 'revenue') === 'revenue')
+        .slice(0, 5)
+      
+      // Prepara dados do gráfico (todos os dias do mês)
+      const diasDoMes = Array.from({ length: endOfMonth.getDate() }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth(), i + 1)
+        return date.toISOString().split('T')[0]
+      })
+      
+      dadosGrafico = await Promise.all(
+        diasDoMes.map(async (date) => {
+          const despesas = await getDespesasRecordsForContext(ctx, date, date)
+          const receitas = await getReceitasRecordsForContext(ctx, date, date)
+          const totalDespesas = despesas.reduce((sum, d) => sum + Number(d.amount), 0)
+          const totalReceitas = receitas.reduce((sum, r) => sum + Number(r.amount), 0)
+          return {
+            date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+            despesas: Number(totalDespesas),
+            receitas: Number(totalReceitas),
+            saldo: Number(totalReceitas - totalDespesas),
+          }
+        })
       )
     } catch (error) {
       console.error('Error fetching financeiro data:', error)
+    }
+    
+    // Calcula caixa (saldo acumulado)
+    let caixa = 0
+    try {
+      caixa = await calcularCaixa(ctx)
+    } catch (error) {
+      console.error('Error calculating caixa:', error)
     }
     
     // Busca compromissos com tratamento de erro
@@ -62,33 +129,46 @@ async function getDashboardData() {
     }
     
     try {
-      hoje = await getTodayCompromissos(tenantId)
+      hoje = await getTodayCompromissos(ctx.tenant_id)
       proximos = await getCompromissosRecords(
-        tenantId,
+        ctx.tenant_id,
         new Date().toISOString()
       )
-      resumo = await gerarResumoMensal(tenantId)
+      resumo = await gerarResumoMensal(ctx.tenant_id)
     } catch (error) {
       console.error('Error fetching compromissos data:', error)
     }
     
+    const saldo = totalReceitas - totalDespesas
+    
     return {
-      totalMes,
-      gastosRecentes: gastosRecentes.slice(0, 5),
+      totalDespesas,
+      totalReceitas,
+      saldo,
+      caixa,
+      gastosRecentes,
+      receitasRecentes,
       gastosMes: gastosMes.length,
+      receitasMes: receitasMes.length,
       hoje: hoje.length,
       proximos: proximos.slice(0, 5),
+      dadosGrafico,
       resumo,
     }
   } catch (error) {
     console.error('Error in getDashboardData:', error)
-    // Retorna dados vazios em caso de erro para não quebrar a página
     return {
-      totalMes: 0,
+      totalDespesas: 0,
+      totalReceitas: 0,
+      saldo: 0,
+      caixa: 0,
       gastosRecentes: [],
+      receitasRecentes: [],
       gastosMes: 0,
+      receitasMes: 0,
       hoje: 0,
       proximos: [],
+      dadosGrafico: [],
       resumo: {
         total: 0,
         porCategoria: {},
@@ -105,85 +185,120 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-base sm:text-lg text-gray-600">
-          Visão geral das suas finanças e compromissos
-        </p>
-          </div>
-          <div className="hidden lg:block shrink-0">
-            <DialogDemo />
-          </div>
+        <div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Dashboard</h1>
+          <p className="text-base sm:text-lg text-gray-600">
+            Visão geral das suas finanças e compromissos
+          </p>
         </div>
       </div>
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {/* Card Gastos do Mês */}
-        <div className="relative bg-linear-to-br from-emerald-600 to-emerald-700 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        {/* Card Saldo do Mês */}
+        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden ${
+          data.saldo >= 0 
+            ? 'bg-gradient-to-br from-emerald-600 to-emerald-700' 
+            : 'bg-gradient-to-br from-red-600 to-red-700'
+        }`}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Wallet className="w-6 h-6 text-white" />
+                {data.saldo >= 0 ? (
+                  <TrendingUp className="w-6 h-6 text-white" />
+                ) : (
+                  <TrendingDown className="w-6 h-6 text-white" />
+                )}
               </div>
             </div>
-            <p className="text-emerald-100 text-sm font-medium mb-1">Gastos do Mês</p>
+            <p className="text-white/90 text-sm font-medium mb-1">Saldo do Mês</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
-              R$ {data.totalMes.toFixed(2)}
+              {formatCurrency(data.saldo)}
+            </p>
+            <p className="text-white/80 text-xs mt-1">
+              {data.totalReceitas > 0 
+                ? `${((data.saldo / data.totalReceitas) * 100).toFixed(1)}% da receita`
+                : 'Sem receitas'
+              }
             </p>
           </div>
         </div>
 
-        {/* Card Registros */}
-        <div className="relative bg-linear-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        {/* Card Receitas */}
+        <div className="relative bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+                <TrendingUp className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-emerald-100 text-sm font-medium mb-1">Registros</p>
+            <p className="text-white/90 text-sm font-medium mb-1">Receitas</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
-              {data.gastosMes}
+              {formatCurrency(data.totalReceitas)}
+            </p>
+            <p className="text-white/80 text-xs mt-1">
+              {data.receitasMes} registro{data.receitasMes !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
 
-        {/* Card Hoje */}
-        <div className="relative bg-linear-to-br from-emerald-400 to-emerald-500 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        {/* Card Despesas */}
+        <div className="relative bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-white" />
+                <TrendingDown className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-emerald-50 text-sm font-medium mb-1">Hoje</p>
+            <p className="text-white/90 text-sm font-medium mb-1">Despesas</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
-              {data.hoje} compromissos
+              {formatCurrency(data.totalDespesas)}
+            </p>
+            <p className="text-white/80 text-xs mt-1">
+              {data.gastosMes} registro{data.gastosMes !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
 
-        {/* Card Próximos */}
-        <div className="relative bg-linear-to-br from-emerald-300 to-emerald-400 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        {/* Card Caixa */}
+        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden ${
+          data.caixa >= 0 
+            ? 'bg-gradient-to-br from-blue-600 to-blue-700' 
+            : 'bg-gradient-to-br from-red-600 to-red-700'
+        }`}>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6 text-white" />
+                <Banknote className="w-6 h-6 text-white" />
               </div>
             </div>
-            <p className="text-emerald-50 text-sm font-medium mb-1">Próximos</p>
+            <p className="text-white/90 text-sm font-medium mb-1">Caixa</p>
             <p className="text-white text-2xl sm:text-3xl font-bold">
-              {data.proximos.length}
+              {formatCurrency(data.caixa)}
             </p>
+            <p className="text-white/80 text-xs mt-1">Saldo acumulado</p>
           </div>
         </div>
       </div>
+
+      {/* Gráfico Financeiro */}
+      {data.dadosGrafico.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
+          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900">Visão Geral do Mês</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Receitas e despesas de {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <div className="p-4 sm:p-6 lg:p-8">
+            <DashboardChart data={data.dadosGrafico} />
+          </div>
+        </div>
+      )}
 
       {/* Gastos Recentes */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
@@ -206,7 +321,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-lg text-gray-900 whitespace-nowrap">
-                      R$ {Number(gasto.amount).toFixed(2)}
+                      {formatCurrency(Number(gasto.amount))}
                     </p>
                   </div>
                 </div>

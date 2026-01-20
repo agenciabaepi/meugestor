@@ -20,7 +20,6 @@ export function FornecedoresClient({ fornecedores: initialFornecedores }: Fornec
 
   useEffect(() => {
     setMounted(true)
-    return () => setMounted(false)
   }, [])
   const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)

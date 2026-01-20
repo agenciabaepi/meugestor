@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/ui'
+import { CurrencyInput } from '@/app/components/ui/CurrencyInput'
 
 interface Categoria {
   nome: string
@@ -23,7 +24,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loadingCategorias, setLoadingCategorias] = useState(true)
   const [formData, setFormData] = useState({
-    amount: '',
+    amount: 0,
     description: '',
     category: '',
     date: new Date().toISOString().split('T')[0],
@@ -60,7 +61,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.amount || !formData.description || !formData.category || !formData.date) {
+    if (!formData.amount || formData.amount <= 0 || !formData.description || !formData.category || !formData.date) {
       toast.error('Campos obrigatórios', 'Preencha todos os campos obrigatórios.')
       return
     }
@@ -71,7 +72,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: parseFloat(formData.amount),
+          amount: formData.amount,
           description: formData.description,
           category: formData.category,
           date: formData.date,
@@ -87,7 +88,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
         onClose()
         // Reset form
         setFormData({
-          amount: '',
+          amount: 0,
           description: '',
           category: categorias[0]?.nome || '',
           date: new Date().toISOString().split('T')[0],
@@ -135,21 +136,13 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             {/* Valor */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Valor (R$) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                placeholder="0.00"
-              />
-            </div>
+            <CurrencyInput
+              label="Valor"
+              required
+              value={formData.amount}
+              onChange={(value) => setFormData({ ...formData, amount: value })}
+              placeholder="0,00"
+            />
 
             {/* Descrição */}
             <div>

@@ -34,10 +34,14 @@ import { getListView, formatListRawResponse } from '../services/listas'
 import { 
   getEmployeePaymentsByEmpresa,
   getPagamentosFuncionariosByEmpresa,
-  getPagamentosFuncionariosByReferencia,
   getFuncionariosByEmpresa,
 } from '../db/queries-empresa'
 import { findFuncionarioByName } from '../services/funcionarios'
+import {
+  calcularPendenciasFuncionariosPorCompetencia,
+  calcularTotalPagoFuncionariosPorCompetencia,
+  listarFuncionariosPagosPorCompetencia,
+} from '../services/pagamentos-funcionarios'
 
 function formatTimeBR(iso: string): string {
   const parts = new Intl.DateTimeFormat('pt-BR', {
@@ -738,145 +742,46 @@ async function queryFuncionariosPagos(
     }
   }
 
-  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
-  const periodo = state.periodo || 'mês'
-  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
-
-  // Para consultas de mês, também podemos usar referencia (formato "01/2026")
-  // Isso é mais confiável que data_pagamento para filtrar por mês
   const now = getNowInBrazil()
-  const referenciaMes = periodo === 'mês' || !periodo 
-    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
-    : null
+  const periodoTexto = 'este mês'
+  const competenciaAno = now.getFullYear()
+  const competenciaMes = now.getMonth() + 1
 
-  // Busca funcionário específico se mencionado
-  let funcionarioId: string | null = null
+  // Caso: funcionário específico
   if (state.employee_name) {
     const funcionario = await findFuncionarioByName(sessionContext, state.employee_name)
-    if (funcionario) {
-      funcionarioId = funcionario.id
+    if (!funcionario) {
+      return { success: true, message: `Não encontrei o funcionário *${state.employee_name}* no cadastro.` }
     }
-  }
-
-  // Busca pagamentos do período
-  // CRÍTICO: Para consultas de mês, usar referencia é mais confiável que data_pagamento
-  // Se temos referencia e período é mês, busca diretamente por referencia
-  let pagamentos: any[] = []
-  
-  if (referenciaMes && (periodo === 'mês' || !periodo) && !funcionarioId) {
-    // Busca TODOS os pagamentos do mês por referencia (mais confiável)
-    // Primeiro busca todos os funcionários para iterar
-    const todosFuncionarios = await getFuncionariosByEmpresa(
-      sessionContext.tenant_id,
-      sessionContext.empresa_id,
-      true,
-      1000
-    )
-    
-    // Para cada funcionário, busca pagamentos por referencia
-    for (const func of todosFuncionarios) {
-      const pagamentosFunc = await getPagamentosFuncionariosByReferencia(
-        sessionContext.tenant_id,
-        sessionContext.empresa_id,
-        func.id,
-        referenciaMes
-      )
-      pagamentos.push(...pagamentosFunc)
-    }
-    
-    console.log(`queryFuncionariosPagos - Buscando por referencia ${referenciaMes}: encontrados ${pagamentos.length} pagamentos`)
-  } else if (referenciaMes && (periodo === 'mês' || !periodo) && funcionarioId) {
-    // Funcionário específico: busca por referencia
-    pagamentos = await getPagamentosFuncionariosByReferencia(
-      sessionContext.tenant_id,
-      sessionContext.empresa_id,
-      funcionarioId,
-      referenciaMes
-    )
-    console.log(`queryFuncionariosPagos - Buscando por referencia ${referenciaMes} para funcionário ${funcionarioId}: encontrados ${pagamentos.length} pagamentos`)
-  } else {
-    // Outros períodos: usa filtro por data
-    pagamentos = await getPagamentosFuncionariosByEmpresa(
-      sessionContext.tenant_id,
-      sessionContext.empresa_id,
-      funcionarioId || undefined,
-      'pago',
-      startDate,
-      endDate
-    )
-    console.log(`queryFuncionariosPagos - Buscando por data (${startDate} a ${endDate}): encontrados ${pagamentos.length} pagamentos`)
-  }
-
-  if (pagamentos.length === 0) {
-    if (state.employee_name) {
-      return {
-        success: true,
-        message: `⚠️ Você ainda não registrou pagamentos para *${state.employee_name}* ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}.`,
-      }
+    const { pagos } = await listarFuncionariosPagosPorCompetencia(sessionContext, competenciaAno, competenciaMes)
+    const found = pagos.find((p) => p.funcionario_id === funcionario.id)
+    if (!found) {
+      return { success: true, message: `⚠️ *${funcionario.nome_original}* ainda não tem pagamentos registrados ${periodoTexto}.` }
     }
     return {
       success: true,
-      message: `📊 Não há funcionários pagos ${periodoTexto === 'este mês' ? 'neste mês' : periodoTexto}.`,
+      message:
+        `✅ Sim. *${found.nome}* já foi pago ${periodoTexto}:\n` +
+        `• Total: R$ ${found.total.toFixed(2).replace('.', ',')}\n` +
+        `• Pagamentos: ${found.pagamentos.length}`,
+      data: found,
     }
   }
 
-  // Busca todos os funcionários para mapear IDs
-  const todosFuncionarios = await getFuncionariosByEmpresa(
-    sessionContext.tenant_id,
-    sessionContext.empresa_id
-  )
-  const funcionariosMap = new Map(todosFuncionarios.map(f => [f.id, f.nome_original]))
-
-  console.log('queryFuncionariosPagos - Debug:', {
-    totalFuncionarios: todosFuncionarios.length,
-    totalPagamentos: pagamentos.length,
-    periodo: { startDate, endDate, periodoTexto, referenciaMes },
-    funcionarioId: funcionarioId || 'todos',
-    pagamentosDetalhes: pagamentos.map(p => ({
-      id: p.id,
-      funcionario_id: p.funcionario_id,
-      valor: p.valor,
-      data_pagamento: p.data_pagamento,
-      referencia: p.referencia,
-      status: p.status
-    }))
-  })
-
-  // Agrupa por funcionário
-  const porFuncionario: Record<string, { nome: string; total: number; pagamentos: number }> = {}
-  
-  for (const pagamento of pagamentos) {
-    const funcionarioIdPag = pagamento.funcionario_id
-    const nome = funcionariosMap.get(funcionarioIdPag) || 'Funcionário'
-    
-    if (!porFuncionario[funcionarioIdPag]) {
-      porFuncionario[funcionarioIdPag] = {
-        nome,
-        total: 0,
-        pagamentos: 0,
-      }
-    }
-    
-    porFuncionario[funcionarioIdPag].total += Number(pagamento.valor)
-    porFuncionario[funcionarioIdPag].pagamentos += 1
+  const { pagos, totalPago } = await listarFuncionariosPagosPorCompetencia(sessionContext, competenciaAno, competenciaMes)
+  if (pagos.length === 0) {
+    return { success: true, message: `📊 Não há funcionários pagos ${periodoTexto}.` }
   }
-
-  const funcionarios = Object.values(porFuncionario)
-  funcionarios.sort((a, b) => a.nome.localeCompare(b.nome))
 
   let response = `✅ *Funcionários Pagos (${periodoTexto})*\n\n`
-  
-  for (const func of funcionarios) {
-    response += `👤 ${func.nome}\n`
-    response += `• Total: R$ ${func.total.toFixed(2).replace('.', ',')}\n`
-    response += `• Pagamentos: ${func.pagamentos}\n\n`
+  for (const f of pagos) {
+    response += `👤 ${f.nome}\n`
+    response += `• Total: R$ ${f.total.toFixed(2).replace('.', ',')}\n`
+    response += `• Pagamentos: ${f.pagamentos.length}\n\n`
   }
+  response += `💰 *Total geral:* R$ ${totalPago.toFixed(2).replace('.', ',')}`
 
-  return {
-    success: true,
-    message: response,
-    data: { funcionarios, periodo: periodoTexto },
-  }
+  return { success: true, message: response, data: { pagos, totalPago, periodo: periodoTexto } }
 }
 
 /**
@@ -894,104 +799,39 @@ async function queryFuncionariosPendentes(
     }
   }
 
-  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
-  const periodo = state.periodo || 'mês'
-  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
-
-  // Busca TODOS os funcionários ativos
-  const todosFuncionarios = await getFuncionariosByEmpresa(
-    sessionContext.tenant_id,
-    sessionContext.empresa_id,
-    true, // apenas ativos
-    1000
-  )
-
-  // Para consultas de mês, também podemos usar referencia (formato "01/2026")
-  // Isso é mais confiável que data_pagamento para filtrar por mês
   const now = getNowInBrazil()
-  const referenciaMes = periodo === 'mês' || !periodo 
-    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
-    : null
+  const periodoTexto = 'este mês'
+  const competenciaAno = now.getFullYear()
+  const competenciaMes = now.getMonth() + 1
 
-  // Busca funcionários que JÁ FORAM PAGOS no período
-  // Primeiro tenta por referencia (mais confiável para mês), depois por data
-  let pagamentos = await getPagamentosFuncionariosByEmpresa(
-    sessionContext.tenant_id,
-    sessionContext.empresa_id,
-    undefined, // todos
-    'pago',
-    startDate,
-    endDate
+  const { pendentes, totalPendente, totalPendenteSemValor } = await calcularPendenciasFuncionariosPorCompetencia(
+    sessionContext,
+    competenciaAno,
+    competenciaMes,
+    now
   )
 
-  // Se temos referencia e período é mês, filtra também por referencia para garantir
-  if (referenciaMes && (periodo === 'mês' || !periodo)) {
-    const pagamentosPorReferencia = pagamentos.filter(p => p.referencia === referenciaMes)
-    if (pagamentosPorReferencia.length > 0) {
-      console.log(`queryFuncionariosPendentes - Usando filtro por referencia: ${referenciaMes}`)
-      pagamentos = pagamentosPorReferencia
-    }
+  if (pendentes.length === 0) {
+    return { success: true, message: `✅ Nenhum funcionário pendente ${periodoTexto}.` }
   }
-
-  // DEBUG: Log para verificar pagamentos encontrados
-  console.log('queryFuncionariosPendentes - Pagamentos encontrados:', {
-    total: pagamentos.length,
-    pagamentos: pagamentos.map(p => ({
-      funcionario_id: p.funcionario_id,
-      data_pagamento: p.data_pagamento,
-      referencia: p.referencia,
-      valor: p.valor
-    })),
-    startDate,
-    endDate
-  })
-
-  // CRÍTICO: Filtra apenas pagamentos com funcionario_id válido (não null)
-  // E remove duplicatas (um funcionário pode ter múltiplos pagamentos no período)
-  const funcionariosPagosIds = new Set(
-    pagamentos
-      .filter(p => p.funcionario_id && p.funcionario_id.trim() !== '') // Remove null/undefined/vazio
-      .map(p => p.funcionario_id)
-  )
-
-  console.log('queryFuncionariosPendentes - Funcionários pagos (IDs):', Array.from(funcionariosPagosIds))
-  console.log('queryFuncionariosPendentes - Total funcionários ativos:', todosFuncionarios.length)
-
-  // Calcula quem NÃO foi pago
-  const funcionariosPendentes = todosFuncionarios.filter(
-    f => !funcionariosPagosIds.has(f.id)
-  )
-
-  const totalPendentes = funcionariosPendentes.length
-  const totalFuncionarios = todosFuncionarios.length
-  const totalPagos = totalFuncionarios - totalPendentes
 
   let response = `📋 *Funcionários Pendentes (${periodoTexto})*\n\n`
-  response += `⏳ Faltam pagar: *${totalPendentes}* de ${totalFuncionarios} funcionários\n\n`
-
-  if (totalPendentes > 0) {
-    response += `*Funcionários que ainda não foram pagos:*\n`
-    funcionariosPendentes
-      .map(f => f.nome_original)
-      .sort()
-      .forEach((nome, idx) => {
-        response += `${idx + 1}. ${nome}\n`
-      })
-  } else {
-    response += `✅ Todos os funcionários já foram pagos!`
+  response += `⏳ Pendências: *${pendentes.length}* funcionário${pendentes.length === 1 ? '' : 's'}\n`
+  response += `💰 Falta pagar (estimado): R$ ${totalPendente.toFixed(2).replace('.', ',')}\n`
+  if (totalPendenteSemValor > 0) {
+    response += `⚠️ ${totalPendenteSemValor} pendência(s) sem valor cadastrado\n`
   }
+  response += `\n`
 
-  return {
-    success: true,
-    message: response,
-    data: { 
-      totalPendentes, 
-      totalFuncionarios, 
-      totalPagos,
-      funcionariosPendentes: funcionariosPendentes.map(f => f.nome_original),
-      periodo: periodoTexto 
-    },
-  }
+  // Lista detalhada (inclui quais quinzenas faltam)
+  pendentes
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .forEach((p, idx) => {
+      const detalhes = p.pendencias.map((d) => d.label).join(', ')
+      response += `${idx + 1}. ${p.nome} — ${p.tipo}${detalhes ? ` — ${detalhes}` : ''}\n`
+    })
+
+  return { success: true, message: response, data: { pendentes, totalPendente, periodo: periodoTexto } }
 }
 
 /**
@@ -1009,79 +849,21 @@ async function querySalariosTotal(
     }
   }
 
-  // REGRA CRÍTICA: Se período não informado, assume "mês" (mês atual)
-  const periodo = state.periodo || 'mês'
-  const { startDate, endDate, periodoTexto } = getDateRangeFromPeriodo(periodo)
-
-  // Para consultas de mês, usar referencia é mais confiável que data_pagamento
   const now = getNowInBrazil()
-  const referenciaMes = periodo === 'mês' || !periodo 
-    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
-    : null
+  const periodoTexto = 'este mês'
+  const competenciaAno = now.getFullYear()
+  const competenciaMes = now.getMonth() + 1
 
-  // Busca TODOS os pagamentos do período
-  // CRÍTICO: Para consultas de mês, usar referencia é mais confiável
-  let pagamentos: any[] = []
-  
-  if (referenciaMes && (periodo === 'mês' || !periodo)) {
-    // Busca TODOS os funcionários para iterar e buscar por referencia
-    const todosFuncionarios = await getFuncionariosByEmpresa(
-      sessionContext.tenant_id,
-      sessionContext.empresa_id,
-      true,
-      1000
-    )
-    
-    // Para cada funcionário, busca pagamentos por referencia
-    for (const func of todosFuncionarios) {
-      const pagamentosFunc = await getPagamentosFuncionariosByReferencia(
-        sessionContext.tenant_id,
-        sessionContext.empresa_id,
-        func.id,
-        referenciaMes
-      )
-      pagamentos.push(...pagamentosFunc)
-    }
-    
-    console.log(`querySalariosTotal - Buscando por referencia ${referenciaMes}: encontrados ${pagamentos.length} pagamentos`)
-  } else {
-    // Outros períodos: usa filtro por data
-    pagamentos = await getPagamentosFuncionariosByEmpresa(
-      sessionContext.tenant_id,
-      sessionContext.empresa_id,
-      undefined, // todos
-      'pago',
-      startDate,
-      endDate
-    )
-    console.log(`querySalariosTotal - Buscando por data (${startDate} a ${endDate}): encontrados ${pagamentos.length} pagamentos`)
-  }
-
-  console.log('querySalariosTotal - Debug:', {
-    periodo: { startDate, endDate, periodoTexto, referenciaMes },
-    totalPagamentos: pagamentos.length,
-    pagamentosDetalhes: pagamentos.map(p => ({
-      id: p.id,
-      funcionario_id: p.funcionario_id,
-      valor: p.valor,
-      data_pagamento: p.data_pagamento,
-      referencia: p.referencia,
-      status: p.status
-    }))
-  })
-
-  // Soma total de salários pagos
-  const total = pagamentos.reduce((sum, p) => sum + Number(p.valor), 0)
+  const { totalPago, pagamentos } = await calcularTotalPagoFuncionariosPorCompetencia(sessionContext, competenciaAno, competenciaMes)
   const quantidadePagamentos = pagamentos.length
-
-  let response = `💰 *Total de Salários Pagos (${periodoTexto})*\n\n`
-  response += `💵 Total: R$ ${total.toFixed(2).replace('.', ',')}\n`
-  response += `📊 Pagamentos: ${quantidadePagamentos}`
 
   return {
     success: true,
-    message: response,
-    data: { total, quantidadePagamentos, periodo: periodoTexto },
+    message:
+      `💰 *Total pago para funcionários (${periodoTexto})*\n\n` +
+      `💵 Total: R$ ${totalPago.toFixed(2).replace('.', ',')}\n` +
+      `📊 Pagamentos: ${quantidadePagamentos}`,
+    data: { total: totalPago, quantidadePagamentos, periodo: periodoTexto },
   }
 }
 

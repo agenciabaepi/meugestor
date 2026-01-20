@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { nome_original, cargo, salario_base, tipo } = body
+    const { nome_original, cargo, salario_base, tipo, remuneracao_tipo, remuneracao_valor, remuneracao_regra } = body
 
     if (!nome_original || String(nome_original).trim().length === 0) {
       return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
       nomeNormalizado,
       cargo || null,
       salario_base ? Number(salario_base) : null,
-      tipo || null
+      tipo || null,
+      remuneracao_tipo || null,
+      remuneracao_valor !== undefined && remuneracao_valor !== null ? Number(remuneracao_valor) : null,
+      remuneracao_regra || null
     )
 
     if (!funcionario) {

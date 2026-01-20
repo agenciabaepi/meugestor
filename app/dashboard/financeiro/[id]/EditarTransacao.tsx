@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
+import { CurrencyInput } from '@/app/components/ui/CurrencyInput'
 
 interface EditarTransacaoProps {
   transacao: Financeiro
@@ -173,22 +174,13 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
           </div>
 
           {/* Valor */}
-          <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Valor (R$) *
-            </label>
-            <input
-              type="number"
-              id="amount"
-              step="0.01"
-              min="0.01"
-              value={formData.amount}
-              onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="0.00"
-            />
-          </div>
+          <CurrencyInput
+            label="Valor"
+            required
+            value={formData.amount}
+            onChange={(value) => setFormData({ ...formData, amount: value })}
+            placeholder="0,00"
+          />
 
           {/* Categoria */}
           <div>

@@ -6,6 +6,7 @@ import { Plus, Edit2, Trash2, Users, TrendingUp, CheckCircle2, Circle, ChevronDo
 import type { Funcionario, Financeiro } from '@/lib/db/types'
 import { PeriodoSelector } from './PeriodoSelector'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
+import { CurrencyInput } from '@/app/components/ui/CurrencyInput'
 
 interface FuncionariosClientProps {
   funcionarios: Funcionario[]
@@ -39,6 +40,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     cargo: '',
     salario_base: '',
     tipo: '' as '' | 'fixo' | 'freelancer' | 'temporario',
+    remuneracao_tipo: 'mensal' as 'mensal' | 'quinzenal' | 'diaria',
     ativo: true,
   })
   const [pagamentoData, setPagamentoData] = useState({
@@ -114,7 +116,12 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
   const handleOpenPagamentoModal = (funcionario: Funcionario) => {
     setSelectedFuncionario(funcionario)
     setPagamentoData({
-      valor: funcionario.salario_base ? String(funcionario.salario_base) : '',
+      valor:
+        (funcionario as any).remuneracao_valor
+          ? String((funcionario as any).remuneracao_valor)
+          : funcionario.salario_base
+            ? String(funcionario.salario_base)
+            : '',
       data: new Date().toISOString().split('T')[0],
       observacao: '',
     })
@@ -186,8 +193,14 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
       setFormData({
         nome_original: funcionario.nome_original,
         cargo: funcionario.cargo || '',
-        salario_base: funcionario.salario_base ? String(funcionario.salario_base) : '',
+        salario_base:
+          (funcionario as any).remuneracao_valor
+            ? String((funcionario as any).remuneracao_valor)
+            : funcionario.salario_base
+              ? String(funcionario.salario_base)
+              : '',
         tipo: funcionario.tipo || '',
+        remuneracao_tipo: ((funcionario as any).remuneracao_tipo as any) || 'mensal',
         ativo: funcionario.ativo,
       })
     } else {
@@ -197,6 +210,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
         cargo: '',
         salario_base: '',
         tipo: '',
+        remuneracao_tipo: 'mensal',
         ativo: true,
       })
     }
@@ -211,6 +225,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
       cargo: '',
       salario_base: '',
       tipo: '',
+      remuneracao_tipo: 'mensal',
       ativo: true,
     })
   }
@@ -239,6 +254,8 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
           cargo: formData.cargo.trim() || null,
           salario_base: formData.salario_base ? parseFloat(formData.salario_base) : null,
           tipo: formData.tipo || null,
+          remuneracao_tipo: formData.remuneracao_tipo || 'mensal',
+          remuneracao_valor: formData.salario_base ? parseFloat(formData.salario_base) : null,
           ativo: formData.ativo,
         }),
       })
@@ -311,6 +328,12 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
       default:
         return '-'
     }
+  }
+
+  const getRemuneracaoLabel = (tipo: 'mensal' | 'quinzenal' | 'diaria') => {
+    if (tipo === 'quinzenal') return 'Valor por quinzena (R$)'
+    if (tipo === 'diaria') return 'Valor da diária (R$)'
+    return 'Salário mensal (R$)'
   }
 
   const ativos = funcionarios.filter((f) => f.ativo)
@@ -1090,21 +1113,13 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
 
               <form onSubmit={handleRegistrarPagamento} className="space-y-4 sm:space-y-5">
                 {/* Valor */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Valor (R$) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    value={pagamentoData.valor}
-                    onChange={(e) => setPagamentoData({ ...pagamentoData, valor: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                    placeholder="0.00"
-                  />
-                </div>
+                <CurrencyInput
+                  label="Valor"
+                  required
+                  value={pagamentoData.valor}
+                  onChange={(value) => setPagamentoData({ ...pagamentoData, valor: String(value) })}
+                  placeholder="0,00"
+                />
 
                 {/* Data */}
                 <div>
@@ -1212,19 +1227,32 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
                 </div>
 
                 {/* Salário */}
+                <CurrencyInput
+                  label={getRemuneracaoLabel(formData.remuneracao_tipo)}
+                  value={formData.salario_base}
+                  onChange={(value) => setFormData({ ...formData, salario_base: String(value) })}
+                  placeholder="0,00"
+                />
+
+                {/* Tipo de remuneração */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Salário Base (R$) (opcional)
+                    Tipo de remuneração <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.salario_base}
-                    onChange={(e) => setFormData({ ...formData, salario_base: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                    placeholder="0.00"
-                  />
+                  <select
+                    value={formData.remuneracao_tipo}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        remuneracao_tipo: e.target.value as 'mensal' | 'quinzenal' | 'diaria',
+                      })
+                    }
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm bg-white"
+                  >
+                    <option value="mensal">Mensal</option>
+                    <option value="quinzenal">Quinzenal</option>
+                    <option value="diaria">Diária</option>
+                  </select>
                 </div>
 
                 {/* Tipo */}

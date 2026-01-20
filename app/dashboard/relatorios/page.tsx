@@ -1,5 +1,7 @@
 import { gerarResumoMensalForContext, gerarResumoSemanalForContext, obterMaioresGastosForContext } from '@/lib/services/relatorios'
+import { gerarDadosAnuais } from '@/lib/services/caixa'
 import { getSessionContext } from '@/lib/utils/session-context'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 async function getRelatoriosData() {
   const ctx = await getSessionContext()
@@ -19,17 +21,20 @@ async function getRelatoriosData() {
         periodo: { inicio: '', fim: '' },
       },
       maioresGastos: [],
+      dadosAnuais: [],
     }
   }
   
   const resumoMensal = await gerarResumoMensalForContext(ctx)
   const resumoSemanal = await gerarResumoSemanalForContext(ctx)
   const maioresGastos = await obterMaioresGastosForContext(ctx, 10)
+  const dadosAnuais = await gerarDadosAnuais(ctx)
 
   return {
     resumoMensal,
     resumoSemanal,
     maioresGastos,
+    dadosAnuais,
   }
 }
 
@@ -55,7 +60,7 @@ export default async function RelatoriosPage() {
             <div>
               <p className="text-xs sm:text-sm font-medium text-gray-500">Total Gasto</p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2 break-words">
-                R$ {data.resumoMensal.total.toFixed(2)}
+                {formatCurrency(data.resumoMensal.total)}
               </p>
               <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                 {data.resumoMensal.totalRegistros} registros
@@ -79,7 +84,7 @@ export default async function RelatoriosPage() {
                     <div key={categoria} className="flex items-center justify-between p-2 sm:p-0">
                       <span className="text-xs sm:text-sm text-gray-700 truncate pr-2">{categoria}</span>
                       <span className="font-semibold text-sm sm:text-base text-gray-900 whitespace-nowrap">
-                        R$ {Number(valor).toFixed(2)}
+                        {formatCurrency(Number(valor))}
                       </span>
                     </div>
                   ))}
@@ -99,7 +104,7 @@ export default async function RelatoriosPage() {
             <div>
               <p className="text-xs sm:text-sm font-medium text-gray-500">Total Gasto</p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2 break-words">
-                R$ {data.resumoSemanal.total.toFixed(2)}
+                {formatCurrency(data.resumoSemanal.total)}
               </p>
               <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                 {data.resumoSemanal.totalRegistros} registros
@@ -108,7 +113,7 @@ export default async function RelatoriosPage() {
             <div>
               <p className="text-xs sm:text-sm font-medium text-gray-500">Média Diária</p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2 break-words">
-                R$ {(data.resumoSemanal.total / 7).toFixed(2)}
+                {formatCurrency(data.resumoSemanal.total / 7)}
               </p>
             </div>
           </div>
@@ -123,12 +128,128 @@ export default async function RelatoriosPage() {
                     <div key={categoria} className="flex items-center justify-between p-2 sm:p-0">
                       <span className="text-xs sm:text-sm text-gray-700 truncate pr-2">{categoria}</span>
                       <span className="font-semibold text-sm sm:text-base text-gray-900 whitespace-nowrap">
-                        R$ {Number(valor).toFixed(2)}
+                        {formatCurrency(Number(valor))}
                       </span>
                     </div>
                   ))}
               </div>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Visão Anual e Fluxo de Caixa */}
+      <div className="bg-white rounded-lg shadow-sm sm:shadow">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Visão Anual {new Date().getFullYear()}</h2>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">Receitas, despesas, saldo e caixa acumulado por mês</p>
+        </div>
+        <div className="p-4 sm:p-6 overflow-x-auto">
+          {data.dadosAnuais.length > 0 ? (
+            <div className="min-w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase">Mês</th>
+                      <th className="text-right py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase">Receitas</th>
+                      <th className="text-right py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase">Despesas</th>
+                      <th className="text-right py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase">Saldo</th>
+                      <th className="text-right py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase">Caixa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.dadosAnuais.map((mes, index) => {
+                      const isMesAtual = mes.mes === new Date().getMonth() + 1
+                      return (
+                        <tr
+                          key={mes.mes}
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                            isMesAtual ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <td className="py-3 px-4">
+                            <span className="text-sm font-medium text-gray-900">
+                              {mes.nomeMes}
+                              {isMesAtual && (
+                                <span className="ml-2 text-xs text-blue-600 font-semibold">(Atual)</span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-sm font-semibold text-green-600">
+                              {formatCurrency(mes.receitas)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className="text-sm font-semibold text-red-600">
+                              {formatCurrency(mes.despesas)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className={`text-sm font-bold ${
+                              mes.saldo >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {formatCurrency(mes.saldo)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span className={`text-sm font-bold ${
+                              mes.caixaAcumulado >= 0 ? 'text-blue-600' : 'text-red-600'
+                            }`}>
+                              {formatCurrency(mes.caixaAcumulado)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50 border-t-2 border-gray-300">
+                      <td className="py-4 px-4">
+                        <span className="text-sm font-bold text-gray-900">Total Anual</span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-sm font-bold text-green-600">
+                          {formatCurrency(
+                            data.dadosAnuais.reduce((sum, m) => sum + m.receitas, 0)
+                          )}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-sm font-bold text-red-600">
+                          {formatCurrency(
+                            data.dadosAnuais.reduce((sum, m) => sum + m.despesas, 0)
+                          )}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className={`text-sm font-bold ${
+                          data.dadosAnuais.reduce((sum, m) => sum + m.saldo, 0) >= 0 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {formatCurrency(
+                            data.dadosAnuais.reduce((sum, m) => sum + m.saldo, 0)
+                          )}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className={`text-sm font-bold text-blue-600`}>
+                          {formatCurrency(
+                            data.dadosAnuais[data.dadosAnuais.length - 1]?.caixaAcumulado || 0
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
+              Nenhum dado disponível
+            </p>
           )}
         </div>
       </div>
@@ -157,7 +278,7 @@ export default async function RelatoriosPage() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-lg sm:text-xl font-bold text-gray-900 whitespace-nowrap">
-                      R$ {gasto.amount.toFixed(2)}
+                      {formatCurrency(gasto.amount)}
                     </p>
                   </div>
                 </div>

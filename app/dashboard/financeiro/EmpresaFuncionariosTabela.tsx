@@ -3,6 +3,7 @@
 import type { Financeiro } from '@/lib/db/types'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface FuncionarioAgrupado {
   funcionario: {
@@ -170,7 +171,7 @@ export function EmpresaFuncionariosTabela({
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                     <span className="text-sm font-semibold text-red-600">
-                      R$ {func.gastos.toFixed(2)}
+                      {formatCurrency(func.gastos)}
                     </span>
                   </td>
                   <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
@@ -214,7 +215,7 @@ export function EmpresaFuncionariosTabela({
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                   <span className="text-sm font-semibold text-gray-600">
-                    R$ {totalSemFuncionario.toFixed(2)}
+                    {formatCurrency(totalSemFuncionario)}
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
@@ -250,7 +251,7 @@ export function EmpresaFuncionariosTabela({
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                 <span className="text-sm font-semibold text-red-600">
-                  R$ {totalGeral.toFixed(2)}
+                  {formatCurrency(totalGeral)}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">

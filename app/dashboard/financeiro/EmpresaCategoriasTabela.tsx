@@ -1,6 +1,7 @@
 'use client'
 
 import type { Financeiro } from '@/lib/db/types'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface CategoriaAgrupada {
   categoria: string
@@ -132,12 +133,12 @@ export function EmpresaCategoriasTabela({
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                   <span className="text-sm font-semibold text-red-600">
-                    R$ {cat.gastos.toFixed(2)}
+                    {formatCurrency(cat.gastos)}
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                   <span className="text-sm font-semibold text-green-600">
-                    R$ {cat.receitas.toFixed(2)}
+                    {formatCurrency(cat.receitas)}
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
@@ -146,7 +147,7 @@ export function EmpresaCategoriasTabela({
                       cat.saldo >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    {cat.saldo >= 0 ? '+' : ''}R$ {cat.saldo.toFixed(2)}
+                    {cat.saldo >= 0 ? '+' : ''}{formatCurrency(cat.saldo)}
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">
@@ -164,14 +165,12 @@ export function EmpresaCategoriasTabela({
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                 <span className="text-sm font-semibold text-red-600">
-                  R${' '}
-                  {categorias.reduce((sum, cat) => sum + cat.gastos, 0).toFixed(2)}
+                  {formatCurrency(categorias.reduce((sum, cat) => sum + cat.gastos, 0))}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                 <span className="text-sm font-semibold text-green-600">
-                  R${' '}
-                  {categorias.reduce((sum, cat) => sum + cat.receitas, 0).toFixed(2)}
+                  {formatCurrency(categorias.reduce((sum, cat) => sum + cat.receitas, 0))}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
@@ -182,8 +181,7 @@ export function EmpresaCategoriasTabela({
                       : 'text-red-600'
                   }`}
                 >
-                  {categorias.reduce((sum, cat) => sum + cat.saldo, 0) >= 0 ? '+' : ''}R${' '}
-                  {categorias.reduce((sum, cat) => sum + cat.saldo, 0).toFixed(2)}
+                  {categorias.reduce((sum, cat) => sum + cat.saldo, 0) >= 0 ? '+' : ''}{formatCurrency(categorias.reduce((sum, cat) => sum + cat.saldo, 0))}
                 </span>
               </td>
               <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-center">

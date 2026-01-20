@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckCircle2, Clock, AlertCircle, Edit2, Trash2, DollarSign, Calendar } from 'lucide-react'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface ContasAPagarClientProps {
   contasAPagar: Financeiro[]
@@ -20,12 +21,7 @@ export function ContasAPagarClient({ contasAPagar: initialContasAPagar, totalPen
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [contaToDelete, setContaToDelete] = useState<Financeiro | null>(null)
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value)
-  }
+  // formatCurrency importado de @/lib/utils/format-currency
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('pt-BR', {

@@ -39,9 +39,6 @@ import { ValidationError } from '../utils/errors'
 import { getListasByTenant, getTenantContext } from '../db/queries'
 import { 
   getFinanceiroEmpresaByFuncionario, 
-  createFinanceiroEmpresa,
-  createPagamentoFuncionario,
-  getPagamentosFuncionariosByReferencia,
   getPagamentosFuncionariosByEmpresa,
 } from '../db/queries-empresa'
 import { supabaseAdmin } from '../db/client'
@@ -71,6 +68,7 @@ import {
   extractEmployeeNameFromSalaryPayment,
   findFuncionarioByName,
 } from '../services/funcionarios'
+import { registrarPagamentoFuncionarioPorRegra } from '../services/pagamentos-funcionarios'
 import { categorizeEmpresaExpense } from '../services/categorization-empresa'
 import { categorizeExpense, categorizeRevenue, extractTags } from '../services/categorization'
 import { parseMultiItemExpense } from '../utils/parse-multi-item-expense'
@@ -370,16 +368,13 @@ export async function processAction(
       const paymentAmount = extractPaymentAmount(message)
       const hasPaymentVerb = /\b(paguei|fiz\s+(?:o\s+)?pagamento|sal[aá]rio|gerei\s+pagamento|paguei\s+o\s+sal[aá]rio)\b/i.test(message)
       
-      // Caso 1: Pagamento COM valor → register_expense
+      // Caso 1: Pagamento COM valor → pay_employee_salary (sempre derivado do funcionário; nunca "gasto genérico")
       if (employeeName && paymentAmount && hasPaymentVerb) {
         const forced: SemanticState = {
-          intent: 'register_expense',
+          intent: 'pay_employee_salary',
           domain: 'empresa',
           amount: paymentAmount,
-          description: `Pagamento funcionário ${employeeName}`,
           employee_name: employeeName,
-          categoria: 'Funcionários',
-          subcategoria: 'salário',
           confidence: 1,
           readyToSave: true,
         }
@@ -2002,240 +1997,60 @@ async function handlePayEmployeeSalary(
       }
     }
 
-    // ============================================================
-    // PASSO 1: EXTRAI NOME DO FUNCIONÁRIO (do estado ou mensagem)
-    // ============================================================
-    let employeeName = state.employee_name ? String(state.employee_name).trim() : null
+    // 1) Extrai nome do funcionário (estado > mensagem)
+    let employeeName =
+      (state.employee_name ? String(state.employee_name).trim() : '') ||
+      extractEmployeeNameFromSalaryPayment(message) ||
+      extractEmployeeNameFromPaymentText(message) ||
+      ''
+
+    employeeName = String(employeeName || '').trim()
     if (!employeeName) {
-      employeeName = extractEmployeeNameFromSalaryPayment(message)
+      return { success: false, message: 'Qual funcionário recebeu o pagamento?' }
     }
 
-    if (!employeeName) {
-      return {
-        success: false,
-        message: 'Qual funcionário recebeu o pagamento?',
-      }
-    }
-
-    // ============================================================
-    // PASSO 2: CONSULTA O BANCO DE DADOS (OBRIGATÓRIO ANTES DE QUALQUER PERGUNTA)
-    // Busca funcionário por similaridade de nome (fuzzy search)
-    // ============================================================
-    console.log('handlePayEmployeeSalary - Consultando banco de dados para funcionário:', employeeName)
+    // 2) Busca funcionário (contrato)
     const funcionario = await findFuncionarioByName(sessionContext, employeeName)
-    
     if (!funcionario) {
-      // Funcionário não existe no banco → informa e pergunta se deseja cadastrar
       return {
         success: false,
-        message: `Não encontrei o funcionário *${employeeName}* no cadastro. Deseja cadastrá-lo primeiro?`,
+        message: `Não encontrei o funcionário *${employeeName}* no cadastro. Cadastre o funcionário primeiro para eu aplicar as regras de pagamento.`,
       }
     }
 
-    // ============================================================
-    // VALIDAÇÃO CRÍTICA: funcionario.id DEVE EXISTIR
-    // ============================================================
-    if (!funcionario.id) {
-      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario.id está null/undefined', funcionario)
-      return {
-        success: false,
-        message: 'Erro interno: funcionário encontrado mas sem ID válido. Tente novamente.',
-      }
-    }
-
-    // Armazena funcionario_id em variável para garantir que não será perdido
-    const funcionarioId = funcionario.id
-    console.log('handlePayEmployeeSalary - Funcionário encontrado e ID armazenado:', {
-      id: funcionarioId,
-      nome: funcionario.nome_original,
-      salario_base: funcionario.salario_base,
-    })
-
-    // ============================================================
-    // PASSO 3: VERIFICA SALARIO_BASE NO BANCO (CONSULTA JÁ FEITA)
-    // ============================================================
-    let salarioBase: number | null = null
-    
-    if (state.amount && state.amount > 0) {
-      // Valor foi fornecido explicitamente (ex: resposta numérica em contexto ativo)
-      salarioBase = state.amount
-      console.log('handlePayEmployeeSalary - Usando valor fornecido pelo usuário:', salarioBase)
-    } else if (funcionario.salario_base && funcionario.salario_base > 0) {
-      // ✅ SALARIO_BASE EXISTE NO BANCO → USA AUTOMATICAMENTE (NÃO PERGUNTA)
-      salarioBase = funcionario.salario_base
-      console.log('handlePayEmployeeSalary - Usando salario_base do banco:', salarioBase)
-    } else {
-      // ❌ SALARIO_BASE NÃO EXISTE → ÚNICA SITUAÇÃO ONDE PODE PERGUNTAR
-      console.log('handlePayEmployeeSalary - salario_base não encontrado, criando contexto ativo')
-      const contextState: SemanticState = {
-        intent: 'pay_employee_salary',
-        domain: 'empresa',
-        employee_name: funcionario.nome_original,
-        confidence: 1,
-        readyToSave: false,
-      }
-      setActiveTask(tenantId, userId, 'pay_employee_salary', contextState)
-      await persistActiveTask(tenantId, userId, {
-        tenantId,
-        userId,
-        type: 'pay_employee_salary',
-        state: contextState,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any)
-      
-      return {
-        success: true,
-        message: `Não encontrei um salário cadastrado para *${funcionario.nome_original}*. Qual foi o valor pago?`,
-      }
-    }
-
-    // Validação final do valor
-    if (!salarioBase || salarioBase <= 0) {
-      return {
-        success: false,
-        message: `Valor inválido. Qual foi o valor do salário pago para *${funcionario.nome_original}*?`,
-      }
-    }
-
-    // Verifica se já foi pago neste mês (evita duplicação)
-    const hoje = new Date()
-    const referencia = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`
-    
-    // Verifica em pagamentos_funcionarios primeiro (mais confiável)
-    // Usa funcionarioId (garantido não-null)
-    const pagamentosExistentes = await getPagamentosFuncionariosByReferencia(
-      tenantId,
-      sessionContext.empresa_id,
-      funcionarioId,
-      referencia
-    )
-
-    if (pagamentosExistentes.length > 0) {
-      const ultimoPagamento = pagamentosExistentes[0]
-      const dataPagamento = new Date(ultimoPagamento.data_pagamento)
-      return {
-        success: true,
-        message: `ℹ️ O salário de *${funcionario.nome_original}* já foi registrado neste mês (${dataPagamento.toLocaleDateString('pt-BR')}).`,
-      }
-    }
-
-    // ============================================================
-    // PASSO 3: REGISTRAR GASTO (VINCULADO) - funcionario_id OBRIGATÓRIO
-    // ============================================================
-    const hojeISO = hoje.toISOString().split('T')[0] // YYYY-MM-DD
-    
-    // VALIDAÇÃO FINAL: funcionarioId NÃO PODE SER NULL
-    if (!funcionarioId) {
-      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionarioId é null antes de criar registro')
-      return {
-        success: false,
-        message: 'Erro interno: não foi possível identificar o funcionário. Tente novamente.',
-      }
-    }
-    
-    console.log('handlePayEmployeeSalary - Criando registro financeiro com funcionario_id:', funcionarioId)
-    
-    const record = await createFinanceiroEmpresa(
-      tenantId,
-      sessionContext.empresa_id,
-      salarioBase,
-      `Salário funcionário ${funcionario.nome_original}`,
-      'Funcionários',
-      hojeISO,
-      null, // receiptImageUrl
-      'salário', // subcategory
-      {
-        funcionario: {
-          id: funcionarioId,
-          nome: funcionario.nome_original,
-        },
-        tipo: 'salario_mensal',
-        periodo: referencia,
-      },
-      ['funcionário', 'salário'],
-      'expense',
+    // 3) Executa regra (pagamento é evento derivado do funcionário)
+    const result = await registrarPagamentoFuncionarioPorRegra(sessionContext, funcionario, {
+      valorOverride: typeof state.amount === 'number' && state.amount > 0 ? state.amount : null,
       userId,
-      funcionarioId // funcionarioId OBRIGATÓRIO
-    )
-
-    if (!record) {
-      console.error('handlePayEmployeeSalary - Erro ao criar registro financeiro', {
-        funcionario_id: funcionarioId,
-        valor: salarioBase,
-      })
-      return {
-        success: false,
-        message: 'Não consegui registrar o pagamento. Tente novamente.',
-      }
-    }
-
-    // VALIDAÇÃO PÓS-INSERÇÃO: Verifica se funcionario_id foi salvo corretamente
-    const recordFuncionarioId = (record as any).funcionario_id
-    if (!recordFuncionarioId || recordFuncionarioId !== funcionarioId) {
-      console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario_id não foi salvo corretamente', {
-        esperado: funcionarioId,
-        recebido: recordFuncionarioId,
-        record_id: record.id,
-      })
-      // Não retorna erro aqui para não bloquear o fluxo, mas loga o problema
-    } else {
-      console.log('handlePayEmployeeSalary - funcionario_id salvo corretamente:', recordFuncionarioId)
-    }
-
-    // ============================================================
-    // PASSO 4: REGISTRAR PAGAMENTO - funcionario_id OBRIGATÓRIO
-    // ============================================================
-    console.log('handlePayEmployeeSalary - Criando registro em pagamentos_funcionarios com funcionario_id:', funcionarioId)
-    
-    const pagamento = await createPagamentoFuncionario(
-      tenantId,
-      sessionContext.empresa_id,
-      funcionarioId, // OBRIGATÓRIO
-      salarioBase,
-      hojeISO,
-      referencia,
-      record.id, // financeiro_id
-      'pago'
-    )
-
-    if (!pagamento) {
-      console.error('handlePayEmployeeSalary - ERRO: Falha ao criar pagamento_funcionario', {
-        funcionario_id: funcionarioId,
-        financeiro_id: record.id,
-      })
-      // Não retorna erro aqui para não bloquear, mas loga o problema
-    } else {
-      console.log('handlePayEmployeeSalary - Pagamento criado com sucesso:', {
-        pagamento_id: pagamento.id,
-        funcionario_id: pagamento.funcionario_id,
-        financeiro_id: pagamento.financeiro_id,
-      })
-      
-      // VALIDAÇÃO FINAL: Garante que funcionario_id foi salvo
-      if (!pagamento.funcionario_id || pagamento.funcionario_id !== funcionarioId) {
-        console.error('handlePayEmployeeSalary - ERRO CRÍTICO: funcionario_id não foi salvo em pagamentos_funcionarios', {
-          esperado: funcionarioId,
-          recebido: pagamento.funcionario_id,
-        })
-      }
-    }
-
-    // ============================================================
-    // PASSO 4: RESPOSTA FINAL (SEM PERGUNTAS)
-    // ============================================================
-    const dataPagamento = new Date(hojeISO).toLocaleDateString('pt-BR', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
+      // dataPagamento: omitido por padrão (hoje)
     })
-    const mesNome = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-    const mesNomeCapitalizado = mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
+
+    if (!result.ok) {
+      return { success: false, message: result.message }
+    }
+
+    if (result.alreadyPaid) {
+      return { success: true, message: result.message }
+    }
+
+    const valor = result.data?.valor
+    const competencia = result.data?.competencia
+    const tipo = (funcionario as any).remuneracao_tipo || 'mensal'
+    const ref =
+      competencia && competencia.ano && competencia.mes
+        ? `${String(competencia.mes).padStart(2, '0')}/${competencia.ano}`
+        : 'este mês'
 
     return {
       success: true,
-      message: `💰 Salário pago com sucesso!\n\n👤 Funcionário: *${funcionario.nome_original}*\n💵 Valor: R$ ${salarioBase.toFixed(2).replace('.', ',')}\n📅 Data: ${dataPagamento}\n\nO pagamento foi registrado e vinculado corretamente ao funcionário.`,
-      data: { financeiro: record, pagamento },
+      message:
+        `✅ Pagamento registrado com sucesso!\n\n` +
+        `👤 Funcionário: *${funcionario.nome_original}*\n` +
+        `📌 Tipo: ${tipo}\n` +
+        `🗓️ Competência: ${ref}\n` +
+        (typeof valor === 'number' ? `💵 Valor: R$ ${valor.toFixed(2).replace('.', ',')}\n` : '') +
+        `\nO pagamento foi vinculado corretamente ao funcionário e lançado como *gasto*.`,
+      data: result.data,
     }
   } catch (error) {
     if (error instanceof ValidationError) {

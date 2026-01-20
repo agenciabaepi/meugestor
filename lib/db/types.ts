@@ -53,6 +53,9 @@ export interface Funcionario {
   cargo: string | null
   salario_base: number | null
   tipo: 'fixo' | 'freelancer' | 'temporario' | null
+  remuneracao_tipo?: 'mensal' | 'quinzenal' | 'diaria'
+  remuneracao_valor?: number | null
+  remuneracao_regra?: Record<string, any> | null
   ativo: boolean
   created_at: string
   updated_at: string
@@ -68,6 +71,11 @@ export interface PagamentoFuncionario {
   status: 'pago' | 'pendente'
   referencia: string | null
   financeiro_id: string | null
+  remuneracao_tipo?: 'mensal' | 'quinzenal' | 'diaria'
+  competencia_ano?: number
+  competencia_mes?: number
+  competencia_quinzena?: 1 | 2 | null
+  quantidade_dias?: number | null
   created_at: string
   updated_at: string
 }

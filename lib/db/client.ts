@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient as createSupabaseServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -17,66 +18,37 @@ export async function createServerClient() {
     throw new Error(errorMsg)
   }
 
-  try {
-    const cookieStore = await cookies()
-    
-    return createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: {
-          getItem: (key: string) => {
-            try {
-              return cookieStore.get(key)?.value ?? null
-            } catch (error) {
-              // Em alguns contextos, cookies() pode não estar disponível
-              return null
-            }
-          },
-          setItem: (key: string, value: string) => {
-            // Cookies só podem ser modificados em Server Actions ou Route Handlers
-            // Em Server Components, apenas lemos os cookies
-            try {
-              cookieStore.set(key, value, {
-                httpOnly: false,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                path: '/',
-                maxAge: 60 * 60 * 24 * 7, // 7 dias
-              })
-            } catch (error) {
-              // Em Server Components, não podemos modificar cookies
-              // Isso é esperado e não é um erro
-            }
-          },
-          removeItem: (key: string) => {
-            try {
-              cookieStore.delete(key)
-            } catch (error) {
-              // Em Server Components, não podemos modificar cookies
-              // Isso é esperado e não é um erro
-            }
-          },
-        },
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
+  const cookieStore = await cookies()
+
+  // Padrão oficial (SSR) para manter sessão em cookies.
+  // Em Server Components, setAll pode não ter efeito (Next limita escrita de cookies),
+  // mas o `proxy.ts` (middleware) vai fazer o refresh e setar cookies corretamente.
+  return createSupabaseServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        try {
+          return cookieStore.getAll().map((c) => ({ name: c.name, value: c.value }))
+        } catch {
+          return []
+        }
       },
-    })
-  } catch (error: any) {
-    console.error('Error creating Supabase server client:', error?.message || error)
-    // Em Route Handlers, podemos criar cliente sem cookies se necessário
-    // Mas preferimos lançar erro para que seja tratado adequadamente
-    if (error?.message?.includes('cookies') || error?.message?.includes('dynamic')) {
-      // Se o erro for relacionado a cookies em contexto dinâmico, cria cliente básico
-      console.warn('Criando cliente Supabase sem cookies (contexto dinâmico)')
-      return createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    }
-    throw error
-  }
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, {
+              ...options,
+              // defaults seguros
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            })
+          })
+        } catch {
+          // Em Server Components não dá para setar cookies — ok.
+        }
+      },
+    },
+  })
 }
 
 

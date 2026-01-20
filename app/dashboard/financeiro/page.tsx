@@ -14,6 +14,7 @@ import { EmpresaFornecedoresTabela } from './EmpresaFornecedoresTabela'
 import { EmpresaFuncionariosTabela } from './EmpresaFuncionariosTabela'
 import { AddTransacaoButton } from './AddTransacaoButton'
 import { PeriodoSelector } from './PeriodoSelector'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 export const dynamic = 'force-dynamic'
 
@@ -231,7 +232,7 @@ export default async function FinanceiroPage({
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Saldo do Mês</p>
           <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 break-words ${data.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {data.saldo >= 0 ? '+' : ''}R$ {data.saldo.toFixed(2)}
+            {data.saldo >= 0 ? '+' : ''}{formatCurrency(data.saldo)}
           </p>
           <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
             {data.totalReceitas >= 0 ? 'Receitas' : 'Despesas'} - {data.totalDespesas >= 0 ? 'Despesas' : 'Receitas'}
@@ -242,7 +243,7 @@ export default async function FinanceiroPage({
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Receitas</p>
           <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2 break-words">
-            R$ {data.totalReceitas.toFixed(2)}
+            {formatCurrency(data.totalReceitas)}
           </p>
           <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoReceitas) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {Number(variacaoReceitas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoReceitas))}% vs mês anterior
@@ -253,7 +254,7 @@ export default async function FinanceiroPage({
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Despesas</p>
           <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2 break-words">
-            R$ {data.totalDespesas.toFixed(2)}
+            {formatCurrency(data.totalDespesas)}
           </p>
           <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoDespesas) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
             {Number(variacaoDespesas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoDespesas))}% vs mês anterior

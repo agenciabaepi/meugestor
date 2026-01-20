@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { formatCurrency } from '@/lib/utils/format-currency'
 
 interface ChartsProps {
   dadosGrafico: Array<{ date: string; total: number }>
@@ -48,7 +49,7 @@ export function Charts({
                 width={isMobile ? 40 : 50}
               />
               <Tooltip 
-                formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                formatter={(value: number) => formatCurrency(value)}
                 contentStyle={{ fontSize: isMobile ? '11px' : '12px', padding: isMobile ? '6px' : '8px' }}
               />
               <Bar dataKey="total" fill="#10B981" radius={[4, 4, 0, 0]} />
