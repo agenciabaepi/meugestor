@@ -660,8 +660,16 @@ async function queryFuncionariosPendentes(
     1000
   )
 
+  // Para consultas de mês, também podemos usar referencia (formato "01/2026")
+  // Isso é mais confiável que data_pagamento para filtrar por mês
+  const now = getNowInBrazil()
+  const referenciaMes = periodo === 'mês' || !periodo 
+    ? `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+    : null
+
   // Busca funcionários que JÁ FORAM PAGOS no período
-  const pagamentos = await getPagamentosFuncionariosByEmpresa(
+  // Primeiro tenta por referencia (mais confiável para mês), depois por data
+  let pagamentos = await getPagamentosFuncionariosByEmpresa(
     sessionContext.tenant_id,
     sessionContext.empresa_id,
     undefined, // todos
@@ -669,6 +677,15 @@ async function queryFuncionariosPendentes(
     startDate,
     endDate
   )
+
+  // Se temos referencia e período é mês, filtra também por referencia para garantir
+  if (referenciaMes && (periodo === 'mês' || !periodo)) {
+    const pagamentosPorReferencia = pagamentos.filter(p => p.referencia === referenciaMes)
+    if (pagamentosPorReferencia.length > 0) {
+      console.log(`queryFuncionariosPendentes - Usando filtro por referencia: ${referenciaMes}`)
+      pagamentos = pagamentosPorReferencia
+    }
+  }
 
   // DEBUG: Log para verificar pagamentos encontrados
   console.log('queryFuncionariosPendentes - Pagamentos encontrados:', {
