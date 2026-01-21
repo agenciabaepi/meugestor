@@ -118,8 +118,8 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     setPagamentoData({
       valor:
         (funcionario as any).remuneracao_valor
-          ? String((funcionario as any).remuneracao_valor)
-          : funcionario.salario_base
+          ? Number((funcionario as any).remuneracao_valor)
+          : (funcionario.salario_base ? Number(funcionario.salario_base) : 0)
             ? String(funcionario.salario_base)
             : '',
       data: new Date().toISOString().split('T')[0],
