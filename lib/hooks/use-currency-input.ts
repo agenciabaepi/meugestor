@@ -48,10 +48,18 @@ export function useCurrencyInput(initialValue: number | string = '') {
     // Remove tudo exceto dígitos e vírgula
     const cleaned = value.replace(/[^\d,]/g, '')
     
-    // Substitui vírgula por ponto
-    const normalized = cleaned.replace(',', '.')
+    if (!cleaned || cleaned === ',') return 0
     
-    const parsed = parseFloat(normalized)
+    // Se tem vírgula, trata como decimal
+    if (cleaned.includes(',')) {
+      // Substitui vírgula por ponto
+      const normalized = cleaned.replace(',', '.')
+      const parsed = parseFloat(normalized)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    
+    // Sem vírgula, trata como valor inteiro (em reais, não centavos)
+    const parsed = parseFloat(cleaned)
     return isNaN(parsed) ? 0 : parsed
   }, [])
 
@@ -67,23 +75,36 @@ export function useCurrencyInput(initialValue: number | string = '') {
     
     // Permite apenas uma vírgula
     const commaIndex = cleaned.indexOf(',')
+    let formatted = ''
+    let numericValue = 0
+    
     if (commaIndex !== -1) {
+      // Tem vírgula: formata como decimal
       const beforeComma = cleaned.substring(0, commaIndex)
       const afterComma = cleaned.substring(commaIndex + 1).replace(/\D/g, '').substring(0, 2)
       cleaned = beforeComma + ',' + afterComma
+      
+      // Converte para número considerando vírgula como decimal
+      if (cleaned === '' || cleaned === ',') {
+        setDisplayValue('')
+        return
+      }
+      
+      numericValue = parseCurrencyValue(cleaned)
+      formatted = formatCurrencyDisplay(numericValue)
     } else {
-      // Sem vírgula, apenas dígitos
+      // Sem vírgula: trata como valor inteiro (reais)
       cleaned = cleaned.replace(/\D/g, '')
+      
+      if (cleaned === '') {
+        setDisplayValue('')
+        return
+      }
+      
+      // Converte string de dígitos para número inteiro
+      numericValue = parseFloat(cleaned)
+      formatted = formatCurrencyDisplay(numericValue)
     }
-
-    // Converte para número e formata
-    if (cleaned === '' || cleaned === ',') {
-      setDisplayValue('')
-      return
-    }
-
-    const numValue = parseCurrencyValue(cleaned)
-    const formatted = formatCurrencyDisplay(numValue)
     
     setDisplayValue(formatted)
 

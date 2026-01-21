@@ -44,7 +44,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     ativo: true,
   })
   const [pagamentoData, setPagamentoData] = useState({
-    valor: '',
+    valor: 0,
     data: new Date().toISOString().split('T')[0],
     observacao: '',
   })
@@ -132,7 +132,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
     setIsPagamentoModalOpen(false)
     setSelectedFuncionario(null)
     setPagamentoData({
-      valor: '',
+      valor: 0,
       data: new Date().toISOString().split('T')[0],
       observacao: '',
     })
@@ -143,7 +143,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
 
     if (!selectedFuncionario) return
 
-    if (!pagamentoData.valor || Number(pagamentoData.valor) <= 0) {
+    if (!pagamentoData.valor || pagamentoData.valor <= 0) {
       toast.error('Valor inválido', 'O valor deve ser maior que zero.')
       return
     }
@@ -154,7 +154,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          valor: Number(pagamentoData.valor),
+          valor: pagamentoData.valor,
           data: pagamentoData.data,
           observacao: pagamentoData.observacao || null,
         }),
@@ -252,7 +252,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
         body: JSON.stringify({
           nome_original: formData.nome_original.trim(),
           cargo: formData.cargo.trim() || null,
-          salario_base: formData.salario_base ? parseFloat(formData.salario_base) : null,
+          salario_base: formData.salario_base ? (typeof formData.salario_base === 'string' ? parseFloat(formData.salario_base) : formData.salario_base) : null,
           tipo: formData.tipo || null,
           remuneracao_tipo: formData.remuneracao_tipo || 'mensal',
           remuneracao_valor: formData.salario_base ? parseFloat(formData.salario_base) : null,
@@ -1117,7 +1117,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
                   label="Valor"
                   required
                   value={pagamentoData.valor}
-                  onChange={(value) => setPagamentoData({ ...pagamentoData, valor: String(value) })}
+                  onChange={(value) => setPagamentoData({ ...pagamentoData, valor: value })}
                   placeholder="0,00"
                 />
 
@@ -1229,7 +1229,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios, mesSelec
                 {/* Salário */}
                 <CurrencyInput
                   label={getRemuneracaoLabel(formData.remuneracao_tipo)}
-                  value={formData.salario_base}
+                  value={formData.salario_base ? (typeof formData.salario_base === 'string' ? parseFloat(formData.salario_base) : formData.salario_base) : 0}
                   onChange={(value) => setFormData({ ...formData, salario_base: String(value) })}
                   placeholder="0,00"
                 />

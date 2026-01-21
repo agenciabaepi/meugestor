@@ -68,9 +68,30 @@ export function CurrencyInput({
       clearTimeout(timeoutRef.current)
     }
     
-    handleCurrencyChange(e)
-    const numericValue = getNumericValue()
+    // Captura o valor antes de processar
+    const inputValue = e.target.value
+    const cleaned = inputValue.replace(/[^\d,]/g, '')
+    
+    // Calcula o valor numérico diretamente do input
+    let numericValue = 0
+    const commaIndex = cleaned.indexOf(',')
+    
+    if (commaIndex !== -1) {
+      // Tem vírgula: trata como decimal
+      const beforeComma = cleaned.substring(0, commaIndex)
+      const afterComma = cleaned.substring(commaIndex + 1).replace(/\D/g, '').substring(0, 2)
+      const normalized = beforeComma + '.' + afterComma
+      numericValue = parseFloat(normalized) || 0
+    } else {
+      // Sem vírgula: trata como valor inteiro
+      numericValue = parseFloat(cleaned) || 0
+    }
+    
+    // Chama onChange com o valor calculado imediatamente
     onChange?.(numericValue)
+    
+    // Depois processa a formatação
+    handleCurrencyChange(e)
     
     // Permite sincronização após usuário parar de digitar
     timeoutRef.current = setTimeout(() => {
