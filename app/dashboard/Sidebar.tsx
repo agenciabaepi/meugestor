@@ -13,9 +13,11 @@ import {
   Building2,
   Users,
   CreditCard,
+  TrendingUp,
 } from 'lucide-react'
 import LogoutButton from './LogoutButton'
 import type { SessionContext } from '@/lib/db/types'
+import { ThemeToggle } from '@/app/components/ThemeToggle'
 
 const menuItems = [
   {
@@ -34,6 +36,12 @@ const menuItems = [
     href: '/dashboard/contas-a-pagar',
     label: 'Contas a Pagar',
     icon: CreditCard,
+    showAlways: true,
+  },
+  {
+    href: '/dashboard/contas-a-receber',
+    label: 'Contas a Receber',
+    icon: TrendingUp,
     showAlways: true,
   },
   {
@@ -80,11 +88,11 @@ export function Sidebar({
     <>
       {/* Sidebar - Apenas Desktop */}
       <aside
-        className="hidden lg:block fixed top-0 left-0 h-screen w-64 bg-white border-r border-gray-200 z-40"
+        className="hidden lg:block fixed top-0 left-0 h-screen w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40"
       >
         <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-linear-to-r from-emerald-50 to-emerald-100">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 bg-linear-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20">
             <Link
               href="/dashboard"
               className="flex items-center justify-center w-full group"
@@ -98,6 +106,7 @@ export function Sidebar({
               </div>
               <span className="sr-only">ORGANIZAPAY</span>
             </Link>
+            <ThemeToggle />
           </div>
 
           {/* Navigation */}
@@ -118,14 +127,16 @@ export function Sidebar({
                         transition-all duration-200
                         ${
                           isActive
-                            ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-sm'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                            ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-semibold shadow-sm'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                         }
                       `}
                     >
                       <Icon
                         className={`w-5 h-5 ${
-                          isActive ? 'text-emerald-700' : 'text-gray-500'
+                          isActive 
+                            ? 'text-emerald-700 dark:text-emerald-400' 
+                            : 'text-gray-500 dark:text-gray-400'
                         }`}
                       />
                       <span className="text-sm">{item.label}</span>
@@ -172,7 +183,7 @@ export function Sidebar({
           </div> */}
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 space-y-2">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
             <Link
               href="/dashboard/perfil"
               className={`
@@ -180,12 +191,12 @@ export function Sidebar({
                 transition-all duration-200
                 ${
                   pathname === '/dashboard/perfil'
-                    ? 'bg-emerald-50 text-emerald-700 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                 }
               `}
             >
-              <User className="w-5 h-5 text-gray-500" />
+              <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               <span className="text-sm">Perfil</span>
             </Link>
             <div className="px-4">

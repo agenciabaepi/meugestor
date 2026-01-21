@@ -30,8 +30,8 @@ export async function createFinanceiroEmpresa(
 ): Promise<Financeiro | null> {
   const client = requireAdmin()
   
-  // Para receitas, sempre pago = true. Para despesas, usa o valor fornecido ou true por padrão
-  const pagoValue = transactionType === 'revenue' ? true : (pago !== undefined ? pago : true)
+  // Usa o valor fornecido em pago, ou padrão: despesas = true, receitas = false (não recebido)
+  const pagoValue = pago !== undefined ? pago : (transactionType === 'expense' ? true : false)
   
   const insertData: any = {
     tenant_id: tenantId,
@@ -150,7 +150,8 @@ export async function getFinanceiroEmpresaNaoPago(
   empresaId: string,
   startDate?: string,
   endDate?: string,
-  userId?: string | null
+  userId?: string | null,
+  transactionType?: 'expense' | 'revenue'
 ): Promise<Financeiro[]> {
   const client = requireAdmin()
   let query = client
@@ -158,7 +159,7 @@ export async function getFinanceiroEmpresaNaoPago(
     .select('*')
     .eq('tenant_id', tenantId)
     .eq('empresa_id', empresaId)
-    .eq('transaction_type', 'expense')
+    .eq('transaction_type', transactionType || 'expense')
     .eq('pago', false)
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })

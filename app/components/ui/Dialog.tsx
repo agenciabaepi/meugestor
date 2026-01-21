@@ -67,7 +67,7 @@ export function Dialog({
     >
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm transition-opacity"
         aria-hidden="true"
       />
 
@@ -75,7 +75,7 @@ export function Dialog({
       <div
         className={`
           relative z-50 w-full ${sizeClasses[size]}
-          bg-white rounded-xl shadow-2xl
+          bg-white dark:bg-gray-800 rounded-xl shadow-2xl
           transform transition-all duration-200 ease-out
           ${open ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}
           max-h-[90vh] overflow-hidden
@@ -85,12 +85,12 @@ export function Dialog({
       >
         {/* Header */}
         {(title || description || showCloseButton) && (
-          <div className="flex items-start justify-between p-6 border-b border-gray-200 bg-linear-to-r from-emerald-50 to-white">
+          <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-linear-to-r from-emerald-50 to-white dark:from-emerald-900/20 dark:to-gray-800">
             <div className="flex-1 pr-4">
               {title && (
                 <h2
                   id="dialog-title"
-                  className="text-xl font-bold text-gray-900 mb-1"
+                  className="text-xl font-bold text-gray-900 dark:text-white mb-1"
                 >
                   {title}
                 </h2>
@@ -98,7 +98,7 @@ export function Dialog({
               {description && (
                 <p
                   id="dialog-description"
-                  className="text-sm text-gray-600"
+                  className="text-sm text-gray-600 dark:text-gray-400"
                 >
                   {description}
                 </p>
@@ -109,10 +109,10 @@ export function Dialog({
                 onClick={() => onOpenChange(false)}
                 className="
                   p-2 rounded-lg
-                  text-gray-400 hover:text-gray-600
-                  hover:bg-gray-100
+                  text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300
+                  hover:bg-gray-100 dark:hover:bg-gray-700
                   transition-colors
-                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800
                 "
                 aria-label="Fechar"
               >
@@ -134,7 +134,7 @@ export function Dialog({
 // Dialog Actions component para botões de ação
 export function DialogActions({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center justify-end gap-3 pt-4 border-t border-gray-200 ${className}`}>
+    <div className={`flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 ${className}`}>
       {children}
     </div>
   )

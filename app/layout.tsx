@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { LOGO_URL } from '@/lib/constants'
 import { ToastProvider } from './components/ui/ToastProvider'
+import { ThemeProvider } from './components/ThemeProvider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -43,11 +44,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <body suppressHydrationWarning className={`${inter.className} antialiased`}>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

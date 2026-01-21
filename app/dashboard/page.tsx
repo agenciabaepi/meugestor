@@ -186,8 +186,8 @@ export default async function DashboardPage() {
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
         <div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Dashboard</h1>
-          <p className="text-base sm:text-lg text-gray-600">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
+          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
             Visão geral das suas finanças e compromissos
           </p>
         </div>
@@ -287,10 +287,10 @@ export default async function DashboardPage() {
 
       {/* Gráfico Financeiro */}
       {data.dadosGrafico.length > 0 && (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
-          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">Visão Geral do Mês</h2>
-            <p className="text-sm text-gray-600 mt-1">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">
+          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Visão Geral do Mês</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Receitas e despesas de {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
             </p>
           </div>
@@ -301,9 +301,9 @@ export default async function DashboardPage() {
       )}
 
       {/* Gastos Recentes */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Gastos Recentes</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">
+        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Gastos Recentes</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
           {data.gastosRecentes.length > 0 ? (
@@ -311,16 +311,16 @@ export default async function DashboardPage() {
               {data.gastosRecentes.map((gasto) => (
                 <div
                   key={gasto.id}
-                  className="flex items-center justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200"
+                  className="flex items-center justify-between p-4 bg-linear-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-gray-200 dark:hover:border-gray-500 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0 pr-4">
-                    <p className="font-semibold text-base text-gray-900 truncate mb-1">{gasto.description}</p>
-                    <p className="text-sm text-gray-500 truncate">
+                    <p className="font-semibold text-base text-gray-900 dark:text-white truncate mb-1">{gasto.description}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                       {gasto.category} • {new Date(gasto.date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-lg text-gray-900 whitespace-nowrap">
+                    <p className="font-bold text-lg text-gray-900 dark:text-white whitespace-nowrap">
                       {formatCurrency(Number(gasto.amount))}
                     </p>
                   </div>
@@ -329,7 +329,7 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-400 text-base">
+              <p className="text-gray-400 dark:text-gray-500 text-base">
                 Nenhum gasto registrado ainda
               </p>
             </div>
@@ -338,9 +338,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Próximos Compromissos */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Próximos Compromissos</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Próximos Compromissos</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
           {data.proximos.length > 0 ? (
@@ -348,14 +348,14 @@ export default async function DashboardPage() {
               {data.proximos.map((compromisso) => (
                 <div
                   key={compromisso.id}
-                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white rounded-lg border border-gray-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200"
+                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-emerald-200 dark:hover:border-emerald-500 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div>
-                      <p className="font-semibold text-base text-gray-900 truncate">{compromisso.title}</p>
+                      <p className="font-semibold text-base text-gray-900 dark:text-white truncate">{compromisso.title}</p>
                     </div>
-                    <p className="text-sm text-gray-500 ml-5">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 ml-5">
                       {new Date(compromisso.scheduled_at).toLocaleString('pt-BR', {
                         day: '2-digit',
                         month: 'long',
@@ -365,7 +365,7 @@ export default async function DashboardPage() {
                       })}
                     </p>
                     {compromisso.description && (
-                      <p className="text-sm text-gray-600 mt-2 ml-5 line-clamp-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 ml-5 line-clamp-2">
                         {compromisso.description}
                       </p>
                     )}
@@ -375,7 +375,7 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-400 text-base">
+              <p className="text-gray-400 dark:text-gray-500 text-base">
                 Nenhum compromisso agendado
               </p>
             </div>

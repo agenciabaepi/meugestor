@@ -136,8 +136,8 @@ export async function createFinanceiro(
   }
   const client = supabaseAdmin
   
-  // Para receitas, sempre pago = true. Para despesas, usa o valor fornecido ou true por padrão
-  const pagoValue = transactionType === 'revenue' ? true : (pago !== undefined ? pago : true)
+  // Usa o valor fornecido em pago, ou padrão: despesas = true, receitas = false (não recebido)
+  const pagoValue = pago !== undefined ? pago : (transactionType === 'expense' ? true : false)
   
   // Prepara dados para inserção
   const insertData: any = {
@@ -330,6 +330,61 @@ export async function getFinanceiroNaoPago(
   if (error) {
     console.error('Error fetching financeiro não pago:', error)
     return []
+  }
+
+  return data || []
+}
+
+export async function getFinanceiroNaoRecebido(
+  tenantId: string,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY.')
+    return []
+  }
+  const client = supabaseAdmin
+  
+  let query = client
+    .from('financeiro')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('transaction_type', 'revenue')
+    .eq('pago', false)
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: false })
+
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  if (startDate) {
+    query = query.gte('date', startDate)
+  }
+
+  if (endDate) {
+    query = query.lte('date', endDate)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching receitas não recebidas:', error)
+    return []
+  }
+
+  console.log('[getFinanceiroNaoRecebido] Query executada - receitas encontradas:', data?.length || 0)
+  if (data && data.length > 0) {
+    console.log('[getFinanceiroNaoRecebido] Primeira receita:', {
+      id: data[0].id,
+      description: data[0].description,
+      pago: data[0].pago,
+      transaction_type: (data[0] as any).transaction_type,
+      date: data[0].date,
+      amount: data[0].amount,
+    })
   }
 
   return data || []

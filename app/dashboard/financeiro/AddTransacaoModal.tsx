@@ -29,8 +29,18 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     category: '',
     date: new Date().toISOString().split('T')[0],
     subcategory: '',
-    pago: true, // Por padrão, considera como pago
+    pago: true, // Por padrão, considera como pago/recebido
   })
+
+  // Atualiza pago baseado no tipo quando o modal abre
+  useEffect(() => {
+    if (isOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        pago: tipo === 'expense' ? true : false, // Despesas padrão pago, receitas padrão não recebido
+      }))
+    }
+  }, [isOpen, tipo])
 
   // Busca categorias ao abrir o modal
   useEffect(() => {
@@ -78,7 +88,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           date: formData.date,
           subcategory: formData.subcategory || null,
           transactionType: tipo,
-          pago: tipo === 'expense' ? formData.pago : true, // Receitas sempre são pagas
+          pago: formData.pago, // Usa o valor do checkbox para ambos os tipos
         }),
       })
 
@@ -93,7 +103,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           category: categorias[0]?.nome || '',
           date: new Date().toISOString().split('T')[0],
           subcategory: '',
-          pago: true,
+          pago: tipo === 'expense' ? true : false, // Despesas padrão pago, receitas padrão não recebido
         })
       } else {
         const error = await response.json()
@@ -212,24 +222,24 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
               />
             </div>
 
-            {/* Status de Pagamento (apenas para despesas) */}
-            {tipo === 'expense' && (
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="pago"
-                  checked={formData.pago}
-                  onChange={(e) => setFormData({ ...formData, pago: e.target.checked })}
-                  className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer"
-                />
-                <label htmlFor="pago" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  Marcar como pago
-                </label>
-                {!formData.pago && (
-                  <span className="text-xs text-orange-600 font-medium">(Pendente de pagamento)</span>
-                )}
-              </div>
-            )}
+            {/* Status de Pagamento/Recebimento */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="pago"
+                checked={formData.pago}
+                onChange={(e) => setFormData({ ...formData, pago: e.target.checked })}
+                className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+              />
+              <label htmlFor="pago" className="text-sm font-medium text-gray-700 cursor-pointer">
+                {tipo === 'expense' ? 'Marcar como pago' : 'Marcar como recebido'}
+              </label>
+              {!formData.pago && (
+                <span className="text-xs text-orange-600 font-medium">
+                  ({tipo === 'expense' ? 'Pendente de pagamento' : 'Pendente de recebimento'})
+                </span>
+              )}
+            </div>
 
             {/* Botões */}
             <div className="flex gap-3 pt-4">

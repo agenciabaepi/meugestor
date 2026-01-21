@@ -576,3 +576,33 @@ export async function deleteFinanceiroRecordForContext(
   
   return deleteFinanceiro(id, ctx.tenant_id)
 }
+
+/**
+ * Obtém receitas não recebidas (contas a receber) respeitando o contexto
+ */
+export async function getContasAReceberForContext(
+  ctx: SessionContext,
+  startDate?: string,
+  endDate?: string,
+  userId?: string | null
+): Promise<Financeiro[]> {
+  console.log('[getContasAReceberForContext] Buscando contas a receber - modo:', ctx.mode, 'tenant_id:', ctx.tenant_id)
+  
+  if (ctx.mode === 'empresa') {
+    if (!ctx.empresa_id) {
+      console.log('[getContasAReceberForContext] Modo empresa mas sem empresa_id')
+      return []
+    }
+    const { getFinanceiroEmpresaNaoPago } = await import('../db/queries-empresa')
+    const receitas = await getFinanceiroEmpresaNaoPago(ctx.tenant_id, ctx.empresa_id, startDate, endDate, userId, 'revenue')
+    console.log('[getContasAReceberForContext] Empresa - receitas encontradas:', receitas.length)
+    return receitas
+  }
+  
+  // Para modo pessoal, buscar receitas não recebidas
+  // Nota: Para receitas, "pago" significa "recebido"
+  const { getFinanceiroNaoRecebido } = await import('../db/queries')
+  const receitas = await getFinanceiroNaoRecebido(ctx.tenant_id, startDate, endDate, userId)
+  console.log('[getContasAReceberForContext] Pessoal - receitas encontradas:', receitas.length)
+  return receitas
+}
