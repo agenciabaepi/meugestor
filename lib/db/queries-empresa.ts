@@ -108,6 +108,11 @@ export async function getFinanceiroEmpresaByEmpresa(
   if (startDate) query = query.gte('date', startDate)
   if (endDate) query = query.lte('date', endDate)
   if (transactionType) query = query.eq('transaction_type', transactionType)
+  
+  // Limita resultados quando não há filtro de data para evitar carregar todos os registros
+  if (!startDate && !endDate) {
+    query = query.limit(1000) // Limite razoável para evitar sobrecarga de memória
+  }
 
   const { data, error } = await query
   if (error) {

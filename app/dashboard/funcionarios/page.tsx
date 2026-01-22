@@ -5,11 +5,7 @@ import { FuncionariosClient } from './FuncionariosClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function FuncionariosPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ mes?: string; ano?: string }>
-}) {
+export default async function FuncionariosPage() {
   const ctx = await getSessionContext()
 
   // Verifica se está no modo empresa
@@ -17,20 +13,8 @@ export default async function FuncionariosPage({
     redirect('/dashboard')
   }
 
-  // Obtém o período selecionado ou usa o mês atual
-  const params = searchParams ? await searchParams : undefined
-  const now = new Date()
-  const mesSelecionado = params?.mes ? parseInt(params.mes, 10) : now.getMonth() + 1
-  const anoSelecionado = params?.ano ? parseInt(params.ano, 10) : now.getFullYear()
-
   // Busca funcionários
   const funcionarios = await getFuncionariosByEmpresa(ctx.tenant_id, ctx.empresa_id)
 
-  return (
-    <FuncionariosClient 
-      funcionarios={funcionarios}
-      mesSelecionado={mesSelecionado}
-      anoSelecionado={anoSelecionado}
-    />
-  )
+  return <FuncionariosClient funcionarios={funcionarios} />
 }

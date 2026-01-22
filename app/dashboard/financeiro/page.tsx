@@ -129,27 +129,40 @@ async function getFinanceiroData(searchParams?: { mes?: string; ano?: string }) 
     return date.toISOString().split('T')[0]
   }).filter(Boolean) as string[]
 
-  const dadosGraficoDespesas = await Promise.all(
-    ultimos7Dias.map(async (date) => {
-      const despesas = await getDespesasRecordsForContext(ctx, date, date)
-      const total = despesas.reduce((sum, d) => sum + Number(d.amount), 0)
-      return {
-        date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
-        total: Number(total),
-      }
-    })
-  )
+  // Usa dados já carregados (despesasMes e receitasMes) para economizar memória
+  const dadosPorDiaDespesas = new Map<string, number>()
+  const dadosPorDiaReceitas = new Map<string, number>()
   
-  const dadosGraficoReceitas = await Promise.all(
-    ultimos7Dias.map(async (date) => {
-      const receitas = await getReceitasRecordsForContext(ctx, date, date)
-      const total = receitas.reduce((sum, r) => sum + Number(r.amount), 0)
-      return {
-        date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
-        total: Number(total),
-      }
-    })
-  )
+  // Agrupa despesas por dia
+  for (const despesa of despesasMes) {
+    const dateKey = despesa.date
+    const current = dadosPorDiaDespesas.get(dateKey) || 0
+    dadosPorDiaDespesas.set(dateKey, current + Number(despesa.amount))
+  }
+  
+  // Agrupa receitas por dia
+  for (const receita of receitasMes) {
+    const dateKey = receita.date
+    const current = dadosPorDiaReceitas.get(dateKey) || 0
+    dadosPorDiaReceitas.set(dateKey, current + Number(receita.amount))
+  }
+  
+  // Mapeia apenas os últimos 7 dias
+  const dadosGraficoDespesas = ultimos7Dias.map((date) => {
+    const total = dadosPorDiaDespesas.get(date) || 0
+    return {
+      date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
+      total: Number(total),
+    }
+  })
+  
+  const dadosGraficoReceitas = ultimos7Dias.map((date) => {
+    const total = dadosPorDiaReceitas.get(date) || 0
+    return {
+      date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
+      total: Number(total),
+    }
+  })
 
   return {
     despesasMes,

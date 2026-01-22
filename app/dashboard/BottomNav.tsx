@@ -9,6 +9,7 @@ import {
   BarChart3,
   ListChecks,
   Building2,
+  Users,
   CreditCard,
   TrendingUp,
 } from 'lucide-react'
@@ -58,6 +59,12 @@ const navItems = [
     showAlways: false, // Apenas para empresas
   },
   {
+    href: '/dashboard/funcionarios',
+    label: 'Funcionários',
+    icon: Users,
+    showAlways: false, // Apenas para empresas
+  },
+  {
     href: '/dashboard/relatorios',
     label: 'Relatórios',
     icon: BarChart3,
@@ -76,7 +83,7 @@ export function BottomNav({
   const filteredItems = navItems.filter((item) => item.showAlways || isEmpresa)
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 z-50 safe-area-bottom shadow-lg">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/98 border-t border-gray-200/50 z-50 safe-area-bottom shadow-lg">
       <div className="overflow-x-auto scrollbar-hide">
         <div className="flex items-center gap-1 px-2 py-2 min-w-max">
           {filteredItems.map((item) => {

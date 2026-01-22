@@ -23,6 +23,8 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
   const [loading, setLoading] = useState(false)
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loadingCategorias, setLoadingCategorias] = useState(true)
+  const [funcionarios, setFuncionarios] = useState<Array<{ id: string; nome_original: string }>>([])
+  const [loadingFuncionarios, setLoadingFuncionarios] = useState(false)
   const [formData, setFormData] = useState({
     amount: 0,
     description: '',
@@ -30,6 +32,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     date: new Date().toISOString().split('T')[0],
     subcategory: '',
     pago: true, // Por padrão, considera como pago/recebido
+    funcionario_id: '' as string | '',
   })
 
   // Atualiza pago baseado no tipo quando o modal abre
@@ -42,12 +45,55 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     }
   }, [isOpen, tipo])
 
-  // Busca categorias ao abrir o modal
+  // Busca categorias e funcionários ao abrir o modal
   useEffect(() => {
     if (isOpen) {
       fetchCategorias()
+      fetchFuncionarios()
     }
   }, [isOpen])
+
+  // Busca funcionários quando categoria muda para "funcionarios" ou "funcionário"
+  useEffect(() => {
+    if (isFuncionariosCategory(formData.category)) {
+      if (funcionarios.length === 0) {
+        fetchFuncionarios()
+      }
+    } else {
+      // Limpa funcionário selecionado se mudou de categoria
+      setFormData((prev) => ({ ...prev, funcionario_id: '' }))
+    }
+  }, [formData.category]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchFuncionarios = async () => {
+    try {
+      setLoadingFuncionarios(true)
+      const response = await fetch('/api/funcionarios')
+      if (response.ok) {
+        const data = await response.json()
+        setFuncionarios((data.funcionarios || []).map((f: any) => ({
+          id: f.id,
+          nome_original: f.nome_original,
+        })))
+      }
+    } catch (error) {
+      console.error('Erro ao buscar funcionários:', error)
+    } finally {
+      setLoadingFuncionarios(false)
+    }
+  }
+
+  // Função helper para verificar se a categoria é de funcionários
+  const isFuncionariosCategory = (category: string): boolean => {
+    if (!category) return false
+    const normalized = category.toLowerCase().trim()
+    return (
+      normalized === 'funcionarios' ||
+      normalized === 'funcionário' ||
+      normalized === 'funcionario' ||
+      normalized === 'funcionários'
+    )
+  }
 
   const fetchCategorias = async () => {
     try {
@@ -76,6 +122,12 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
       return
     }
 
+    // Valida funcionário se categoria for funcionarios
+    if (isFuncionariosCategory(formData.category) && !formData.funcionario_id) {
+      toast.error('Funcionário obrigatório', 'Selecione um funcionário para esta categoria.')
+      return
+    }
+
     setLoading(true)
     try {
       const response = await fetch('/api/financeiro', {
@@ -89,6 +141,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           subcategory: formData.subcategory || null,
           transactionType: tipo,
           pago: formData.pago, // Usa o valor do checkbox para ambos os tipos
+          funcionario_id: isFuncionariosCategory(formData.category) && formData.funcionario_id ? formData.funcionario_id : null,
         }),
       })
 
@@ -104,6 +157,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           date: new Date().toISOString().split('T')[0],
           subcategory: '',
           pago: tipo === 'expense' ? true : false, // Despesas padrão pago, receitas padrão não recebido
+          funcionario_id: '',
         })
       } else {
         const error = await response.json()
@@ -207,6 +261,38 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
                 placeholder="Ex: Supermercado"
               />
             </div>
+
+            {/* Funcionário (apenas quando categoria for funcionarios) */}
+            {isFuncionariosCategory(formData.category) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Funcionário <span className="text-red-500">*</span>
+                </label>
+                {loadingFuncionarios ? (
+                  <div className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 shadow-sm">
+                    Carregando funcionários...
+                  </div>
+                ) : funcionarios.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 border border-orange-300 rounded-lg bg-orange-50 text-orange-700 text-sm shadow-sm">
+                    Nenhum funcionário cadastrado. Cadastre um funcionário primeiro.
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={formData.funcionario_id}
+                    onChange={(e) => setFormData({ ...formData, funcionario_id: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm bg-white"
+                  >
+                    <option value="">Selecione um funcionário</option>
+                    {funcionarios.map((func) => (
+                      <option key={func.id} value={func.id}>
+                        {func.nome_original}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             {/* Data */}
             <div>

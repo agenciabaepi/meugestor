@@ -19,8 +19,9 @@ export default async function DashboardLayout({
   const sessionContext = await getSessionContext()
 
   return (
-    <div className="relative isolate min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      <AnimatedTopoBackground src="/bg.svg" opacity={0.14} linesOnly motionScale={1.05} speedScale={0.9} />
+    <div className="relative isolate min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      {/* AnimatedTopoBackground desabilitado para reduzir uso de GPU */}
+      {/* <AnimatedTopoBackground src="/bg.svg" opacity={0.14} linesOnly motionScale={1.05} speedScale={0.9} /> */}
       {/* Header - Fixo no topo (Desktop) */}
       <Header sessionContext={sessionContext} />
 

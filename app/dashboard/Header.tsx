@@ -80,7 +80,7 @@ export function Header({ sessionContext }: { sessionContext: SessionContext | nu
   const isEmpresa = sessionContext?.mode === 'empresa'
 
   return (
-    <header className="hidden lg:block fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 z-30">
+    <header className="hidden lg:block fixed top-0 left-0 right-0 h-16 bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-800 z-30">
       <div className="h-full flex items-center justify-between px-6">
         {/* Logo */}
         <div className="flex-shrink-0">

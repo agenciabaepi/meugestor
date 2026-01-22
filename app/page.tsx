@@ -4,7 +4,7 @@ import { LOGO_URL } from '@/lib/constants'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-emerald-100">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-100">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 sm:pt-24 sm:pb-20">
@@ -28,7 +28,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 bg-emerald-700 text-white px-8 py-4 rounded-lg font-semibold hover:bg-emerald-800 transition-all transform hover:scale-105 text-lg shadow-lg"
+                className="inline-flex items-center gap-2 bg-emerald-700 text-white px-8 py-4 rounded-lg font-semibold hover:bg-emerald-800 transition-colors text-lg shadow-lg"
               >
                 Acessar Dashboard
                 <ArrowRight className="w-5 h-5" />
@@ -51,7 +51,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="mb-4">
                 <Smartphone className="w-12 h-12 text-emerald-700" />
               </div>
@@ -63,7 +63,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="mb-4">
                 <Bot className="w-12 h-12 text-emerald-700" />
               </div>
@@ -75,7 +75,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="mb-4">
                 <Wallet className="w-12 h-12 text-emerald-700" />
               </div>
@@ -87,7 +87,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-linear-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 hover:shadow-lg transition-shadow">
               <div className="mb-4">
                 <Calendar className="w-12 h-12 text-emerald-700" />
               </div>
@@ -103,7 +103,7 @@ export default function Home() {
       </div>
 
       {/* Benefits Section */}
-      <div className="py-16 sm:py-24 bg-linear-to-br from-gray-50 to-emerald-50">
+      <div className="py-16 sm:py-24 bg-gradient-to-br from-gray-50 to-emerald-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
@@ -159,7 +159,7 @@ export default function Home() {
       </div>
 
       {/* CTA Section */}
-      <div className="py-16 sm:py-24 bg-linear-to-r from-emerald-800 to-emerald-700">
+      <div className="py-16 sm:py-24 bg-gradient-to-r from-emerald-800 to-emerald-700">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             Pronto para começar?
@@ -169,7 +169,7 @@ export default function Home() {
           </p>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 bg-white text-emerald-800 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-all transform hover:scale-105 text-lg shadow-lg"
+            className="inline-flex items-center gap-2 bg-white text-emerald-800 px-8 py-4 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-lg shadow-lg"
           >
             Acessar Dashboard
             <ArrowRight className="w-5 h-5" />

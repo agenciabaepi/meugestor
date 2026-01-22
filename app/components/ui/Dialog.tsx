@@ -67,7 +67,7 @@ export function Dialog({
     >
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/50 dark:bg-black/70  transition-opacity"
         aria-hidden="true"
       />
 
@@ -85,7 +85,7 @@ export function Dialog({
       >
         {/* Header */}
         {(title || description || showCloseButton) && (
-          <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-linear-to-r from-emerald-50 to-white dark:from-emerald-900/20 dark:to-gray-800">
+          <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/20 dark:to-gray-800">
             <div className="flex-1 pr-4">
               {title && (
                 <h2

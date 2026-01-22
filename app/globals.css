@@ -11,6 +11,24 @@
   box-sizing: border-box;
 }
 
+/* GPU Performance Optimizations */
+* {
+  /* Evita aceleração de hardware desnecessária */
+  will-change: auto;
+}
+
+/* Otimizações para elementos com transições */
+button, a, [role="button"] {
+  /* Usa GPU apenas quando necessário (hover/active) */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Desabilita aceleração de hardware em elementos estáticos */
+img, svg {
+  transform: translateZ(0);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;

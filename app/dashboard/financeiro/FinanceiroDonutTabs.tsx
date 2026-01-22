@@ -60,7 +60,7 @@ export function FinanceiroDonutTabs({ donutDespesas, donutReceitas }: Props) {
         else setSelectedReceitas(null)
       }}
     >
-      <div className="bg-linear-to-br from-emerald-950 via-emerald-900 to-emerald-800">
+      <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800">
         <div className="px-5 sm:px-6 pt-5 sm:pt-6 text-center">
           <h2 className="text-white text-lg sm:text-xl font-bold tracking-tight">Resumo por categoria</h2>
           <p className="text-white/75 text-sm sm:text-base mt-1">

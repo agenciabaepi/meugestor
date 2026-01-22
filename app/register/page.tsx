@@ -127,8 +127,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center lg:items-start justify-center px-4 py-10 lg:py-16 bg-linear-to-br from-emerald-50 via-white to-emerald-100">
-      <div className="w-full max-w-md lg:max-w-4xl p-6 sm:p-8 lg:p-10 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl ring-1 ring-gray-200">
+    <div className="min-h-screen flex items-center lg:items-start justify-center px-4 py-10 lg:py-16 bg-gradient-to-br from-emerald-50 via-white to-emerald-100">
+      <div className="w-full max-w-md lg:max-w-4xl p-6 sm:p-8 lg:p-10 bg-white/80  rounded-2xl shadow-xl ring-1 ring-gray-200">
         <div>
           <div className="flex justify-center">
             <div className="relative h-10 w-[220px] flex items-center justify-center">

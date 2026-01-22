@@ -87,7 +87,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen relative isolate flex items-center justify-center bg-transparent">
       <AnimatedTopoBackground src="/bg.svg" opacity={1} motionScale={1.7} speedScale={1.2} />
-        <div className="relative z-20 max-w-md w-full space-y-8 p-8 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-xl ring-1 ring-black/5 dark:ring-white/10">
+        <div className="relative z-20 max-w-md w-full space-y-8 p-8 bg-white/90 dark:bg-gray-800/90  rounded-lg shadow-xl ring-1 ring-black/5 dark:ring-white/10">
         <div>
           <div className="mt-2 flex justify-center">
             <div className="relative h-10 w-[220px] flex items-center justify-center">

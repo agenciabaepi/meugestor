@@ -278,7 +278,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
 
       {!isAuthenticated && (
         <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
+          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
             <h2 className="text-xl font-bold text-gray-900">Faça login para ver suas listas</h2>
           </div>
           <div className="p-6 text-gray-600">
@@ -297,9 +297,9 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
             ].join(' ')}
           >
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 bg-linear-to-r from-emerald-50 to-white border-b border-gray-100 flex items-center justify-between">
+              <div className="px-6 py-5 bg-gradient-to-r from-emerald-50 to-white border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-linear-to-br from-emerald-700 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
                     <ShoppingCart className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -413,7 +413,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
             ].join(' ')}
           >
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 bg-linear-to-r from-gray-50 to-white border-b border-gray-100">
+              <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-lg font-bold text-gray-900 truncate">
@@ -493,7 +493,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                           {view.pendentes.map((it) => (
                             <div
                               key={it.id}
-                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-linear-to-r from-gray-50 to-white px-4 py-3"
+                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-3"
                             >
                               <div className="min-w-0">
                                 <div className="font-semibold text-gray-900 truncate">{it.nome}</div>

@@ -234,6 +234,11 @@ export async function getFinanceiroByTenant(
   if (endDate) {
     query = query.lte('date', endDate)
   }
+  
+  // Limita resultados quando não há filtro de data para evitar carregar todos os registros
+  if (!startDate && !endDate) {
+    query = query.limit(1000) // Limite razoável para evitar sobrecarga de memória
+  }
 
   // Filtra por tipo de transação se fornecido
   // Tenta filtrar, mas se o campo não existir (migration não aplicada), ignora o filtro

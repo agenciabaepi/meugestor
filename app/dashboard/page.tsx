@@ -77,35 +77,57 @@ async function getDashboardData() {
         endOfMonth.toISOString().split('T')[0]
       )
       
-      // Busca registros recentes (últimos 5)
-      const todasTransacoes = await getFinanceiroRecordsForContext(ctx)
-      gastosRecentes = todasTransacoes
-        .filter((t: any) => (t.transaction_type || 'expense') === 'expense')
-        .slice(0, 5)
-      receitasRecentes = todasTransacoes
-        .filter((t: any) => (t.transaction_type || 'revenue') === 'revenue')
-        .slice(0, 5)
+      // Busca registros recentes (últimos 5) - apenas do mês atual para economizar memória
+      const recentesStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const recentesEndDate = endOfMonth.toISOString().split('T')[0]
+      const gastosRecentesRaw = await getDespesasRecordsForContext(ctx, recentesStartDate, recentesEndDate)
+      const receitasRecentesRaw = await getReceitasRecordsForContext(ctx, recentesStartDate, recentesEndDate)
+      gastosRecentes = gastosRecentesRaw.slice(0, 5)
+      receitasRecentes = receitasRecentesRaw.slice(0, 5)
       
-      // Prepara dados do gráfico (todos os dias do mês)
-      const diasDoMes = Array.from({ length: endOfMonth.getDate() }, (_, i) => {
-        const date = new Date(now.getFullYear(), now.getMonth(), i + 1)
-        return date.toISOString().split('T')[0]
-      })
+      // Prepara dados do gráfico - usa dados já carregados (gastosMes e receitasMes) para economizar memória
+      // Agrupa por dia em vez de fazer queries separadas
+      const dadosPorDia = new Map<string, { despesas: number; receitas: number }>()
       
-      dadosGrafico = await Promise.all(
-        diasDoMes.map(async (date) => {
-          const despesas = await getDespesasRecordsForContext(ctx, date, date)
-          const receitas = await getReceitasRecordsForContext(ctx, date, date)
-          const totalDespesas = despesas.reduce((sum, d) => sum + Number(d.amount), 0)
-          const totalReceitas = receitas.reduce((sum, r) => sum + Number(r.amount), 0)
+      // Inicializa todos os dias do mês com zero
+      for (let i = 1; i <= endOfMonth.getDate(); i++) {
+        const date = new Date(now.getFullYear(), now.getMonth(), i)
+        const dateKey = date.toISOString().split('T')[0]
+        dadosPorDia.set(dateKey, { despesas: 0, receitas: 0 })
+      }
+      
+      // Agrupa despesas por dia
+      for (const despesa of gastosMes) {
+        const dateKey = despesa.date
+        const current = dadosPorDia.get(dateKey) || { despesas: 0, receitas: 0 }
+        current.despesas += Number(despesa.amount)
+        dadosPorDia.set(dateKey, current)
+      }
+      
+      // Agrupa receitas por dia
+      for (const receita of receitasMes) {
+        const dateKey = receita.date
+        const current = dadosPorDia.get(dateKey) || { despesas: 0, receitas: 0 }
+        current.receitas += Number(receita.amount)
+        dadosPorDia.set(dateKey, current)
+      }
+      
+      // Converte para array ordenado
+      dadosGrafico = Array.from(dadosPorDia.entries())
+        .map(([dateKey, values]) => {
+          const date = new Date(dateKey)
           return {
-            date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-            despesas: Number(totalDespesas),
-            receitas: Number(totalReceitas),
-            saldo: Number(totalReceitas - totalDespesas),
+            date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+            despesas: Number(values.despesas),
+            receitas: Number(values.receitas),
+            saldo: Number(values.receitas - values.despesas),
           }
         })
-      )
+        .sort((a, b) => {
+          const dateA = new Date(a.date.split('/').reverse().join('-'))
+          const dateB = new Date(b.date.split('/').reverse().join('-'))
+          return dateA.getTime() - dateB.getTime()
+        })
     } catch (error) {
       console.error('Error fetching financeiro data:', error)
     }
@@ -196,7 +218,7 @@ export default async function DashboardPage() {
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Card Saldo do Mês */}
-        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden ${
+        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 overflow-hidden ${
           data.saldo >= 0 
             ? 'bg-gradient-to-br from-emerald-600 to-emerald-700' 
             : 'bg-gradient-to-br from-red-600 to-red-700'
@@ -204,7 +226,7 @@ export default async function DashboardPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/20  rounded-xl flex items-center justify-center">
                 {data.saldo >= 0 ? (
                   <TrendingUp className="w-6 h-6 text-white" />
                 ) : (
@@ -226,11 +248,11 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Receitas */}
-        <div className="relative bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/20  rounded-xl flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -245,11 +267,11 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Despesas */}
-        <div className="relative bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden">
+        <div className="relative bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/20  rounded-xl flex items-center justify-center">
                 <TrendingDown className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -264,7 +286,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Card Caixa */}
-        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 p-6 overflow-hidden ${
+        <div className={`relative rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 p-6 overflow-hidden ${
           data.caixa >= 0 
             ? 'bg-gradient-to-br from-blue-600 to-blue-700' 
             : 'bg-gradient-to-br from-red-600 to-red-700'
@@ -272,7 +294,7 @@ export default async function DashboardPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/20  rounded-xl flex items-center justify-center">
                 <Banknote className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -302,7 +324,7 @@ export default async function DashboardPage() {
 
       {/* Gastos Recentes */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+        <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Gastos Recentes</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
@@ -311,7 +333,7 @@ export default async function DashboardPage() {
               {data.gastosRecentes.map((gasto) => (
                 <div
                   key={gasto.id}
-                  className="flex items-center justify-between p-4 bg-linear-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-gray-200 dark:hover:border-gray-500 hover:shadow-md transition-all duration-200"
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-gray-200 dark:hover:border-gray-500 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <p className="font-semibold text-base text-gray-900 dark:text-white truncate mb-1">{gasto.description}</p>
@@ -339,7 +361,7 @@ export default async function DashboardPage() {
 
       {/* Próximos Compromissos */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="px-6 lg:px-8 py-5 bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+        <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Próximos Compromissos</h2>
         </div>
         <div className="p-4 sm:p-6 lg:p-8">
@@ -348,7 +370,7 @@ export default async function DashboardPage() {
               {data.proximos.map((compromisso) => (
                 <div
                   key={compromisso.id}
-                  className="flex items-start justify-between p-4 bg-linear-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-emerald-200 dark:hover:border-emerald-500 hover:shadow-md transition-all duration-200"
+                  className="flex items-start justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-100 dark:border-gray-600 hover:border-emerald-200 dark:hover:border-emerald-500 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">

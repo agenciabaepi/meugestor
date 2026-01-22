@@ -30,6 +30,7 @@ export interface CreateFinanceiroInput {
   tags?: string[] | null
   transactionType?: 'expense' | 'revenue'
   pago?: boolean
+  funcionario_id?: string | null
 }
 
 /**
@@ -108,6 +109,27 @@ export async function createFinanceiroRecordForContext(
       throw new ValidationError('Modo empresa sem empresa vinculada')
     }
     const { createFinanceiroEmpresa } = await import('../db/queries-empresa')
+    
+    // Se categoria for funcionarios e funcionario_id foi fornecido, inclui no metadata
+    const categoriaLower = (input.category || '').toLowerCase()
+    const isFuncionariosCategory =
+      categoriaLower === 'funcionarios' || categoriaLower === 'funcionário' || categoriaLower === 'funcionario'
+    
+    let finalMetadata = input.metadata || {}
+    let finalFuncionarioId = input.funcionario_id || null
+    
+    // Se categoria é funcionarios mas não tem funcionario_id, não bloqueia (pode ser gasto genérico)
+    // Mas se tem funcionario_id, adiciona ao metadata para referência
+    if (isFuncionariosCategory && finalFuncionarioId) {
+      finalMetadata = {
+        ...finalMetadata,
+        funcionario: {
+          id: finalFuncionarioId,
+          // Nome será buscado depois se necessário
+        },
+      }
+    }
+    
     const record = await createFinanceiroEmpresa(
       ctx.tenant_id,
       ctx.empresa_id,
@@ -117,11 +139,11 @@ export async function createFinanceiroRecordForContext(
       input.date,
       input.receiptImageUrl,
       input.subcategory,
-      input.metadata,
+      finalMetadata,
       input.tags,
       input.transactionType || 'expense',
       input.userId || null,
-      undefined, // funcionarioId
+      finalFuncionarioId, // funcionarioId
       input.pago
     )
     if (!record) throw new ValidationError('Erro ao criar registro financeiro')
