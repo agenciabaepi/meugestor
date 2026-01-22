@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Users, ArrowRight } from 'lucide-react'
+import { Plus, Users, ArrowRight, Edit2, Trash2 } from 'lucide-react'
 import type { Funcionario } from '@/lib/db/types'
-import { useToast } from '@/app/components/ui'
+import { useToast, Dialog, DialogActions } from '@/app/components/ui'
 import { CurrencyInput } from '@/app/components/ui/CurrencyInput'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import Link from 'next/link'
@@ -18,6 +18,9 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
   const toast = useToast()
   const [funcionarios, setFuncionarios] = useState(initialFuncionarios)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingFuncionario, setEditingFuncionario] = useState<Funcionario | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [funcionarioToDelete, setFuncionarioToDelete] = useState<{ id: string; nome: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     nome_original: '',
@@ -39,19 +42,32 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
     }
   }
 
-  const handleOpenModal = () => {
-    setFormData({
-      nome_original: '',
-      cargo: '',
-      salario_base: '',
-      tipo: '',
-      ativo: true,
-    })
+  const handleOpenModal = (funcionario?: Funcionario) => {
+    if (funcionario) {
+      setEditingFuncionario(funcionario)
+      setFormData({
+        nome_original: funcionario.nome_original,
+        cargo: funcionario.cargo || '',
+        salario_base: funcionario.salario_base ? String(funcionario.salario_base) : '',
+        tipo: funcionario.tipo || '',
+        ativo: funcionario.ativo,
+      })
+    } else {
+      setEditingFuncionario(null)
+      setFormData({
+        nome_original: '',
+        cargo: '',
+        salario_base: '',
+        tipo: '',
+        ativo: true,
+      })
+    }
     setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
+    setEditingFuncionario(null)
     setFormData({
       nome_original: '',
       cargo: '',
@@ -71,8 +87,11 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
     setLoading(true)
     try {
-      const response = await fetch('/api/funcionarios', {
-        method: 'POST',
+      const url = editingFuncionario ? `/api/funcionarios/${editingFuncionario.id}` : '/api/funcionarios'
+      const method = editingFuncionario ? 'PATCH' : 'POST'
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nome_original: formData.nome_original.trim(),
@@ -99,6 +118,38 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
     }
   }
 
+  const handleDelete = (id: string, nome: string) => {
+    setFuncionarioToDelete({ id, nome })
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!funcionarioToDelete) return
+
+    setLoading(true)
+    setDeleteConfirmOpen(false)
+
+    try {
+      const response = await fetch(`/api/funcionarios/${funcionarioToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast.success('Funcionário excluído', `"${funcionarioToDelete.nome}" foi removido com sucesso.`)
+        router.refresh()
+        fetchFuncionarios()
+      } else {
+        const error = await response.json()
+        toast.error('Erro ao excluir', error.error || 'Não foi possível excluir o funcionário.')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir funcionário:', error)
+      toast.error('Erro ao excluir', 'Ocorreu um erro ao tentar excluir o funcionário.')
+    } finally {
+      setLoading(false)
+      setFuncionarioToDelete(null)
+    }
+  }
 
   const getTipoLabel = (tipo: string | null) => {
     switch (tipo) {
@@ -181,13 +232,15 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
           </div>
           <div className="divide-y divide-gray-200">
             {ativos.map((funcionario) => (
-              <Link
+              <div
                 key={funcionario.id}
-                href={`/dashboard/funcionarios/${funcionario.id}`}
-                className="block p-4 sm:p-6 hover:bg-gray-50 transition-colors group"
+                className="p-4 sm:p-6 hover:bg-gray-50 transition-colors group"
               >
                 <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/dashboard/funcionarios/${funcionario.id}`}
+                    className="flex-1 min-w-0"
+                  >
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
                         {funcionario.nome_original}
@@ -216,12 +269,33 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2 shrink-0">
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                    <button
+                      onClick={() => handleOpenModal(funcionario)}
+                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
+                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Excluir"
+                      disabled={loading}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <Link
+                      href={`/dashboard/funcionarios/${funcionario.id}`}
+                      className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors"
+                      title="Ver detalhes"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </Link>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -235,13 +309,15 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
           </div>
           <div className="divide-y divide-gray-200">
             {inativos.map((funcionario) => (
-              <Link
+              <div
                 key={funcionario.id}
-                href={`/dashboard/funcionarios/${funcionario.id}`}
-                className="block p-4 sm:p-6 hover:bg-gray-50 transition-colors group opacity-60"
+                className="p-4 sm:p-6 hover:bg-gray-50 transition-colors group opacity-60"
               >
                 <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/dashboard/funcionarios/${funcionario.id}`}
+                    className="flex-1 min-w-0"
+                  >
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
                         {funcionario.nome_original}
@@ -262,12 +338,33 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2 shrink-0">
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                    <button
+                      onClick={() => handleOpenModal(funcionario)}
+                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
+                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Excluir"
+                      disabled={loading}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <Link
+                      href={`/dashboard/funcionarios/${funcionario.id}`}
+                      className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors"
+                      title="Ver detalhes"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </Link>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -296,7 +393,9 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
             <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={handleCloseModal} />
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Adicionar Funcionário</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  {editingFuncionario ? 'Editar Funcionário' : 'Adicionar Funcionário'}
+                </h2>
                 <button
                   onClick={handleCloseModal}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
@@ -392,7 +491,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                     disabled={loading}
                     className="flex-1 px-4 py-2.5 rounded-lg font-medium text-white transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm bg-emerald-600 hover:bg-emerald-700"
                   >
-                    {loading ? 'Salvando...' : 'Salvar'}
+                    {loading ? 'Salvando...' : editingFuncionario ? 'Atualizar' : 'Salvar'}
                   </button>
                 </div>
               </form>
@@ -401,6 +500,42 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
         </div>
       )}
 
+      {/* Dialog de Confirmação de Exclusão */}
+      {deleteConfirmOpen && (
+        <Dialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="Confirmar exclusão"
+          description="Esta ação não pode ser desfeita."
+          size="sm"
+        >
+          <p className="text-gray-700 mb-4">
+            Tem certeza que deseja excluir o funcionário?
+            {funcionarioToDelete && (
+              <span className="block mt-2 text-sm text-gray-500">"{funcionarioToDelete.nome}"</span>
+            )}
+          </p>
+
+          <DialogActions>
+            <button
+              onClick={() => {
+                setDeleteConfirmOpen(false)
+                setFuncionarioToDelete(null)
+              }}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDelete}
+              disabled={loading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </DialogActions>
+        </Dialog>
+      )}
     </div>
   )
 }

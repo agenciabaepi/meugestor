@@ -32,8 +32,6 @@ export function Dialog({
   showCloseButton = true,
   closeOnOverlayClick = true,
 }: DialogProps) {
-  if (!open) return null
-
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (closeOnOverlayClick && e.target === e.currentTarget) {
       onOpenChange(false)
@@ -55,6 +53,8 @@ export function Dialog({
       window.removeEventListener('keydown', handleEscape)
     }
   }, [open, onOpenChange])
+
+  if (!open) return null
 
   return (
     <div
