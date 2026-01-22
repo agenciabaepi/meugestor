@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { DonutGastosChart, type DonutGastosData } from '../components/DonutGastosChart'
 
 type Props = {
@@ -17,9 +18,27 @@ function safeData(input: DonutGastosData): DonutGastosData {
 }
 
 export function FinanceiroDonutTabs({ donutDespesas, donutReceitas }: Props) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [active, setActive] = useState<TabKey>('despesas')
   const [selectedDespesas, setSelectedDespesas] = useState<string | null>(null)
   const [selectedReceitas, setSelectedReceitas] = useState<string | null>(null)
+  
+  const mes = searchParams.get('mes')
+  const ano = searchParams.get('ano')
+  
+  const buildCategoriaUrl = (categoria: string) => {
+    const params = new URLSearchParams()
+    if (mes) params.set('mes', mes)
+    if (ano) params.set('ano', ano)
+    const query = params.toString()
+    return `/dashboard/financeiro/categoria/${encodeURIComponent(categoria)}${query ? `?${query}` : ''}`
+  }
+  
+  const handleSelectCategory = (nome: string) => {
+    // Navega para a página de detalhes da categoria
+    router.push(buildCategoriaUrl(nome))
+  }
 
   const despesas = useMemo(() => safeData(donutDespesas), [donutDespesas])
   const receitas = useMemo(() => safeData(donutReceitas), [donutReceitas])
@@ -91,10 +110,7 @@ export function FinanceiroDonutTabs({ donutDespesas, donutReceitas }: Props) {
             centerValue={selectedValue ?? undefined}
             gapDegrees={3.25}
             showCenterButton={false}
-            onSelectCategory={(nome) => {
-              if (active === 'despesas') setSelectedDespesas((prev) => (prev === nome ? null : nome))
-              else setSelectedReceitas((prev) => (prev === nome ? null : nome))
-            }}
+            onSelectCategory={handleSelectCategory}
           />
         </div>
       </div>

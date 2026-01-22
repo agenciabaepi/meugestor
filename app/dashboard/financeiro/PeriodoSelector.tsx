@@ -1,12 +1,20 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import { useState } from 'react'
 
-export function PeriodoSelector() {
+interface PeriodoSelectorProps {
+  basePath?: string
+}
+
+export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  
+  // Usa basePath se fornecido, senão usa o pathname atual
+  const currentBasePath = basePath || pathname || '/dashboard/financeiro'
   
   // Obtém o mês atual da URL ou usa o mês atual
   const monthParam = searchParams.get('mes')
@@ -48,7 +56,7 @@ export function PeriodoSelector() {
     const params = new URLSearchParams(searchParams.toString())
     params.set('mes', month.toString())
     params.set('ano', year.toString())
-    router.push(`/dashboard/financeiro?${params.toString()}`)
+    router.push(`${currentBasePath}?${params.toString()}`)
   }
   
   // Verifica se é o mês atual

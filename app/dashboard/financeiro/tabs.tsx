@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Edit2, Trash2 } from 'lucide-react'
@@ -30,41 +30,6 @@ export function FinanceiroTabs({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [transacaoToDelete, setTransacaoToDelete] = useState<Financeiro | null>(null)
-  const [funcionariosInfo, setFuncionariosInfo] = useState<Record<string, { nome: string }>>({})
-
-  // Busca informações dos funcionários
-  useEffect(() => {
-    const funcionarioIds = new Set<string>()
-    todasTransacoes.forEach((transacao) => {
-      const funcionarioId = (transacao as any).funcionario_id
-      if (funcionarioId) {
-        funcionarioIds.add(funcionarioId)
-      }
-    })
-
-    if (funcionarioIds.size > 0) {
-      Promise.all(
-        Array.from(funcionarioIds).map(async (id) => {
-          try {
-            const response = await fetch(`/api/funcionarios/${id}`)
-            if (response.ok) {
-              const data = await response.json()
-              return { id, nome: data.funcionario?.nome_original || 'Funcionário desconhecido' }
-            }
-          } catch (error) {
-            console.error('Erro ao buscar funcionário:', error)
-          }
-          return null
-        })
-      ).then((results) => {
-        const info: Record<string, { nome: string }> = {}
-        results.forEach((r) => {
-          if (r) info[r.id] = { nome: r.nome }
-        })
-        setFuncionariosInfo(info)
-      })
-    }
-  }, [todasTransacoes])
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -181,13 +146,18 @@ export function FinanceiroTabs({
                 // Fallback: se transaction_type não existir, assume despesa (comportamento antigo)
                 const isReceita = (transacao as any).transaction_type === 'revenue'
                 
-                // Extrai informações do metadata e funcionario_id
+                // Extrai informações do metadata
                 const metadata = transacao.metadata || {}
                 const fornecedor = metadata.fornecedor || null
-                const funcionarioId = (transacao as any).funcionario_id || null
                 
                 // Data e hora: usa created_at para hora, date para data
-                const date = new Date(transacao.date)
+                // Evita problemas de timezone ao criar a data a partir de uma string YYYY-MM-DD
+                const dateParts = transacao.date.split('-')
+                const date = new Date(
+                  parseInt(dateParts[0]), // ano
+                  parseInt(dateParts[1]) - 1, // mês (0-indexed)
+                  parseInt(dateParts[2]) // dia
+                )
                 const createdAt = transacao.created_at ? new Date(transacao.created_at) : date
                 const dataFormatada = date.toLocaleDateString('pt-BR', {
                   day: '2-digit',
@@ -269,21 +239,6 @@ export function FinanceiroTabs({
                           <>
                             <span className="text-gray-300">•</span>
                             <span className="text-gray-600 font-medium">🏢 {fornecedor.nome}</span>
-                          </>
-                        )}
-                        {funcionarioId && funcionariosInfo[funcionarioId] && (
-                          <>
-                            <span className="text-gray-300">•</span>
-                            <button
-                              type="button"
-                              className="text-emerald-600 font-medium hover:text-emerald-700 hover:underline"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                router.push('/dashboard/funcionarios')
-                              }}
-                            >
-                              👤 {funcionariosInfo[funcionarioId].nome}
-                            </button>
                           </>
                         )}
                         {transacao.tags && transacao.tags.length > 0 && (

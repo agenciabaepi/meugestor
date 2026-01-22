@@ -24,7 +24,14 @@ export function ContasAPagarClient({ contasAPagar: initialContasAPagar, totalPen
   // formatCurrency importado de @/lib/utils/format-currency
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR', {
+    // Evita problemas de timezone ao criar a data a partir de uma string YYYY-MM-DD
+    const dateParts = date.split('-')
+    const dateObj = new Date(
+      parseInt(dateParts[0]), // ano
+      parseInt(dateParts[1]) - 1, // mês (0-indexed)
+      parseInt(dateParts[2]) // dia
+    )
+    return dateObj.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

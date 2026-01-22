@@ -318,9 +318,17 @@ export async function getFinanceiroByCategoryRecordsForContext(
   startDate?: string,
   endDate?: string
 ): Promise<Financeiro[]> {
-  if (!isValidCategory(category)) {
+  // Validação: apenas para modo pessoal (categorias fixas)
+  // No modo empresa, categorias são dinâmicas e não precisam estar na lista fixa
+  if (ctx.mode !== 'empresa' && !isValidCategory(category)) {
     throw new ValidationError('Categoria inválida')
   }
+  
+  // Validação básica: categoria não pode ser vazia
+  if (!category || String(category).trim().length === 0) {
+    throw new ValidationError('Categoria é obrigatória')
+  }
+  
   if (ctx.mode === 'empresa') {
     if (!ctx.empresa_id) return []
     return getFinanceiroEmpresaByCategory(ctx.tenant_id, ctx.empresa_id, category, startDate, endDate)

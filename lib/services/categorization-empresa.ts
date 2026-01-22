@@ -50,12 +50,12 @@ const MAPPINGS: Record<string, MapEntry> = {
   produtos: { category: 'Produtos', subcategory: null, tags: ['produtos'] },
 
   // Funcionários (pagamentos)
-  funcionario: { category: 'Funcionários', subcategory: 'salário', tags: ['funcionário', 'salário'] },
-  funcionários: { category: 'Funcionários', subcategory: 'salário', tags: ['funcionário', 'salário'] },
-  salario: { category: 'Funcionários', subcategory: 'salário', tags: ['salário', 'funcionário'] },
-  salário: { category: 'Funcionários', subcategory: 'salário', tags: ['salário', 'funcionário'] },
-  pagamento: { category: 'Funcionários', subcategory: 'pagamento', tags: ['pagamento', 'funcionário'] },
-  paguei: { category: 'Funcionários', subcategory: 'pagamento', tags: ['pagamento', 'funcionário'] },
+  funcionario: { category: 'funcionario', subcategory: 'salario', tags: ['funcionario', 'salario'] },
+  funcionários: { category: 'funcionario', subcategory: 'salario', tags: ['funcionario', 'salario'] },
+  salario: { category: 'funcionario', subcategory: 'salario', tags: ['funcionario', 'salario'] },
+  salário: { category: 'funcionario', subcategory: 'salario', tags: ['funcionario', 'salario'] },
+  pagamento: { category: 'funcionario', subcategory: 'pagamento', tags: ['funcionario', 'pagamento'] },
+  paguei: { category: 'funcionario', subcategory: 'pagamento', tags: ['funcionario', 'pagamento'] },
 }
 
 export function categorizeEmpresaExpense(description: string): EmpresaCategorizationResult {

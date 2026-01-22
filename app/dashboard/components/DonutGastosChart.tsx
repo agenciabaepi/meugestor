@@ -231,6 +231,10 @@ export function DonutGastosChart({
       return {
         nome: p.nome,
         icon: p.icon,
+        // Importante para SSR/hydration:
+        // pequenas diferenças de ponto flutuante entre runtimes (Node vs Browser)
+        // podem gerar strings diferentes em `style={{ left/top }}`.
+        // Arredondamos para estabilizar o HTML do SSR.
         leftPct: (x / size) * 100,
         topPct: (y / size) * 100,
       }
@@ -317,7 +321,11 @@ export function DonutGastosChart({
               isSelected ? 'bg-white shadow-lg ring-1 ring-black/10' : 'bg-white/85 shadow-md',
               dimOthers ? 'opacity-50' : 'opacity-100',
             ].join(' ')}
-            style={{ left: `${p.leftPct}%`, top: `${p.topPct}%`, transform: 'translate(-50%, -50%)' }}
+            style={{
+              left: `${Number.isFinite(p.leftPct) ? p.leftPct.toFixed(4) : '0'}%`,
+              top: `${Number.isFinite(p.topPct) ? p.topPct.toFixed(4) : '0'}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
             aria-label={`Selecionar categoria ${p.nome}`}
             onClick={(e) => {
               e.stopPropagation()

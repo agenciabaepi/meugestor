@@ -11,7 +11,6 @@ import { FinanceiroTabs } from './tabs'
 import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
 import { EmpresaCategoriasTabela } from './EmpresaCategoriasTabela'
 import { EmpresaFornecedoresTabela } from './EmpresaFornecedoresTabela'
-import { EmpresaFuncionariosTabela } from './EmpresaFuncionariosTabela'
 import { AddTransacaoButton } from './AddTransacaoButton'
 import { PeriodoSelector } from './PeriodoSelector'
 import { formatCurrency } from '@/lib/utils/format-currency'
@@ -231,7 +230,7 @@ export default async function FinanceiroPage({
         {/* Saldo */}
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Saldo do Mês</p>
-          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 break-words ${data.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 wrap-break-word ${data.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {data.saldo >= 0 ? '+' : ''}{formatCurrency(data.saldo)}
           </p>
           <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
@@ -242,7 +241,7 @@ export default async function FinanceiroPage({
         {/* Receitas */}
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Receitas</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2 break-words">
+          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2 wrap-break-word">
             {formatCurrency(data.totalReceitas)}
           </p>
           <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoReceitas) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -253,7 +252,7 @@ export default async function FinanceiroPage({
         {/* Despesas */}
         <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <p className="text-xs sm:text-sm font-medium text-gray-500">Despesas</p>
-          <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2 break-words">
+          <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2 wrap-break-word">
             {formatCurrency(data.totalDespesas)}
           </p>
           <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoDespesas) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -281,7 +280,6 @@ export default async function FinanceiroPage({
             receitas={data.receitasMes}
           />
           <EmpresaFornecedoresTabela despesas={data.despesasMes} />
-          <EmpresaFuncionariosTabela despesas={data.despesasMes} />
         </>
       )}
 

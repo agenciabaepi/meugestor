@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import type { Financeiro } from '@/lib/db/types'
 import { formatCurrency } from '@/lib/utils/format-currency'
 
@@ -21,6 +23,17 @@ export function EmpresaCategoriasTabela({
   despesas,
   receitas,
 }: EmpresaCategoriasTabelaProps) {
+  const searchParams = useSearchParams()
+  const mes = searchParams.get('mes')
+  const ano = searchParams.get('ano')
+  
+  const buildCategoriaUrl = (categoria: string) => {
+    const params = new URLSearchParams()
+    if (mes) params.set('mes', mes)
+    if (ano) params.set('ano', ano)
+    const query = params.toString()
+    return `/dashboard/financeiro/categoria/${encodeURIComponent(categoria)}${query ? `?${query}` : ''}`
+  }
   // Agrupa por categoria
   const categoriasMap = new Map<string, CategoriaAgrupada>()
 
@@ -125,11 +138,18 @@ export function EmpresaCategoriasTabela({
             {categorias.map((cat) => (
               <tr key={cat.categoria} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{cat.categoria}</div>
-                  <div className="text-xs text-gray-500">
-                    {cat.registrosGastos.length} gasto{cat.registrosGastos.length !== 1 ? 's' : ''} •{' '}
-                    {cat.registrosReceitas.length} receita{cat.registrosReceitas.length !== 1 ? 's' : ''}
-                  </div>
+                  <Link
+                    href={buildCategoriaUrl(cat.categoria)}
+                    className="block hover:text-emerald-600 transition-colors"
+                  >
+                    <div className="text-sm font-medium text-gray-900 hover:text-emerald-600">
+                      {cat.categoria}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {cat.registrosGastos.length} gasto{cat.registrosGastos.length !== 1 ? 's' : ''} •{' '}
+                      {cat.registrosReceitas.length} receita{cat.registrosReceitas.length !== 1 ? 's' : ''}
+                    </div>
+                  </Link>
                 </td>
                 <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                   <span className="text-sm font-semibold text-red-600">
