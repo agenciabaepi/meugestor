@@ -1443,18 +1443,19 @@ async function handleRegisterExpense(
     }
 
     // Caso contrário, comportamento tradicional (gasto único)
-    // Validação rígida: verifica dados obrigatórios
+    // REGRA 1 — INTENÇÃO > FORMULÁRIO: Validação apenas para dados ESSENCIAIS
+    // Se faltar, pergunta UMA VEZ e encerra se usuário não responder
     if (!state.amount || state.amount <= 0) {
       return {
         success: false,
-        message: 'Preciso saber o valor do gasto. Quanto foi?',
+        message: 'Quanto foi?',
       }
     }
 
     if (!state.description) {
       return {
         success: false,
-        message: 'Preciso saber o que foi comprado. Pode descrever?',
+        message: 'Com o que foi?',
       }
     }
 
@@ -1757,18 +1758,18 @@ async function handleRegisterRevenue(
   sessionContext: SessionContext | null
 ): Promise<ActionResult> {
   try {
-    // Validação rígida: verifica dados obrigatórios
+    // REGRA 1 — INTENÇÃO > FORMULÁRIO: Validação apenas para dados ESSENCIAIS
     if (!state.amount || state.amount <= 0) {
       return {
         success: false,
-        message: 'Preciso saber o valor da receita. Quanto foi?',
+        message: 'Quanto foi?',
       }
     }
 
     if (!state.description) {
       return {
         success: false,
-        message: 'Preciso saber de onde veio essa receita. Pode descrever?',
+        message: 'De onde veio?',
       }
     }
 
