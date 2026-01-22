@@ -413,11 +413,12 @@ Responda APENAS com JSON no formato:
   "readyToSave": boolean
 }
 
-REGRAS IMPORTANTES:
+REGRAS IMPORTANTES (APLICAR SEMPRE):
 - Se é conversa casual → intent: "chat", confidence: 0.8
-- Se dados estão completos e claros → readyToSave: true, execute ação diretamente (SEM confirmação)
-- Se há ambiguidade REAL → needsClarification: true, readyToSave: false
+- Se dados estão completos e claros → readyToSave: true, needsClarification: false, needsConfirmation: false → EXECUTA DIRETO
+- Se há ambiguidade REAL (faltou dado ESSENCIAL) → needsClarification: true, readyToSave: false
 - Se está corrigindo → use update_* com targetId da última ação
+- FILTRO HUMANO: Se um humano normal não perguntaria isso → readyToSave: true (mesmo que falte detalhe opcional)
 - NUNCA invente dados - se não conseguir extrair, deixe null
 - scheduled_at NUNCA deve ser ISO 8601
 - scheduled_at deve ser apenas o horário (ex: "15:00"). O backend converte (periodo + horário -> ISO).
