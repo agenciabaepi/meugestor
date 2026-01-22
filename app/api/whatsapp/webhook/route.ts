@@ -10,6 +10,8 @@ import {
 import { getOrCreateTenantByWhatsApp as getTenantByWhatsApp } from '@/lib/modules/auth'
 import { createConversation, getRecentConversations } from '@/lib/db/queries'
 import { processAction } from '@/lib/ai/actions'
+import { processMessage } from '@/lib/ai/conversation'
+import { analyzeIntention } from '@/lib/ai/context-analyzer'
 import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
 import { createFinanceiroRecordForContext } from '@/lib/services/financeiro'
@@ -154,112 +156,97 @@ async function processWhatsAppMessage(
       process.env.NEXT_PUBLIC_SITE_URL ||
       'https://seu-dominio.com'
 
-      // Salva a mensagem do usuário na conversa
+      // NOVO FLUXO: CONVERSA ≠ DECISÃO ≠ EXECUÇÃO
+      // 1. Analisa se é conversa casual ou ação operacional
       if (message.type === 'text' && message.text?.body) {
-        const userMessage = message.text.body.toLowerCase().trim()
+        const userMessage = message.text.body
+        await createConversation(tenantId, userMessage, 'user', userId)
         
-        // Verifica se é uma saudação inicial (oi, olá, etc)
-        const greetings = ['oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello']
-        if (greetings.includes(userMessage)) {
-          const presentation =
-            `👋 Olá! Tudo bem?\n\n` +
-            `Eu sou o assistente do *ORGANIZAPAY* e estou aqui para te ajudar.\n\n` +
-            (isEmpresaMode
-              ? `🏢 Você está no *modo empresa*.\n\n` +
-                `Você pode, por exemplo:\n` +
-                `• "cadastra um fornecedor chamado Megamix"\n` +
-                `• "gastei 50 reais com tinta no fornecedor Megamix"\n\n`
-              : '') +
-            `*Exemplos:*\n` +
-            `• "Gastei 50 reais de gasolina"\n` +
-            `• "Tenho reunião amanhã às 10h"\n` +
-            `• "Quanto gastei este mês?"\n\n` +
-            `Pode me enviar uma mensagem e eu te ajudo!`
-          
-          await sendTextMessage(from, presentation)
-          await createConversation(tenantId, message.text.body, 'user', userId)
-          await createConversation(tenantId, presentation, 'assistant', userId)
-          
-          console.log(`Apresentação enviada para ${from}`)
-          return
-        }
-      
-      // Verifica se é confirmação de registro de comprovante
-      if (userMessage === 'sim' || userMessage === 's' || userMessage === 'confirmar') {
-        // Busca última conversa com dados extraídos
-        const recentMessages = await getRecentConversations(tenantId, 10, userId)
-        const lastImageData = recentMessages.find(m => 
-          m.role === 'assistant' && m.message.includes('[Imagem processada]')
-        )
+        // Analisa intenção (conversa vs ação)
+        const intentionAnalysis = analyzeIntention(userMessage)
         
-        if (lastImageData) {
-          try {
-            const dataMatch = lastImageData.message.match(/\{.*\}/)
-            if (dataMatch) {
-              const extractedData = JSON.parse(dataMatch[0])
-              
-              // Busca a URL da imagem se foi salva
-              // A URL pode estar na mensagem ou precisamos buscar do storage
-              let imageUrl: string | null = null
-              if (extractedData.imageUrl) {
-                imageUrl = extractedData.imageUrl
+        console.log('Webhook - Análise de intenção:', intentionAnalysis)
+        
+        // Verifica se é confirmação de registro de comprovante (caso especial)
+        const lowerMessage = userMessage.toLowerCase().trim()
+        if (lowerMessage === 'sim' || lowerMessage === 's' || lowerMessage === 'confirmar') {
+          const recentMessages = await getRecentConversations(tenantId, 10, userId)
+          const lastImageData = recentMessages.find(m => 
+            m.role === 'assistant' && m.message.includes('[Imagem processada]')
+          )
+          
+          if (lastImageData) {
+            try {
+              const dataMatch = lastImageData.message.match(/\{.*\}/)
+              if (dataMatch) {
+                const extractedData = JSON.parse(dataMatch[0])
+                let imageUrl: string | null = null
+                if (extractedData.imageUrl) {
+                  imageUrl = extractedData.imageUrl
+                }
+                
+                const record = await createFinanceiroRecordForContext(sessionCtx || { tenant_id: tenantId, user_id: userId, mode: 'pessoal', empresa_id: null }, {
+                  userId: userId,
+                  amount: extractedData.amount || 0,
+                  description: extractedData.description || extractedData.establishment || 'Gasto do comprovante',
+                  category: extractedData.category || 'Outros',
+                  date: extractedData.date || new Date().toISOString().split('T')[0],
+                  receiptImageUrl: imageUrl,
+                })
+                
+                await sendTextMessage(
+                  from,
+                  `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${extractedData.amount?.toFixed(2) || '0.00'}\n📝 Descrição: ${extractedData.description || extractedData.establishment || 'Gasto do comprovante'}\n🏷️ Categoria: ${extractedData.category || 'Outros'}`
+                )
+                await createConversation(tenantId, 'Gasto registrado com sucesso', 'assistant', userId)
+                return
               }
-              
-              // Registra o gasto
-              const record = await createFinanceiroRecordForContext(sessionCtx || { tenant_id: tenantId, user_id: userId, mode: 'pessoal', empresa_id: null }, {
-                userId: userId,
-                amount: extractedData.amount || 0,
-                description: extractedData.description || extractedData.establishment || 'Gasto do comprovante',
-                category: extractedData.category || 'Outros',
-                date: extractedData.date || new Date().toISOString().split('T')[0],
-                receiptImageUrl: imageUrl,
-              })
-              
-              await sendTextMessage(
-                from,
-                `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${extractedData.amount?.toFixed(2) || '0.00'}\n📝 Descrição: ${extractedData.description || extractedData.establishment || 'Gasto do comprovante'}\n🏷️ Categoria: ${extractedData.category || 'Outros'}`
-              )
-              
-              await createConversation(tenantId, userMessage, 'user', userId)
-              await createConversation(tenantId, 'Gasto registrado com sucesso', 'assistant', userId)
-              
-              console.log(`Gasto registrado via confirmação de imagem de ${from}`)
-              return
+            } catch (error) {
+              console.error('Erro ao processar confirmação:', error)
             }
-          } catch (error) {
-            console.error('Erro ao processar confirmação:', error)
           }
         }
-      }
-      
-        // Salva mensagem do usuário
-        await createConversation(tenantId, message.text.body, 'user', userId)
         
-        // Processa ação (registro de gastos, compromissos, etc)
+        // DECISÃO: Conversa casual → conversation.ts | Ação operacional → processAction
+        if (!intentionAnalysis.hasOperationalIntent) {
+          // CONVERSA: Usa camada humana (conversation.ts)
+          console.log('Webhook - Tratando como conversa casual')
+          try {
+            const conversationResponse = await processMessage(userMessage, {
+              tenantId,
+              userId: userId || null,
+              recentMessages: await getRecentConversations(tenantId, 5, userId),
+            })
+            
+            await sendTextMessage(from, conversationResponse)
+            await createConversation(tenantId, conversationResponse, 'assistant', userId)
+            return
+          } catch (error) {
+            console.error('Erro ao processar conversa:', error)
+            // Fallback para processAction se conversation falhar
+          }
+        }
+        
+        // AÇÃO: Usa orquestrador (processAction → conversational-assistant → actions)
+        console.log('Webhook - Tratando como ação operacional')
         let actionResult
         try {
           console.log('=== WEBHOOK PROCESSAMENTO ===')
-          console.log('Webhook - Mensagem recebida:', message.text.body)
+          console.log('Webhook - Mensagem recebida:', userMessage)
           console.log('Webhook - TenantId:', tenantId)
           console.log('Webhook - From:', from)
           
-          actionResult = await processAction(message.text.body, tenantId, userId, sessionCtx)
+          actionResult = await processAction(userMessage, tenantId, userId, sessionCtx)
           
           console.log('Webhook - Resultado da ação:', {
             success: actionResult.success,
             message: actionResult.message?.substring(0, 100),
             hasData: !!actionResult.data
           })
-          console.log('Webhook - Resultado completo:', JSON.stringify(actionResult, null, 2))
         } catch (error) {
           console.error('=== ERRO NO WEBHOOK ===')
           console.error('Webhook - Erro ao executar processAction:', error)
-          console.error('Webhook - Tipo do erro:', error?.constructor?.name)
-          console.error('Webhook - Mensagem do erro:', error instanceof Error ? error.message : String(error))
-          console.error('Webhook - Stack trace:', error instanceof Error ? error.stack : 'N/A')
-          console.error('Webhook - Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
           
-          // Envia mensagem de erro determinística (sem usar IA para gerar texto)
           const errorMessage = error instanceof Error 
             ? `Erro: ${error.message}` 
             : 'Erro desconhecido ao processar'
@@ -272,16 +259,14 @@ async function processWhatsAppMessage(
           return
         }
         
-        // Se a ação foi executada com sucesso e tem mensagem, responde diretamente
+        // Responde resultado da ação
         if (actionResult.success && actionResult.message && actionResult.message !== 'Mensagem recebida. Processando...') {
           await sendTextMessage(from, actionResult.message)
           await createConversation(tenantId, actionResult.message, 'assistant', userId)
         } else if (!actionResult.success) {
-          // Se a ação falhou, retorna mensagem determinística do backend
           await sendTextMessage(from, actionResult.message || 'Desculpe, não consegui entender. Pode reformular sua pergunta?')
           await createConversation(tenantId, actionResult.message || 'Erro ao processar', 'assistant', userId)
         } else {
-          // Se não há mensagem (caso raro), envia resposta padrão determinística
           await sendTextMessage(from, actionResult.message || 'Mensagem recebida. Como posso ajudar?')
           await createConversation(tenantId, actionResult.message || 'Mensagem recebida', 'assistant', userId)
         }

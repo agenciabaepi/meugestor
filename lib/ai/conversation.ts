@@ -18,8 +18,23 @@ export interface ConversationContext {
 }
 
 /**
- * Processa uma mensagem do usuário e gera uma resposta usando GPT-5.2
- * Agora com processamento mais inteligente e conversacional
+ * CAMADA HUMANA DO SISTEMA
+ * 
+ * Responsabilidades EXCLUSIVAS:
+ * - Responder mensagens casuais ("oi", "tudo bem", "bom dia")
+ * - Manter fluidez de conversa
+ * - Responder perguntas abertas sem intenção operacional
+ * - Ajudar o usuário a se expressar melhor quando está confuso
+ * 
+ * PROIBIDO:
+ * - Validar dados
+ * - Executar ações
+ * - Falar de banco de dados
+ * - Retornar JSON técnico
+ * 
+ * Aqui a IA pode conversar livremente, como ChatGPT, sem schema rígido.
+ * Se a mensagem NÃO for claramente uma ação ("paguei", "cria", "adiciona", "marca"),
+ * a resposta deve ser HUMANA, não técnica.
  */
 export async function processMessage(
   message: string,
@@ -28,34 +43,36 @@ export async function processMessage(
   try {
     validateOpenAIConfig()
     
-    // Carrega contexto recente (aumenta para 10 para ter mais contexto)
+    // Carrega contexto recente para manter fluidez
     const recentConversations = context.recentMessages || 
       await getRecentConversations(context.tenantId, 10, context.userId || null)
 
-    // Usa resumos fornecidos ou gera novos
-    const financeiroSummary = context.financeiroSummary || 
-      await getFinanceiroSummary(context.tenantId, context.userId || null)
-    
-    const compromissosSummary = context.compromissosSummary || 
-      await getCompromissosSummary(context.tenantId, context.userId || null)
+    // Monta prompt focado em conversa humana
+    const conversationContext = recentConversations.length > 0
+      ? recentConversations.slice(-5).map(c => 
+          `${c.role === 'user' ? 'Usuário' : 'Assistente'}: ${c.message}`
+        ).join('\n')
+      : ''
 
-    // Monta o prompt com contexto mais rico
-    const contextPrompt = getContextPrompt(
-      recentConversations.map(c => ({
-        role: c.role,
-        message: c.message,
-      })),
-      financeiroSummary,
-      compromissosSummary
-    )
+    // Prompt simplificado para conversa humana
+    const humanConversationPrompt = `Você é um assistente amigável e conversacional para gestão pessoal via WhatsApp.
 
-    // Adiciona instruções específicas sobre lembretes automáticos
-    const reminderInfo = `\n\nINFORMAÇÃO IMPORTANTE SOBRE LEMBRETES:
-O sistema já envia lembretes automáticos para TODOS os compromissos:
-- ⏰ 5 minutos antes
+SEU PAPEL:
+- Conversar de forma NATURAL, amigável e brasileira - como um amigo
+- Responder saudações e conversas casuais de forma humana
+- Ajudar o usuário a se expressar melhor quando está confuso
+- Ser caloroso, profissional e conversacional
 
-Se o usuário pedir para lembrar de um compromisso, EXPLIQUE que o sistema já faz isso automaticamente.
-NÃO crie um novo compromisso só para lembrete.`
+VOCÊ NÃO DEVE:
+- Validar dados
+- Executar ações
+- Falar de banco de dados
+- Retornar JSON técnico
+- Ser robótico ou formal demais
+
+${conversationContext ? `CONTEXTO DA CONVERSA:\n${conversationContext}\n\n` : ''}
+
+Responda de forma natural e humana, como se estivesse conversando com um amigo.`
 
     // Chama a API do OpenAI
     const model = process.env.OPENAI_MODEL || 'gpt-5.2'
@@ -64,20 +81,15 @@ NÃO crie um novo compromisso só para lembrete.`
       messages: [
         {
           role: 'system',
-          content: SYSTEM_PROMPT + reminderInfo,
-        },
-        {
-          role: 'system',
-          content: contextPrompt,
+          content: humanConversationPrompt,
         },
         {
           role: 'user',
           content: message,
         },
       ],
-      temperature: 0.8, // Aumenta um pouco para respostas mais naturais
-      // gpt-5.x não aceita `max_tokens` (usa `max_completion_tokens`)
-      max_completion_tokens: 600,
+      temperature: 0.9, // Mais criativo para conversa natural
+      max_completion_tokens: 400,
     })
 
     const response = completion.choices[0]?.message?.content || 
@@ -97,13 +109,14 @@ NÃO crie um novo compromisso só para lembrete.`
         model,
         inputTokens,
         outputTokens,
+        type: 'conversation',
       },
     })
 
     return response
   } catch (error) {
-    console.error('Erro ao processar mensagem com IA:', error)
-    return 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns instantes.'
+    console.error('Erro ao processar mensagem conversacional:', error)
+    return 'Desculpe, ocorreu um erro. Tente novamente em alguns instantes.'
   }
 }
 

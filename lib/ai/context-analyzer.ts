@@ -1,8 +1,35 @@
 /**
- * Analisador de contexto inteligente
- * Analisa mensagens para entender intenções e evitar ações desnecessárias
+ * ANALISADOR DE INTENÇÃO E EXTRAÇÃO DE ENTIDADES
+ * 
+ * Responsabilidades EXCLUSIVAS:
+ * - Analisar a mensagem do usuário
+ * - Identificar se existe uma intenção operacional clara
+ * - Extrair entidades básicas (nomes, valores, datas relativas)
+ * 
+ * PROIBIDO:
+ * - Validar se está completo
+ * - Decidir fluxo
+ * - Executar nada
+ * 
+ * Retorna apenas:
+ * - intenção provável
+ * - entidades encontradas
+ * - nível de confiança
  */
 
+export interface IntentionAnalysis {
+  hasOperationalIntent: boolean
+  probableIntent?: string
+  entities?: {
+    names?: string[]
+    values?: number[]
+    dates?: string[]
+    categories?: string[]
+  }
+  confidence: number
+}
+
+// Mantém interface antiga para compatibilidade
 export interface ContextAnalysis {
   shouldProceed: boolean
   message?: string
@@ -11,8 +38,8 @@ export interface ContextAnalysis {
 }
 
 /**
- * Analisa se uma ação de criar compromisso é realmente necessária
- * ou se o usuário está pedindo algo que o sistema já faz
+ * DEPRECATED: Funções antigas mantidas para compatibilidade
+ * A nova arquitetura usa analyzeIntention() para análise simples
  */
 import type { SemanticState } from './semantic-state'
 
@@ -260,7 +287,66 @@ export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
 }
 
 /**
- * Analisa se o usuário está apenas conversando ou realmente quer uma ação
+ * Analisa se a mensagem é conversa casual ou ação operacional
+ * Retorna análise simples: tem intenção operacional ou não
+ */
+export function analyzeIntention(message: string): IntentionAnalysis {
+  const lowerMessage = message.toLowerCase().trim()
+  
+  // Palavras-chave que indicam ação operacional clara
+  const actionKeywords = [
+    'gastei', 'paguei', 'recebi', 'ganhei', 'cria', 'cadastra', 'adiciona',
+    'marca', 'remove', 'agenda', 'reunião', 'compromisso', 'marcar',
+    'quanto', 'quantos', 'quais', 'mostre', 'mostra', 'lista', 'relatório'
+  ]
+  
+  // Saudações e conversas casuais
+  const casualKeywords = [
+    'oi', 'olá', 'ola', 'eae', 'e aí', 'opa', 'hey', 'hi', 'hello',
+    'tudo bem', 'tudo certo', 'obrigado', 'obrigada', 'valeu', 'vlw',
+    'ok', 'okay', 'beleza', 'show', 'legal', 'bacana', 'top', 'perfeito'
+  ]
+  
+  const hasActionKeyword = actionKeywords.some(keyword => lowerMessage.includes(keyword))
+  const isCasual = casualKeywords.some(keyword => 
+    lowerMessage === keyword || 
+    lowerMessage.startsWith(keyword + ' ') ||
+    lowerMessage.endsWith(' ' + keyword)
+  )
+  
+  // Extrai entidades básicas
+  const entities: IntentionAnalysis['entities'] = {}
+  
+  // Extrai valores (números seguidos de "reais", "r$", etc)
+  const valueMatches = lowerMessage.match(/(\d+(?:[.,]\d{2})?)\s*(?:reais?|r\$|rs)/i)
+  if (valueMatches) {
+    entities.values = [parseFloat(valueMatches[1].replace(',', '.'))]
+  }
+  
+  // Extrai nomes (palavras capitalizadas após verbos de ação)
+  const nameMatches = lowerMessage.match(/(?:chamado|nome|funcionário|fornecedor)\s+([A-ZÁÉÍÓÚÇ][a-záéíóúç]+(?:\s+[A-ZÁÉÍÓÚÇ][a-záéíóúç]+)*)/)
+  if (nameMatches) {
+    entities.names = [nameMatches[1]]
+  }
+  
+  // Extrai categorias comuns
+  const categoryKeywords = ['mercado', 'combustível', 'gasolina', 'cartão', 'restaurante']
+  const foundCategories = categoryKeywords.filter(cat => lowerMessage.includes(cat))
+  if (foundCategories.length > 0) {
+    entities.categories = foundCategories
+  }
+  
+  return {
+    hasOperationalIntent: hasActionKeyword && !isCasual,
+    probableIntent: hasActionKeyword ? 'action' : 'conversation',
+    entities: Object.keys(entities).length > 0 ? entities : undefined,
+    confidence: hasActionKeyword ? 0.8 : (isCasual ? 0.9 : 0.5)
+  }
+}
+
+/**
+ * DEPRECATED: Mantido para compatibilidade
+ * Use analyzeIntention() ao invés disso
  */
 export function analyzeConversationalIntent(message: string): ContextAnalysis {
   const lowerMessage = message.toLowerCase()

@@ -1,8 +1,24 @@
 /**
- * Assistente Conversacional Inteligente
+ * ORQUESTRADOR DO SISTEMA
  * 
- * Princípio: IA conversa naturalmente, entende intenção, confirma quando necessário,
- * e só então gera ação estruturada para o sistema executar.
+ * Responsabilidades EXCLUSIVAS:
+ * - Receber a intenção já interpretada
+ * - Consultar dados existentes (salário, funcionário, lista, compromisso)
+ * - Decidir se pode executar direto
+ * - Decidir se precisa pedir algo (apenas se realmente não existir no sistema)
+ * - Aplicar regras de negócio
+ * - Impedir perguntas redundantes
+ * - Impedir duplicidade de ações
+ * 
+ * PROIBIDO:
+ * - Responder conversa casual
+ * - Tentar ser "simpático"
+ * - Responder "oi"
+ * - Responder "tudo bem"
+ * - Tentar explicar funcionalidades
+ * - Conversar com o usuário sem necessidade
+ * 
+ * Ele apenas decide e chama execução.
  */
 
 import { openai } from './openai'
