@@ -486,20 +486,22 @@ export async function processAction(
       }
     }
     
-    // CONFIRMAÇÃO INTELIGENTE: só pede confirmação se realmente necessário
-    // Se dados estão completos (readyToSave), executa diretamente
+    // REGRA 1 — INTENÇÃO > FORMULÁRIO: Se dados estão completos, executa DIRETO
+    // REGRA 2 — ENCERRAMENTO: Após executar, limpa TODO o contexto (assunto encerrado)
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
-      console.log('processAction - Dados completos, executando diretamente sem confirmação')
+      console.log('processAction - Dados completos, executando diretamente (INTENÇÃO > FORMULÁRIO)')
       const result = await executeAction(semanticState, tenantId, userId, message, effectiveSessionContext)
-      // REGRA CRÍTICA: Após salvar com sucesso, limpa TODO o contexto para evitar follow-ups
+      // REGRA CRÍTICA: Após salvar com sucesso, limpa TODO o contexto (ASSUNTO ENCERRADO)
       if (result.success && isMutatingIntent(semanticState.intent)) {
         await cleanupAfterMutation(tenantId, userId, semanticState.intent)
+        console.log('processAction - Ação executada com sucesso, assunto ENCERRADO (contexto limpo)')
       }
       return result
     }
     
-    // Se precisa confirmação (ambiguidade real), salva e retorna mensagem
+    // REGRA 6 — CONFIRMAÇÃO SÓ SE O USUÁRIO PEDIR
+    // Só pede confirmação se usuário explicitamente pediu (ex: "confirma?", "posso salvar assim?")
     if (semanticState.needsConfirmation && semanticState.confirmationMessage) {
       // Marca ação ativa se for compromisso (não deixa perder o foco)
       if (semanticState.intent === 'create_appointment' || semanticState.intent === 'update_appointment') {
