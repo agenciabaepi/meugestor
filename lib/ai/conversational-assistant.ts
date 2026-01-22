@@ -34,17 +34,17 @@ import type { ActiveTask } from './session-focus'
 
 /**
  * Valida se os dados essenciais estão completos para salvar
+ * REGRA: Aplica FILTRO HUMANO - se intenção está clara, executa mesmo que falte detalhe opcional
  */
 function validateDataCompleteness(state: SemanticState): boolean {
   switch (state.intent) {
     case 'create_appointment':
-      // Execução direta: só salva sem conversa se tiver título + período + horário.
-      // scheduled_at aqui é apenas o horário (ex: "23:00", "23h", "23h30")
+      // Execução direta: título + (período OU horário) já é suficiente
+      // Se tem título + horário, assume hoje se não mencionar período
+      // Se tem título + período, pode inferir horário padrão
       return !!(
         state.title &&
-        state.periodo &&
-        state.scheduled_at &&
-        /^(?:\d{1,2}:\d{2}|\d{1,2}h(?:\d{2})?)$/i.test(String(state.scheduled_at).trim())
+        (state.periodo || state.scheduled_at) // Flexível: período OU horário já é suficiente
       )
 
     case 'cancel_appointment':
@@ -52,8 +52,15 @@ function validateDataCompleteness(state: SemanticState): boolean {
     
     case 'register_expense':
     case 'register_revenue':
-      // Precisa: amount + description
-      return !!(state.amount && state.amount > 0 && state.description)
+      // REGRA 1 — INTENÇÃO > FORMULÁRIO: Se tem verbo de ação + valor OU descrição clara, executa
+      // Exemplo: "conta de água que paguei hoje 120" → tem descrição ("conta de água") + valor implícito
+      // Se tem amount OU description com valor extraído → readyToSave
+      if (state.amount && state.amount > 0) {
+        // Tem valor, mesmo sem descrição explícita, pode ter sido extraído da mensagem
+        return true
+      }
+      // Se tem descrição que indica valor (ex: "conta de água 120"), também é válido
+      return !!(state.description && String(state.description).trim().length > 0)
     
     case 'pay_employee_salary':
       // Precisa: employee_name (salário será buscado automaticamente)
