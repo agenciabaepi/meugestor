@@ -203,6 +203,9 @@ REGRAS CRÍTICAS (OBRIGATÓRIAS):
 3. NUNCA perguntar a mesma informação mais de uma vez
 4. Local (cidade/endereço) é OPCIONAL - nunca bloquear salvamento por falta de local
 5. PROIBIDO: pedir formato técnico de data, ISO 8601 ou fuso horário
+6. REGRA DE OURO - FOLLOW-UP: Se um registro já foi salvo com sucesso (readyToSave = true E EXECUTADO), NÃO fazer perguntas automáticas de follow-up
+7. CAMPOS OPCIONAIS (NUNCA perguntar após salvar): mês de referência, forma de pagamento, empresa (Sabesp etc), observações
+8. Se usuário responder "não", "ok", "deixa assim", "já falei" → NÃO insistir, NÃO repetir pergunta
 
 REGRA CRÍTICA - NOVO DOMÍNIO "listas":
 - Listas são para intenção futura (ex: compras). NUNCA registre gasto automaticamente.
@@ -300,11 +303,21 @@ EXEMPLOS DE QUANDO NÃO PERGUNTAR:
 - "tenho dentista amanhã às 10" → Dados completos! readyToSave: true, executar diretamente
 - "gastei 50 no mercado" → Dados completos! readyToSave: true, executar diretamente
 - "15/01/2026 às 12:00" → Data/hora explícita! readyToSave: true, executar diretamente
+- "conta de água paga hoje 120 reais" → Dados completos! readyToSave: true, executar diretamente, NÃO perguntar mês/forma de pagamento
+- "lança uma conta de água que acabei de pagar 120 reais" → Dados completos! readyToSave: true, executar diretamente
 
 EXEMPLOS DE QUANDO PERGUNTAR (apenas ambiguidade real):
 - "tenho reunião" → Falta data/hora → needsClarification: true
 - "gastei no mercado" → Falta valor → needsClarification: true
 - "reunião às 10" → Falta período → needsClarification: true (pergunte "hoje ou amanhã?")
+
+PROIBIDO APÓS SALVAR COM SUCESSO:
+- NÃO perguntar mês de referência
+- NÃO perguntar forma de pagamento (pix/cartão/boleto)
+- NÃO perguntar empresa (Sabesp, etc)
+- NÃO perguntar observações
+- NÃO fazer follow-up automático
+- NÃO insistir se usuário disse "não", "ok", "deixa assim"
 
 ${conversationContext ? `
 CONTEXTO DA CONVERSA:

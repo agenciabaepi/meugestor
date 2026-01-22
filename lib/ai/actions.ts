@@ -204,6 +204,18 @@ export async function processAction(
     const lowerMessage = message.toLowerCase().trim()
     const isPositiveConfirm = ['sim', 's', 'confirmar', 'ok', 'isso', 'isso mesmo', 'pode', 'pode sim', 'pode salvar', 'confirmo'].includes(lowerMessage)
     const isNegativeConfirm = ['não', 'nao', 'cancelar', 'cancela'].includes(lowerMessage)
+    
+    // DETECÇÃO DE "NÃO INSISTÊNCIA" (REGRA CRÍTICA)
+    // Se usuário diz qualquer uma dessas formas, encerra follow-ups imediatamente
+    const isNoInsistence = [
+      'não', 'nao', 'não precisa', 'nao precisa', 'não quero', 'nao quero',
+      'ok', 'okay', 'tá bom', 'ta bom', 'tá bom assim', 'ta bom assim',
+      'deixa assim', 'deixa', 'deixa pra lá', 'deixa pra la',
+      'já falei', 'ja falei', 'já disse', 'ja disse', 'já informei', 'ja informei',
+      'já falei que', 'ja falei que', 'já disse que', 'ja disse que',
+      'não quero mais', 'nao quero mais', 'para', 'para de perguntar',
+      'chega', 'basta', 'suficiente'
+    ].some(phrase => lowerMessage === phrase || lowerMessage.startsWith(phrase + ' ') || lowerMessage.includes(' ' + phrase + ' '))
 
     let pendingConfirmation = getPendingConfirmation(tenantId, userId)
     if (!pendingConfirmation) {
@@ -244,10 +256,10 @@ export async function processAction(
           ? { success: true, message: buildCommitFinalMessage(activeTask.state, actionResult), data: actionResult.data }
           : { success: false, message: actionResult.message || 'Não consegui executar a ação. Tente novamente.', data: actionResult.data }
       }
-      if (isNegativeConfirm) {
-        console.log('processAction - Cancelamento recebido (activeTask), limpando ação ativa')
+      if (isNegativeConfirm || isNoInsistence) {
+        console.log('processAction - Cancelamento/Não-insistência recebido (activeTask), limpando ação ativa')
         await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
-        return { success: true, message: 'Entendido, cancelado. Como posso ajudar?' }
+        return { success: true, message: 'Entendido. Como posso ajudar?' }
       }
     }
     
@@ -328,12 +340,12 @@ export async function processAction(
           message: actionResult.message || 'Não consegui executar a ação. Tente novamente.',
           data: actionResult.data,
         }
-      } else if (isNegativeConfirm) {
-        console.log('processAction - Cancelamento recebido')
+      } else if (isNegativeConfirm || isNoInsistence) {
+        console.log('processAction - Cancelamento/Não-insistência recebido')
         await cleanupAfterMutation(tenantId, userId, pendingConfirmation.state.intent)
         return {
           success: true,
-          message: 'Entendido, cancelado. Como posso ajudar?'
+          message: 'Entendido. Como posso ajudar?'
         }
       }
     }
@@ -431,6 +443,19 @@ export async function processAction(
     
     console.log('processAction - Estado semântico:', JSON.stringify(semanticState, null, 2))
     
+    // REGRA CRÍTICA: Se usuário disse "não", "ok", "deixa assim", NÃO faz perguntas de esclarecimento
+    if (isNoInsistence) {
+      console.log('processAction - Usuário pediu para parar, ignorando needsClarification')
+      // Limpa qualquer contexto ativo
+      if (activeTask) {
+        await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
+      }
+      return {
+        success: true,
+        message: 'Entendido. Como posso ajudar?'
+      }
+    }
+    
     // Se precisa esclarecimento, mantém tarefa ativa (persistida) para entender os próximos passos
     if (semanticState.needsClarification && semanticState.clarificationMessage) {
       try {
@@ -446,12 +471,28 @@ export async function processAction(
       }
     }
     
+    // REGRA CRÍTICA: Se usuário disse "não", "ok", "deixa assim", encerra qualquer follow-up
+    if (isNoInsistence && (activeTask || pendingConfirmation)) {
+      console.log('processAction - Usuário pediu para parar, encerrando follow-ups')
+      if (activeTask) {
+        await cleanupAfterMutation(tenantId, userId, activeTask.state.intent)
+      }
+      if (pendingConfirmation) {
+        await cleanupAfterMutation(tenantId, userId, pendingConfirmation.state.intent)
+      }
+      return {
+        success: true,
+        message: 'Entendido. Como posso ajudar?'
+      }
+    }
+    
     // CONFIRMAÇÃO INTELIGENTE: só pede confirmação se realmente necessário
     // Se dados estão completos (readyToSave), executa diretamente
     if (semanticState.readyToSave && !semanticState.needsConfirmation) {
       // Dados completos, executa diretamente sem confirmação
       console.log('processAction - Dados completos, executando diretamente sem confirmação')
       const result = await executeAction(semanticState, tenantId, userId, message, effectiveSessionContext)
+      // REGRA CRÍTICA: Após salvar com sucesso, limpa TODO o contexto para evitar follow-ups
       if (result.success && isMutatingIntent(semanticState.intent)) {
         await cleanupAfterMutation(tenantId, userId, semanticState.intent)
       }
