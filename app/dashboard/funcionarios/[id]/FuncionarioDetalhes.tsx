@@ -2,6 +2,7 @@
 
 import type { Funcionario, Financeiro } from '@/lib/db/types'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { parseLocalDate } from '@/lib/utils/format-date'
 import { Calendar, DollarSign, CheckCircle2, Clock } from 'lucide-react'
 
 interface FuncionarioDetalhesProps {
@@ -39,7 +40,7 @@ export function FuncionarioDetalhes({ funcionario, pagamentos }: FuncionarioDeta
       </div>
       <div className="divide-y divide-gray-200 dark:divide-gray-700">
         {pagamentos.map((pagamento) => {
-          const pagamentoDate = new Date(pagamento.date)
+          const pagamentoDate = parseLocalDate(pagamento.date)
           const isRecent = new Date().getTime() - pagamentoDate.getTime() < 7 * 24 * 60 * 60 * 1000
 
           return (

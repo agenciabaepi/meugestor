@@ -14,6 +14,7 @@ import { EmpresaFornecedoresTabela } from './EmpresaFornecedoresTabela'
 import { AddTransacaoButton } from './AddTransacaoButton'
 import { PeriodoSelector } from './PeriodoSelector'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { parseLocalDate } from '@/lib/utils/format-date'
 
 export const dynamic = 'force-dynamic'
 
@@ -151,7 +152,7 @@ async function getFinanceiroData(searchParams?: { mes?: string; ano?: string }) 
   const dadosGraficoDespesas = ultimos7Dias.map((date) => {
     const total = dadosPorDiaDespesas.get(date) || 0
     return {
-      date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
+      date: parseLocalDate(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
       total: Number(total),
     }
   })
@@ -159,7 +160,7 @@ async function getFinanceiroData(searchParams?: { mes?: string; ano?: string }) 
   const dadosGraficoReceitas = ultimos7Dias.map((date) => {
     const total = dadosPorDiaReceitas.get(date) || 0
     return {
-      date: new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
+      date: parseLocalDate(date).toLocaleDateString('pt-BR', { weekday: 'short' }),
       total: Number(total),
     }
   })

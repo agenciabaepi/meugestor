@@ -47,9 +47,8 @@ async function getCategoriaData(
 
   // Ordena por data (mais recente primeiro)
   const transacoesOrdenadas = [...todasTransacoes].sort((a, b) => {
-    const dateA = new Date(a.date).getTime()
-    const dateB = new Date(b.date).getTime()
-    if (dateA !== dateB) return dateB - dateA
+    // Compara strings diretamente (YYYY-MM-DD) para evitar problemas de timezone
+    if (a.date !== b.date) return b.date.localeCompare(a.date)
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 

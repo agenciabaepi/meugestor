@@ -100,8 +100,20 @@ export async function createFinanceiroRecordForContext(
   if (ctx.mode === 'empresa' && (!input.category || String(input.category).trim().length === 0)) {
     throw new ValidationError('Categoria é obrigatória')
   }
-  if (!isValidDate(input.date)) {
+  
+  // Normaliza a data para garantir formato YYYY-MM-DD (evita problemas de timezone)
+  let normalizedDate = String(input.date).trim()
+  if (normalizedDate.includes('T')) {
+    normalizedDate = normalizedDate.split('T')[0]
+  }
+  
+  if (!isValidDate(normalizedDate)) {
     throw new ValidationError('Data inválida')
+  }
+  
+  // Garante que a data está no formato YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+    throw new ValidationError('Formato de data inválido')
   }
 
   if (ctx.mode === 'empresa') {
@@ -136,7 +148,7 @@ export async function createFinanceiroRecordForContext(
       input.amount,
       input.description.trim(),
       input.category,
-      input.date,
+      normalizedDate,
       input.receiptImageUrl,
       input.subcategory,
       finalMetadata,
@@ -155,7 +167,7 @@ export async function createFinanceiroRecordForContext(
     input.amount,
     input.description.trim(),
     input.category,
-    input.date,
+    normalizedDate,
     input.receiptImageUrl,
     input.subcategory,
     input.metadata,

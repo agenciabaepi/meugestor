@@ -50,10 +50,9 @@ async function getFuncionarioData(funcionarioId: string) {
   const totalMesAtual = pagamentosMesAtual.reduce((sum, p) => sum + Number(p.amount), 0)
 
   // Ordena por data (mais recente primeiro)
+  // Compara strings diretamente (YYYY-MM-DD) para evitar problemas de timezone
   const pagamentosOrdenados = [...pagamentosFiltrados].sort((a, b) => {
-    const dateA = new Date(a.date).getTime()
-    const dateB = new Date(b.date).getTime()
-    if (dateA !== dateB) return dateB - dateA
+    if (a.date !== b.date) return b.date.localeCompare(a.date)
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 

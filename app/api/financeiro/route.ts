@@ -62,6 +62,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Garante que a data seja tratada como data local (YYYY-MM-DD)
+    // Evita problemas de timezone que podem causar diferença de 1 dia
+    let normalizedDate = String(date).trim()
+    
+    // Se a data já está no formato YYYY-MM-DD, usa diretamente
+    // Se estiver em outro formato, converte para YYYY-MM-DD
+    if (normalizedDate.includes('T')) {
+      // Se for ISO string, extrai apenas a parte da data
+      normalizedDate = normalizedDate.split('T')[0]
+    }
+    
+    // Valida formato YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      return NextResponse.json({ error: 'Formato de data inválido. Use YYYY-MM-DD' }, { status: 400 })
+    }
+
     // Cria o registro
     try {
       const record = await createFinanceiroRecordForContext(ctx, {
@@ -69,7 +85,7 @@ export async function POST(request: NextRequest) {
         amount: Number(amount),
         description: String(description).trim(),
         category: String(category).trim(),
-        date: String(date),
+        date: normalizedDate,
         subcategory: subcategory ? String(subcategory).trim() : null,
         transactionType: transactionType as 'expense' | 'revenue',
         tags: Array.isArray(tags) ? tags : null,

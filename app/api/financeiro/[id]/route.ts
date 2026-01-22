@@ -57,12 +57,25 @@ export async function PUT(
       ? (pago !== undefined ? Boolean(pago) : undefined) 
       : true
 
+    // Normaliza a data para evitar problemas de timezone
+    let normalizedDate = date
+    if (date) {
+      normalizedDate = String(date).trim()
+      if (normalizedDate.includes('T')) {
+        normalizedDate = normalizedDate.split('T')[0]
+      }
+      // Valida formato YYYY-MM-DD
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+        return NextResponse.json({ error: 'Formato de data inválido. Use YYYY-MM-DD' }, { status: 400 })
+      }
+    }
+
     const updatePayload: any = {
       amount,
       description,
       category,
       subcategory,
-      date,
+      date: normalizedDate,
       tags,
       transactionType,
     }

@@ -7,6 +7,7 @@ import { Edit2, Trash2 } from 'lucide-react'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { parseLocalDate } from '@/lib/utils/format-date'
 
 interface CategoriaDetalhesProps {
   categoria: string
@@ -89,12 +90,7 @@ export function CategoriaDetalhes({
               const fornecedor = metadata.fornecedor || null
 
               // Data e hora
-              const dateParts = transacao.date.split('-')
-              const date = new Date(
-                parseInt(dateParts[0]),
-                parseInt(dateParts[1]) - 1,
-                parseInt(dateParts[2])
-              )
+              const date = parseLocalDate(transacao.date)
               const createdAt = transacao.created_at ? new Date(transacao.created_at) : date
               const dataFormatada = date.toLocaleDateString('pt-BR', {
                 day: '2-digit',

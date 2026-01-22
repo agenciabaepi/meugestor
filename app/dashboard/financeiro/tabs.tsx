@@ -8,6 +8,7 @@ import { Charts } from './charts'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import { parseLocalDate } from '@/lib/utils/format-date'
 
 interface FinanceiroTabsProps {
   despesas: Financeiro[]
@@ -152,12 +153,7 @@ export function FinanceiroTabs({
                 
                 // Data e hora: usa created_at para hora, date para data
                 // Evita problemas de timezone ao criar a data a partir de uma string YYYY-MM-DD
-                const dateParts = transacao.date.split('-')
-                const date = new Date(
-                  parseInt(dateParts[0]), // ano
-                  parseInt(dateParts[1]) - 1, // mês (0-indexed)
-                  parseInt(dateParts[2]) // dia
-                )
+                const date = parseLocalDate(transacao.date)
                 const createdAt = transacao.created_at ? new Date(transacao.created_at) : date
                 const dataFormatada = date.toLocaleDateString('pt-BR', {
                   day: '2-digit',
