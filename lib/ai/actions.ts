@@ -1577,13 +1577,14 @@ async function handleRegisterExpense(
       const funcionarioNome = metadata.funcionario.nome || employeeNameCreated || 'Funcionário'
       responseMessage = `✅ Pagamento de *${funcionarioNome}* registrado:\n• Valor: R$ ${amount.toFixed(2)}\n• Categoria: Funcionários`
     } else {
-      responseMessage = `✅ Gasto registrado com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
+      // Resposta curta e conclusiva (sem sugerir follow-ups)
+      responseMessage = `✅ Gasto registrado!\n\n💰 R$ ${amount.toFixed(2)}\n📝 ${description}\n🏷️ ${category}`
       
       if (subcategory) {
-        responseMessage += `\n📌 Subcategoria: ${subcategory}`
+        responseMessage += ` › ${subcategory}`
       }
       
-      responseMessage += `\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}`
+      responseMessage += `\n📅 ${new Date(date).toLocaleDateString('pt-BR')}`
     }
 
     return {
@@ -1834,13 +1835,14 @@ async function handleRegisterRevenue(
             transactionType: 'revenue',
           })
 
-    let responseMessage = `✅ Receita registrada com sucesso!\n\n💰 Valor: R$ ${amount.toFixed(2)}\n📝 Descrição: ${description}\n🏷️ Categoria: ${category}`
+    // Resposta curta e conclusiva (sem sugerir follow-ups)
+    let responseMessage = `✅ Receita registrada!\n\n💰 R$ ${amount.toFixed(2)}\n📝 ${description}\n🏷️ ${category}`
     
     if (subcategory) {
-      responseMessage += `\n📌 Subcategoria: ${subcategory}`
+      responseMessage += ` › ${subcategory}`
     }
     
-    responseMessage += `\n📅 Data: ${new Date(date).toLocaleDateString('pt-BR')}`
+    responseMessage += `\n📅 ${new Date(date).toLocaleDateString('pt-BR')}`
 
     return {
       success: true,
