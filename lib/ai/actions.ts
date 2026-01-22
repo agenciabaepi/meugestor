@@ -707,7 +707,12 @@ async function executeAction(
       return await handleCreateSupplier(semanticState, tenantId, userId, sessionContext)
 
     case 'chat':
-      return await handleChat(message, tenantId, userId, sessionContext)
+      // Conversa deve ser tratada no webhook antes de chegar aqui
+      // Fallback de segurança
+      return {
+        success: true,
+        message: 'Como posso ajudar? Você pode registrar gastos, agendar compromissos ou consultar informações.',
+      }
 
     case 'create_employee':
       return await handleCreateEmployee(semanticState, tenantId, userId, message, sessionContext)
