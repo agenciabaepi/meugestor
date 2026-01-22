@@ -287,10 +287,92 @@ export function analyzeSystemFeaturesRequest(message: string): ContextAnalysis {
 }
 
 /**
+ * LIMPA TODO O CONTEXTO OPERACIONAL
+ * 
+ * Usado quando mensagem casual é detectada para garantir
+ * que não haja vazamento de contexto de ações anteriores.
+ */
+export async function clearAllOperationalContext(
+  tenantId: string,
+  userId: string
+): Promise<void> {
+  // Limpa session focus (activeTask)
+  const { clearActiveTask } = await import('./session-focus')
+  clearActiveTask(tenantId, userId)
+  
+  // Limpa focus lock
+  const { clearFocus } = await import('./focus-lock')
+  clearFocus(tenantId, 'appointment')
+  clearFocus(tenantId, 'expense')
+  clearFocus(tenantId, 'revenue')
+  
+  // Limpa semantic state (lastValidState)
+  const { clearState } = await import('./semantic-state')
+  clearState()
+  
+  // Limpa pending confirmation
+  const { clearPendingConfirmation } = await import('./confirmation-manager')
+  clearPendingConfirmation(tenantId, userId)
+  
+  console.log('context-analyzer - TODO o contexto operacional foi limpo:', { tenantId, userId })
+}
+
+/**
+ * DETECÇÃO DE MENSAGENS CASUAIS (GUARDA CRÍTICA)
+ * 
+ * Mensagens casuais DEVEM resetar o contexto operacional.
+ * NUNCA devem ser tratadas como continuação de ações anteriores.
+ */
+export function isCasualMessage(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim()
+  
+  // Padrões exatos de mensagens casuais
+  const casualExactPatterns = [
+    /^(oi|olá|ola|eae|e aí|e ai|opa|hey|hi|hello)$/i,
+    /^(tudo bem|tudo certo|tudo ok|tudo tranquilo|tranquilo)$/i,
+    /^(bom dia|boa tarde|boa noite)$/i,
+    /^(kkk|haha|rs|hehe|kk)$/i,
+    /^(só um oi|só um ola)$/i,
+    /^(obrigado|obrigada|valeu|vlw|agradeço|thanks)$/i,
+    /^(tchau|até|até logo|até mais|bye|falou)$/i,
+  ]
+  
+  // Verifica padrões exatos
+  if (casualExactPatterns.some(pattern => pattern.test(lowerMessage))) {
+    return true
+  }
+  
+  // Mensagens muito curtas sem verbos de ação (menos de 10 caracteres)
+  if (lowerMessage.length < 10) {
+    // Verifica se NÃO contém verbos de ação
+    const actionVerbs = [
+      'gastei', 'paguei', 'recebi', 'ganhei', 'cria', 'cadastra', 'adiciona',
+      'marca', 'remove', 'agenda', 'reunião', 'compromisso', 'marcar',
+      'quanto', 'quantos', 'quais', 'mostre', 'mostra', 'lista', 'relatório'
+    ]
+    
+    const hasActionVerb = actionVerbs.some(verb => lowerMessage.includes(verb))
+    if (!hasActionVerb) {
+      return true
+    }
+  }
+  
+  return false
+}
+
+/**
  * Analisa se a mensagem é conversa casual ou ação operacional
  * Retorna análise simples: tem intenção operacional ou não
  */
 export function analyzeIntention(message: string): IntentionAnalysis {
+  // GUARDA CRÍTICA: Se for mensagem casual, retorna imediatamente
+  if (isCasualMessage(message)) {
+    return {
+      hasOperationalIntent: false,
+      probableIntent: 'conversation',
+      confidence: 0.95,
+    }
+  }
   const lowerMessage = message.toLowerCase().trim()
   
   // Palavras-chave que indicam ação operacional clara

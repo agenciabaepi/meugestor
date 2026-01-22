@@ -11,7 +11,7 @@ import { getOrCreateTenantByWhatsApp as getTenantByWhatsApp } from '@/lib/module
 import { createConversation, getRecentConversations } from '@/lib/db/queries'
 import { processAction } from '@/lib/ai/actions'
 import { processMessage } from '@/lib/ai/conversation'
-import { analyzeIntention } from '@/lib/ai/context-analyzer'
+import { analyzeIntention, isCasualMessage, clearAllOperationalContext } from '@/lib/ai/context-analyzer'
 import { processWhatsAppAudio } from '@/lib/ai/whisper'
 import { processWhatsAppImage } from '@/lib/ai/vision'
 import { createFinanceiroRecordForContext } from '@/lib/services/financeiro'
@@ -157,9 +157,40 @@ async function processWhatsAppMessage(
       'https://seu-dominio.com'
 
       // NOVO FLUXO: CONVERSA ≠ DECISÃO ≠ EXECUÇÃO
-      // 1. Analisa se é conversa casual ou ação operacional
+      // GUARDA CRÍTICA: Detectar mensagens casuais ANTES de qualquer processamento
       if (message.type === 'text' && message.text?.body) {
         const userMessage = message.text.body
+        
+        // DETECÇÃO DE MENSAGEM CASUAL (ANTES DE TUDO)
+        if (isCasualMessage(userMessage)) {
+          console.log('Webhook - Mensagem casual detectada, limpando contexto e respondendo apenas conversa')
+          
+          // LIMPA TODO O CONTEXTO OPERACIONAL
+          await clearAllOperationalContext(tenantId, userId || '')
+          
+          // Salva mensagem do usuário
+          await createConversation(tenantId, userMessage, 'user', userId)
+          
+          // RESPONDE APENAS COM CONVERSA (sem passar por processAction)
+          try {
+            const conversationResponse = await processMessage(userMessage, {
+              tenantId,
+              userId: userId || null,
+              recentMessages: await getRecentConversations(tenantId, 5, userId),
+            })
+            
+            await sendTextMessage(from, conversationResponse)
+            await createConversation(tenantId, conversationResponse, 'assistant', userId)
+            return
+          } catch (error) {
+            console.error('Erro ao processar conversa casual:', error)
+            await sendTextMessage(from, 'Olá! Como posso ajudar?')
+            await createConversation(tenantId, 'Olá! Como posso ajudar?', 'assistant', userId)
+            return
+          }
+        }
+        
+        // Se não for casual, continua com o fluxo normal
         await createConversation(tenantId, userMessage, 'user', userId)
         
         // Analisa intenção (conversa vs ação)
