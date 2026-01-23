@@ -8,11 +8,11 @@ import {
 } from '@/lib/services/financeiro'
 import { getSessionContext } from '@/lib/utils/session-context'
 import { FinanceiroTabs } from './tabs'
-import { FinanceiroDonutTabs } from './FinanceiroDonutTabs'
 import { EmpresaCategoriasTabela } from './EmpresaCategoriasTabela'
 import { EmpresaFornecedoresTabela } from './EmpresaFornecedoresTabela'
 import { AddTransacaoButton } from './AddTransacaoButton'
 import { PeriodoSelector } from './PeriodoSelector'
+import { UltimasTransacoes } from './UltimasTransacoes'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { parseLocalDate } from '@/lib/utils/format-date'
 
@@ -221,24 +221,6 @@ export default async function FinanceiroPage({
         <PeriodoSelector />
       </Suspense>
 
-      {/* Donuts (Despesas/Receitas) */}
-      <FinanceiroDonutTabs
-        donutDespesas={{
-          total: Number(data.totalDespesas) || 0,
-          categorias: (data.dadosPorCategoriaDespesas || []).map((c: any) => ({
-            nome: String(c.name),
-            valor: Number(c.value),
-          })),
-        }}
-        donutReceitas={{
-          total: Number(data.totalReceitas) || 0,
-          categorias: (data.dadosPorCategoriaReceitas || []).map((c: any) => ({
-            nome: String(c.name),
-            valor: Number(c.value),
-          })),
-        }}
-      />
-
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* Saldo */}
@@ -285,6 +267,9 @@ export default async function FinanceiroPage({
           </p>
         </div>
       </div>
+
+      {/* Últimas Transações (últimos 15) */}
+      <UltimasTransacoes transacoes={data.todasTransacoes} />
 
       {/* Seção de Empresas: Tabelas por Categoria, Fornecedor e Funcionários */}
       {isEmpresa && (

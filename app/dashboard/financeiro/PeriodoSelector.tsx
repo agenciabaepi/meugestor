@@ -1,17 +1,24 @@
 'use client'
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
-import { useState } from 'react'
+import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 
 interface PeriodoSelectorProps {
   basePath?: string
 }
 
+const months = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+]
+
 export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [isOpen, setIsOpen] = useState(false)
+  const modalRef = useRef<HTMLDivElement>(null)
   
   // Usa basePath se fornecido, senão usa o pathname atual
   const currentBasePath = basePath || pathname || '/dashboard/financeiro'
@@ -28,150 +35,173 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
     new Date(currentYear, currentMonth - 1, 1)
   )
   
-  // Navega para o mês anterior
-  const goToPreviousMonth = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setMonth(newDate.getMonth() - 1)
-    updatePeriod(newDate)
-  }
-  
-  // Navega para o próximo mês
-  const goToNextMonth = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setMonth(newDate.getMonth() + 1)
-    updatePeriod(newDate)
-  }
-  
-  // Vai para o mês atual
-  const goToCurrentMonth = () => {
-    updatePeriod(new Date())
-  }
+  const [tempMonth, setTempMonth] = useState(currentMonth - 1)
+  const [tempYear, setTempYear] = useState(currentYear)
   
   // Atualiza o período na URL
-  const updatePeriod = (date: Date) => {
-    const month = date.getMonth() + 1
-    const year = date.getFullYear()
-    setSelectedDate(date)
+  const updatePeriod = (month: number, year: number) => {
+    setSelectedDate(new Date(year, month, 1))
     
     const params = new URLSearchParams(searchParams.toString())
-    params.set('mes', month.toString())
+    params.set('mes', (month + 1).toString())
     params.set('ano', year.toString())
     router.push(`${currentBasePath}?${params.toString()}`)
+    setIsOpen(false)
   }
   
-  // Verifica se é o mês atual
-  const isCurrentMonth = 
-    selectedDate.getMonth() === now.getMonth() &&
-    selectedDate.getFullYear() === now.getFullYear()
+  // Sincroniza tempMonth e tempYear quando abre o modal
+  useEffect(() => {
+    if (isOpen) {
+      setTempMonth(currentMonth - 1)
+      setTempYear(currentYear)
+    }
+  }, [isOpen, currentMonth, currentYear])
   
-  // Formata o nome do mês
-  const monthName = selectedDate.toLocaleDateString('pt-BR', {
-    month: 'long',
-    year: 'numeric'
+  // Fecha ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+  
+  // Fecha com ESC
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
+
+  const monthName = selectedDate.toLocaleDateString('pt-BR', { 
+    month: 'long', 
+    year: 'numeric' 
   })
   
-  // Gera lista dos últimos 6 meses para abas
-  const recentMonths = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date(now)
-    date.setMonth(date.getMonth() - i)
-    return {
-      month: date.getMonth() + 1,
-      year: date.getFullYear(),
-      date,
-      label: date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
-      isCurrent: i === 0,
-    }
-  }).reverse()
+  const navigateYear = (direction: 'prev' | 'next') => {
+    setTempYear(prev => direction === 'prev' ? prev - 1 : prev + 1)
+  }
   
+  const handleMonthSelect = (month: number) => {
+    updatePeriod(month, tempYear)
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        {/* Navegação de Mês */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button
-            onClick={goToPreviousMonth}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="Mês anterior"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Calendar className="w-5 h-5 text-emerald-600" />
-            <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 capitalize">
-                {monthName}
-              </h2>
-              {!isCurrentMonth && (
-                <button
-                  onClick={goToCurrentMonth}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 underline mt-0.5"
-                >
-                  Voltar para o mês atual
-                </button>
-              )}
-            </div>
-          </div>
-          
-          <button
-            onClick={goToNextMonth}
-            disabled={isCurrentMonth}
-            className={`p-2 rounded-lg transition-colors ${
-              isCurrentMonth
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-gray-100'
-            }`}
-            aria-label="Próximo mês"
-          >
-            <ChevronRight className={`w-5 h-5 ${isCurrentMonth ? 'text-gray-400' : 'text-gray-600'}`} />
-          </button>
-        </div>
-        
-        {/* Seleção de Mês/Ano */}
-        <div className="flex items-center gap-2">
-          <input
-            type="month"
-            value={`${currentYear}-${String(currentMonth).padStart(2, '0')}`}
-            onChange={(e) => {
-              const [year, month] = e.target.value.split('-')
-              const newDate = new Date(parseInt(year), parseInt(month) - 1, 1)
-              updatePeriod(newDate)
-            }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-          />
-        </div>
+    <>
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm text-gray-700"
+        >
+          <Calendar className="w-4 h-4 text-gray-600" />
+          <span className="font-medium">
+            {monthName}
+          </span>
+        </button>
       </div>
       
-      {/* Abas de Meses Recentes */}
-      <div className="mt-4 sm:mt-6 border-t border-gray-200 pt-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
-          {recentMonths.map((m) => {
-            const isSelected = 
-              m.month === currentMonth && m.year === currentYear
-            
-            return (
+      {/* Modal do Calendário */}
+      {isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div 
+            ref={modalRef}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-white font-semibold text-lg">Selecionar Período</h3>
+              </div>
               <button
-                key={`${m.year}-${m.month}`}
-                onClick={() => updatePeriod(m.date)}
-                className={`
-                  px-3 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap
-                  transition-colors
-                  ${
-                    isSelected
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
-                  }
-                `}
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center transition-colors"
               >
-                {m.label}
-                {m.isCurrent && (
-                  <span className="ml-1 text-xs text-emerald-600">•</span>
-                )}
+                <X className="w-5 h-5 text-white" />
               </button>
-            )
-          })}
+            </div>
+            
+            {/* Navegação de Ano */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <button
+                onClick={() => navigateYear('prev')}
+                className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <span className="text-2xl font-bold text-gray-900">{tempYear}</span>
+              <button
+                onClick={() => navigateYear('next')}
+                className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            
+            {/* Grid de Meses */}
+            <div className="p-6">
+              <div className="grid grid-cols-3 gap-3">
+                {months.map((month, index) => {
+                  const isSelected = index === tempMonth && tempYear === currentYear && (index + 1) === currentMonth
+                  const isCurrentMonth = index === now.getMonth() && tempYear === now.getFullYear()
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleMonthSelect(index)}
+                      className={`
+                        px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                        ${isSelected
+                          ? 'bg-emerald-500 text-white shadow-lg scale-105'
+                          : isCurrentMonth
+                          ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:scale-105'
+                        }
+                      `}
+                    >
+                      {month}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  const today = new Date()
+                  updatePeriod(today.getMonth(), today.getFullYear())
+                }}
+                className="px-4 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+              >
+                Hoje
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }

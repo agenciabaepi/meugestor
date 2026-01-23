@@ -2,6 +2,16 @@ import { gerarResumoMensalForContext, gerarResumoSemanalForContext, obterMaiores
 import { gerarDadosAnuais } from '@/lib/services/caixa'
 import { getSessionContext } from '@/lib/utils/session-context'
 import { formatCurrency } from '@/lib/utils/format-currency'
+import {
+  getDespesasRecordsForContext,
+  getReceitasRecordsForContext,
+  getFinanceiroRecordsForContext,
+  calculateTotalSpentForContext,
+  calculateTotalRevenueForContext,
+} from '@/lib/services/financeiro'
+import { ExportPDFButton } from './ExportPDFButton'
+
+export const dynamic = 'force-dynamic'
 
 async function getRelatoriosData() {
   const ctx = await getSessionContext()
@@ -22,6 +32,15 @@ async function getRelatoriosData() {
       },
       maioresGastos: [],
       dadosAnuais: [],
+      // Dados para PDF
+      receitasMes: [],
+      despesasMes: [],
+      todasTransacoes: [],
+      totalReceitas: 0,
+      totalDespesas: 0,
+      saldo: 0,
+      mes: '',
+      ano: 0,
     }
   }
   
@@ -30,11 +49,60 @@ async function getRelatoriosData() {
   const maioresGastos = await obterMaioresGastosForContext(ctx, 10)
   const dadosAnuais = await gerarDadosAnuais(ctx)
 
+  // Busca dados completos para o PDF (mês atual)
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+  const despesasMes = await getDespesasRecordsForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+
+  const receitasMes = await getReceitasRecordsForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+
+  const todasTransacoes = await getFinanceiroRecordsForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+
+  const totalDespesas = await calculateTotalSpentForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+
+  const totalReceitas = await calculateTotalRevenueForContext(
+    ctx,
+    startOfMonth.toISOString().split('T')[0],
+    endOfMonth.toISOString().split('T')[0]
+  )
+
+  const saldo = totalReceitas - totalDespesas
+
+  const mesNome = now.toLocaleDateString('pt-BR', { month: 'long' })
+  const mesCapitalizado = mesNome.charAt(0).toUpperCase() + mesNome.slice(1)
+
   return {
     resumoMensal,
     resumoSemanal,
     maioresGastos,
     dadosAnuais,
+    // Dados para PDF
+    receitasMes,
+    despesasMes,
+    todasTransacoes,
+    totalReceitas,
+    totalDespesas,
+    saldo,
+    mes: mesCapitalizado,
+    ano: now.getFullYear(),
   }
 }
 
@@ -52,8 +120,18 @@ export default async function RelatoriosPage() {
 
       {/* Resumo Mensal */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900">Resumo Mensal</h2>
+          <ExportPDFButton
+            receitas={data.receitasMes}
+            despesas={data.despesasMes}
+            todasTransacoes={data.todasTransacoes}
+            totalReceitas={data.totalReceitas}
+            totalDespesas={data.totalDespesas}
+            saldo={data.saldo}
+            mes={data.mes}
+            ano={data.ano}
+          />
         </div>
         <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">

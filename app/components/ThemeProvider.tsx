@@ -33,17 +33,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   const setTheme = useCallback((newTheme: Theme) => {
+    if (typeof window === 'undefined') return
+    
     setThemeState(newTheme)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', newTheme)
-    }
+    localStorage.setItem('theme', newTheme)
+    
+    // Aplica o tema imediatamente no DOM
+    const root = document.documentElement
+    root.classList.remove('light', 'dark')
+    
+    const resolved = getResolvedTheme(newTheme)
+    setResolvedTheme(resolved)
+    root.classList.add(resolved)
   }, [])
 
+  // Inicializa o tema ao montar
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
     setMounted(true)
-    // Aplica tema inicial
     const initialTheme = getInitialTheme()
     const initialResolved = getResolvedTheme(initialTheme)
+    
+    setThemeState(initialTheme)
     setResolvedTheme(initialResolved)
     
     const root = document.documentElement
@@ -51,8 +63,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.add(initialResolved)
   }, [])
 
+  // Atualiza o tema quando o estado muda (fallback)
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || typeof window === 'undefined') return
 
     const root = document.documentElement
     root.classList.remove('light', 'dark')

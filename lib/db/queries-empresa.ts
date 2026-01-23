@@ -84,6 +84,62 @@ export async function createFinanceiroEmpresa(
     })
   }
   
+  // Se for uma despesa (expense), também registra em gastos_empresa
+  if (transactionType === 'expense') {
+    try {
+      // Busca ou cria categoria
+      const categoriaId = await getOrCreateCategoriaEmpresa(tenantId, empresaId, category)
+      
+      if (categoriaId) {
+        // Busca ou cria subcategoria (se houver)
+        const subcategoriaId = subcategory 
+          ? await getOrCreateSubcategoriaEmpresa(tenantId, empresaId, categoriaId, subcategory)
+          : null
+        
+        // Extrai fornecedor_id do metadata ou busca pela descrição
+        let fornecedorId: string | null = null
+        
+        // Tenta obter do metadata primeiro
+        if (metadata && typeof metadata === 'object' && 'fornecedor' in metadata) {
+          const fornecedor = (metadata as any).fornecedor
+          if (fornecedor && typeof fornecedor === 'object' && 'id' in fornecedor) {
+            fornecedorId = fornecedor.id
+          }
+        }
+        
+        // Se não encontrou no metadata, tenta buscar pela descrição
+        if (!fornecedorId && description) {
+          const { extractSupplierNameFromExpenseText, normalizeFornecedorName } = await import('../services/fornecedores')
+          const supplierName = extractSupplierNameFromExpenseText(description)
+          if (supplierName) {
+            const nomeNormalizado = normalizeFornecedorName(supplierName)
+            const fornecedor = await getFornecedorByNormalizedName(tenantId, empresaId, nomeNormalizado)
+            if (fornecedor) {
+              fornecedorId = fornecedor.id
+            }
+          }
+        }
+        
+        // Cria registro em gastos_empresa
+        await createGastoEmpresa(
+          tenantId,
+          empresaId,
+          categoriaId,
+          subcategoriaId,
+          fornecedorId,
+          description,
+          amount,
+          date,
+          null, // quantidade
+          null  // valor_unitario
+        )
+      }
+    } catch (error) {
+      // Não falha a criação do financeiro_empresa se houver erro ao criar gasto_empresa
+      console.error('Error creating gasto_empresa (não crítico):', error)
+    }
+  }
+  
   return data
 }
 
@@ -925,6 +981,179 @@ export async function deleteFornecedor(
     return false
   }
   return true
+}
+
+// ============================================
+// CATEGORIAS E SUBCATEGORIAS EMPRESA (Helpers)
+// ============================================
+
+/**
+ * Busca ou cria uma categoria_empresa pelo nome
+ */
+export async function getOrCreateCategoriaEmpresa(
+  tenantId: string,
+  empresaId: string,
+  nome: string
+): Promise<string | null> {
+  const client = requireAdmin()
+  
+  // Usa a função normalize_list_name do banco (similar ao normalizeText)
+  const { normalizeText } = await import('../utils/normalize-text')
+  const nomeNormalizado = normalizeText(nome)
+  
+  if (!nomeNormalizado) {
+    console.error('Nome de categoria vazio após normalização')
+    return null
+  }
+  
+  // Tenta buscar categoria existente
+  const { data: existing } = await client
+    .from('categorias_empresa')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('empresa_id', empresaId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .single()
+  
+  if (existing) {
+    return existing.id
+  }
+  
+  // Cria nova categoria (tipo variável por padrão)
+  const { data: created, error } = await client
+    .from('categorias_empresa')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      nome,
+      nome_normalizado: nomeNormalizado,
+      tipo: 'variavel',
+      is_default: false,
+    })
+    .select('id')
+    .single()
+  
+  if (error) {
+    console.error('Error creating categoria_empresa:', error)
+    return null
+  }
+  
+  return created.id
+}
+
+/**
+ * Busca ou cria uma subcategoria_empresa pelo nome
+ */
+export async function getOrCreateSubcategoriaEmpresa(
+  tenantId: string,
+  empresaId: string,
+  categoriaId: string,
+  nome: string | null
+): Promise<string | null> {
+  if (!nome || !nome.trim()) {
+    return null
+  }
+  
+  const client = requireAdmin()
+  const { normalizeText } = await import('../utils/normalize-text')
+  const nomeNormalizado = normalizeText(nome)
+  
+  if (!nomeNormalizado) {
+    return null
+  }
+  
+  // Tenta buscar subcategoria existente
+  const { data: existing } = await client
+    .from('subcategorias_empresa')
+    .select('id')
+    .eq('categoria_id', categoriaId)
+    .eq('nome_normalizado', nomeNormalizado)
+    .single()
+  
+  if (existing) {
+    return existing.id
+  }
+  
+  // Cria nova subcategoria
+  const { data: created, error } = await client
+    .from('subcategorias_empresa')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      categoria_id: categoriaId,
+      nome,
+      nome_normalizado: nomeNormalizado,
+    })
+    .select('id')
+    .single()
+  
+  if (error) {
+    console.error('Error creating subcategoria_empresa:', error)
+    return null
+  }
+  
+  return created.id
+}
+
+// ============================================
+// GASTOS EMPRESA
+// ============================================
+
+export interface GastoEmpresa {
+  id: string
+  tenant_id: string
+  empresa_id: string
+  categoria_id: string
+  subcategoria_id: string | null
+  fornecedor_id: string | null
+  descricao: string
+  quantidade: number | null
+  valor_unitario: number | null
+  valor_total: number
+  data: string
+  created_at: string
+}
+
+/**
+ * Cria um registro em gastos_empresa
+ */
+export async function createGastoEmpresa(
+  tenantId: string,
+  empresaId: string,
+  categoriaId: string,
+  subcategoriaId: string | null,
+  fornecedorId: string | null,
+  descricao: string,
+  valorTotal: number,
+  dataGasto: string,
+  quantidade?: number | null,
+  valorUnitario?: number | null
+): Promise<GastoEmpresa | null> {
+  const client = requireAdmin()
+  
+  const { data, error } = await client
+    .from('gastos_empresa')
+    .insert({
+      tenant_id: tenantId,
+      empresa_id: empresaId,
+      categoria_id: categoriaId,
+      subcategoria_id: subcategoriaId || null,
+      fornecedor_id: fornecedorId || null,
+      descricao,
+      quantidade: quantidade || null,
+      valor_unitario: valorUnitario || null,
+      valor_total: valorTotal,
+      data: dataGasto,
+    })
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error creating gasto_empresa:', error)
+    return null
+  }
+  
+  return data
 }
 
 // ============================================

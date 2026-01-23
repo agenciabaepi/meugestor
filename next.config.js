@@ -27,6 +27,13 @@ const nextConfig = {
     root: projectRoot,
   },
 
+  experimental: {
+    // No macOS tivemos corrupção frequente do cache persistente do Turbopack (.sst/.meta),
+    // causando ENOENT em build-manifest/routes-manifest durante o dev.
+    // Desabilitamos a persistência em dev para ficar estável.
+    turbopackFileSystemCacheForDev: false,
+  },
+
   // Root do projeto para output tracing (deve bater com turbopack.root)
   outputFileTracingRoot: projectRoot,
 }

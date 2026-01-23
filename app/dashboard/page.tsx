@@ -12,6 +12,7 @@ import { getSessionContext } from '@/lib/utils/session-context'
 import { Wallet, FileText, Calendar, Clock, TrendingUp, TrendingDown, Banknote } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { DashboardChart } from './components/DashboardChart'
+import { DonutGastosChart, type DonutGastosData } from './components/DonutGastosChart'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,8 @@ async function getDashboardData() {
           totalRegistros: 0,
           periodo: { inicio: '', fim: '' },
         },
+        dadosPorCategoriaDespesas: [],
+        dadosPorCategoriaReceitas: [],
       }
     }
     
@@ -53,6 +56,8 @@ async function getDashboardData() {
     let gastosMes: any[] = []
     let receitasMes: any[] = []
     let dadosGrafico: Array<{ date: string; despesas: number; receitas: number }> = []
+    let dadosPorCategoriaDespesas: Array<{ name: string; value: number }> = []
+    let dadosPorCategoriaReceitas: Array<{ name: string; value: number }> = []
     
     try {
       totalDespesas = await calculateTotalSpentForContext(
@@ -76,6 +81,27 @@ async function getDashboardData() {
         startOfMonth.toISOString().split('T')[0],
         endOfMonth.toISOString().split('T')[0]
       )
+      
+      // Calcula dados por categoria para os donuts
+      const totalsByCategoryDespesas = new Map<string, number>()
+      for (const d of gastosMes) {
+        const key = String(d.category || 'Outros')
+        totalsByCategoryDespesas.set(key, (totalsByCategoryDespesas.get(key) || 0) + Number(d.amount))
+      }
+      dadosPorCategoriaDespesas = Array.from(totalsByCategoryDespesas.entries())
+        .map(([name, value]) => ({ name, value: Number(value) }))
+        .filter((d) => d.value > 0)
+        .sort((a, b) => b.value - a.value)
+      
+      const totalsByCategoryReceitas = new Map<string, number>()
+      for (const r of receitasMes) {
+        const key = String(r.category || 'Outros')
+        totalsByCategoryReceitas.set(key, (totalsByCategoryReceitas.get(key) || 0) + Number(r.amount))
+      }
+      dadosPorCategoriaReceitas = Array.from(totalsByCategoryReceitas.entries())
+        .map(([name, value]) => ({ name, value: Number(value) }))
+        .filter((d) => d.value > 0)
+        .sort((a, b) => b.value - a.value)
       
       // Busca registros recentes (últimos 5) - apenas do mês atual para economizar memória
       const recentesStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
@@ -176,6 +202,8 @@ async function getDashboardData() {
       proximos: proximos.slice(0, 5),
       dadosGrafico,
       resumo,
+      dadosPorCategoriaDespesas,
+      dadosPorCategoriaReceitas,
     }
   } catch (error) {
     console.error('Error in getDashboardData:', error)
@@ -197,6 +225,8 @@ async function getDashboardData() {
         totalRegistros: 0,
         periodo: { inicio: '', fim: '' },
       },
+      dadosPorCategoriaDespesas: [],
+      dadosPorCategoriaReceitas: [],
     }
   }
 }
@@ -207,11 +237,11 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="mb-8 lg:mb-10">
-        <div>
+          <div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h1>
           <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
-            Visão geral das suas finanças e compromissos
-          </p>
+          Visão geral das suas finanças e compromissos
+        </p>
         </div>
       </div>
 
@@ -321,6 +351,65 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Gráficos Donut - Despesas e Receitas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Donut Despesas */}
+        {data.totalDespesas > 0 && (
+          <div className="overflow-hidden rounded-2xl shadow-lg border border-emerald-950/10">
+            <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800">
+              <div className="px-5 sm:px-6 pt-5 sm:pt-6 text-center">
+                <h2 className="text-white text-lg sm:text-xl font-bold tracking-tight">Despesas por Categoria</h2>
+                <p className="text-white/75 text-sm sm:text-base mt-1">
+                  Total: {formatCurrency(data.totalDespesas)}
+                </p>
+              </div>
+              <div className="px-4 sm:px-6 py-4 sm:py-6">
+                <DonutGastosChart
+                  data={{
+                    total: Number(data.totalDespesas) || 0,
+                    categorias: (data.dadosPorCategoriaDespesas || []).map((c: any) => ({
+                      nome: String(c.name),
+                      valor: Number(c.value),
+                    })),
+                  }}
+                  variant="dark"
+                  centerTitle="Gasto total"
+                  showCenterButton={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Donut Receitas */}
+        {data.totalReceitas > 0 && (
+          <div className="overflow-hidden rounded-2xl shadow-lg border border-emerald-950/10">
+            <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800">
+              <div className="px-5 sm:px-6 pt-5 sm:pt-6 text-center">
+                <h2 className="text-white text-lg sm:text-xl font-bold tracking-tight">Receitas por Categoria</h2>
+                <p className="text-white/75 text-sm sm:text-base mt-1">
+                  Total: {formatCurrency(data.totalReceitas)}
+                </p>
+              </div>
+              <div className="px-4 sm:px-6 py-4 sm:py-6">
+                <DonutGastosChart
+                  data={{
+                    total: Number(data.totalReceitas) || 0,
+                    categorias: (data.dadosPorCategoriaReceitas || []).map((c: any) => ({
+                      nome: String(c.name),
+                      valor: Number(c.value),
+                    })),
+                  }}
+                  variant="dark"
+                  centerTitle="Receita total"
+                  showCenterButton={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Gastos Recentes */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">

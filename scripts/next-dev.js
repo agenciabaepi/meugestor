@@ -21,7 +21,8 @@ const wantsWebpack = userArgs.includes('--webpack')
 const noClean = userArgs.includes('--no-clean')
 
 const nextArgs = ['dev']
-// No Next.js 16 o padrão é Turbopack. Mantemos webpack só como opção.
+// No Next.js 16 o padrão é Turbopack. Mantemos webpack como opção.
+// Obs: a persistência do cache do Turbopack em dev foi desativada no next.config.js para estabilidade.
 if (wantsWebpack) nextArgs.push('--webpack')
 else if (wantsTurbo) nextArgs.push('--turbo')
 else nextArgs.push('--turbo')

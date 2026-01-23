@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
@@ -78,9 +79,37 @@ const menuItems = [
 export function Header({ sessionContext }: { sessionContext: SessionContext | null }) {
   const pathname = usePathname()
   const isEmpresa = sessionContext?.mode === 'empresa'
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+
+      // Mostra o header quando está no topo ou quando rola para cima
+      if (currentScrollY < 10) {
+        setIsVisible(true)
+      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Oculta quando rola para baixo (após 100px)
+        setIsVisible(false)
+      } else if (currentScrollY < lastScrollY) {
+        // Mostra quando rola para cima
+        setIsVisible(true)
+      }
+
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScrollY])
 
   return (
-    <header className="hidden lg:block fixed top-0 left-0 right-0 h-16 bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-800 z-30">
+    <header 
+      className={`hidden lg:block fixed top-0 left-0 right-0 h-20 bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-800 z-30 transition-transform duration-300 ease-in-out ${
+        isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}
+    >
       <div className="h-full flex items-center justify-between px-6">
         {/* Logo */}
         <div className="flex-shrink-0">
@@ -88,7 +117,7 @@ export function Header({ sessionContext }: { sessionContext: SessionContext | nu
             href="/dashboard"
             className="flex items-center group"
           >
-            <div className="relative h-7 w-[140px] group-hover:opacity-95 transition-opacity flex items-center justify-center">
+            <div className="relative h-8 w-[160px] group-hover:opacity-95 transition-opacity flex items-center justify-center">
               <img
                 src={LOGO_URL}
                 alt="ORGANIZAPAY"
@@ -130,7 +159,7 @@ export function Header({ sessionContext }: { sessionContext: SessionContext | nu
                         : 'text-gray-500 dark:text-gray-400'
                     }`}
                   />
-                  <span className="text-xs font-medium">{item.label}</span>
+                  <span className="text-xs font-medium leading-tight">{item.label}</span>
                 </Link>
               )
             })}

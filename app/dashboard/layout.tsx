@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       <Header sessionContext={sessionContext} />
 
       {/* Main Content - Com padding para o header */}
-      <main className="relative z-10 lg:pt-16 min-h-screen pb-20 lg:pb-0">
+      <main className="relative z-10 lg:pt-20 min-h-screen pb-20 lg:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
           <div className="w-full">
             {children}
