@@ -118,19 +118,19 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Contas a Receber</h1>
-        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Contas a Receber</h1>
+        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
           Gerencie suas receitas previstas para receber
         </p>
       </div>
 
       {/* Estatísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Total Pendente</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Total Pendente</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1">
                 {formatCurrency(initialTotal)}
               </p>
             </div>
@@ -139,10 +139,10 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6 border-l-4 border-orange-500">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6 border-l-4 border-orange-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Atrasadas</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Atrasadas</p>
               <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-1">
                 {atrasadas.length}
               </p>
@@ -155,10 +155,10 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6 border-l-4 border-blue-500">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Previstas</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Previstas</p>
               <p className="text-2xl sm:text-3xl font-bold text-blue-600 mt-1">
                 {previstas.length}
               </p>
@@ -175,32 +175,32 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
 
       {/* Contas Atrasadas */}
       {atrasadas.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden border-l-4 border-orange-500">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-orange-50">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden border-l-4 border-orange-500">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-orange-50 dark:bg-orange-900/20">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               ⚠️ Contas Atrasadas ({atrasadas.length})
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Total: {formatCurrency(totalAtrasadas)}
             </p>
           </div>
           <div className="divide-y divide-gray-200">
             {atrasadas.map((conta) => (
-              <div key={conta.id} className="p-4 sm:p-6 hover:bg-orange-50/50 transition-colors">
+              <div key={conta.id} className="p-4 sm:p-6 hover:bg-orange-50 dark:bg-orange-900/20/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                         {conta.description}
                       </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-800">
                         Atrasada
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <div>
                         <span className="font-medium">Valor:</span>{' '}
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-900 dark:text-white font-semibold">
                           {formatCurrency(Number(conta.amount))}
                         </span>
                       </div>
@@ -225,14 +225,14 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
                     </button>
                     <Link
                       href={`/dashboard/financeiro/${conta.id}`}
-                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                       title="Editar"
                     >
                       <Edit2 className="w-5 h-5" />
                     </Link>
                     <button
                       onClick={() => handleDelete(conta)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
                       title="Excluir"
                       disabled={loading === conta.id}
                     >
@@ -248,32 +248,32 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
 
       {/* Receitas Previstas */}
       {previstas.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden border-l-4 border-blue-500">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-blue-50">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden border-l-4 border-blue-500">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               📅 Receitas Previstas ({previstas.length})
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Total: {formatCurrency(totalPrevistas)}
             </p>
           </div>
           <div className="divide-y divide-gray-200">
             {previstas.map((conta) => (
-              <div key={conta.id} className="p-4 sm:p-6 hover:bg-blue-50/50 transition-colors">
+              <div key={conta.id} className="p-4 sm:p-6 hover:bg-blue-50 dark:bg-blue-900/20/50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                         {conta.description}
                       </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
                         Pendente
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <div>
                         <span className="font-medium">Valor:</span>{' '}
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-900 dark:text-white font-semibold">
                           {formatCurrency(Number(conta.amount))}
                         </span>
                       </div>
@@ -298,14 +298,14 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
                     </button>
                     <Link
                       href={`/dashboard/financeiro/${conta.id}`}
-                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                       title="Editar"
                     >
                       <Edit2 className="w-5 h-5" />
                     </Link>
                     <button
                       onClick={() => handleDelete(conta)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
                       title="Excluir"
                       disabled={loading === conta.id}
                     >
@@ -321,12 +321,12 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
 
       {/* Mensagem quando não há contas */}
       {contasAReceber.length === 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-8 sm:p-12 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-8 sm:p-12 text-center">
           <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Nenhuma conta a receber
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
             Todas as suas receitas foram recebidas!
           </p>
           <Link
@@ -350,7 +350,7 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
         <p className="text-gray-700 mb-4">
           Tem certeza que deseja excluir esta conta?
           {contaToDelete && (
-            <span className="block mt-2 text-sm text-gray-500">
+            <span className="block mt-2 text-sm text-gray-500 dark:text-gray-400">
               "{contaToDelete.description}"
             </span>
           )}
@@ -362,7 +362,7 @@ export function ContasAReceberClient({ contasAReceber: initialContasAReceber, to
               setDeleteConfirmOpen(false)
               setContaToDelete(null)
             }}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             Cancelar
           </button>

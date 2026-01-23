@@ -13,20 +13,20 @@ export function AgendaClient({ compromissos }: { compromissos: Compromisso[] }) 
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Agenda</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Agenda</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Gerencie seus compromissos e eventos
           </p>
         </div>
         
         {/* Toggle de visualização */}
-        <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex-shrink-0">
           <button
             onClick={() => setView('calendar')}
             className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded transition touch-manipulation ${
               view === 'calendar'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
             style={{ minWidth: '44px', minHeight: '44px' }}
           >
@@ -36,8 +36,8 @@ export function AgendaClient({ compromissos }: { compromissos: Compromisso[] }) 
             onClick={() => setView('list')}
             className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded transition touch-manipulation ${
               view === 'list'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
             style={{ minWidth: '44px', minHeight: '44px' }}
           >
@@ -54,11 +54,11 @@ export function AgendaClient({ compromissos }: { compromissos: Compromisso[] }) 
           <ListView compromissos={compromissos} />
         )
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center">
           <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
               <svg
-                className="w-8 h-8 text-gray-400"
+                className="w-8 h-8 text-gray-400 dark:text-gray-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -71,10 +71,10 @@ export function AgendaClient({ compromissos }: { compromissos: Compromisso[] }) 
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Nenhum compromisso agendado
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Seus compromissos futuros aparecerão aqui
             </p>
           </div>

@@ -260,8 +260,8 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Listas</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Listas</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Lista de compras e checklists do dia a dia
           </p>
         </div>
@@ -269,7 +269,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
         <button
           onClick={loadListas}
           disabled={!isAuthenticated || loading}
-          className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" />
           Atualizar
@@ -277,11 +277,11 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
       </div>
 
       {!isAuthenticated && (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900">Faça login para ver suas listas</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="px-6 lg:px-8 py-5 bg-gradient-to-r from-gray-50 dark:from-gray-800 to-white dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Faça login para ver suas listas</h2>
           </div>
-          <div className="p-6 text-gray-600">
+          <div className="p-6 text-gray-600 dark:text-gray-400">
             Entre na sua conta para acessar e gerenciar suas listas.
           </div>
         </div>
@@ -296,14 +296,14 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
               mobilePanel === 'itens' ? 'hidden lg:block' : 'block',
             ].join(' ')}
           >
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 bg-gradient-to-r from-emerald-50 to-white border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="px-6 py-5 bg-gradient-to-r from-emerald-50 dark:from-emerald-900/20 to-white dark:to-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-emerald-700 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
                     <ShoppingCart className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">Suas listas</h2>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Suas listas</h2>
                     <p className="text-xs text-gray-500">{listas.length} no total</p>
                   </div>
                 </div>
@@ -312,7 +312,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
               <div className="p-4 space-y-3">
                 {/* Toggle mobile */}
                 <div className="lg:hidden flex items-center justify-between">
-                  <div className="text-xs font-semibold text-gray-600">
+                  <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                     Toque em uma lista para ver os itens
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                     value={newListName}
                     onChange={(e) => setNewListName(e.target.value)}
                     placeholder='Nova lista (ex: "mercado")'
-                    className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                    className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
                   />
                   <button
                     onClick={createList}
@@ -366,7 +366,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                             'w-full text-left rounded-lg px-4 py-3 border transition-all',
                             active
                               ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                              : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50 text-gray-800',
+                              : 'bg-white border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800',
                           ].join(' ')}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -389,7 +389,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                                   deleteList(l.id, l.nome)
                                 }}
                                 disabled={loading}
-                                className="inline-flex items-center justify-center rounded-lg bg-white p-2 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 hover:text-red-600 disabled:opacity-60"
+                                className="inline-flex items-center justify-center rounded-lg bg-white p-2 text-gray-600 dark:text-gray-400 ring-1 ring-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 disabled:opacity-60"
                                 title="Apagar lista"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -412,11 +412,11 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
               mobilePanel === 'listas' ? 'hidden lg:block' : 'block',
             ].join(' ')}
           >
-            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="px-6 py-5 bg-gradient-to-r from-gray-50 dark:from-gray-800 to-white dark:to-gray-800 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-gray-900 truncate">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
                       {activeListName ? `Lista: ${activeListName}` : 'Selecione uma lista'}
                     </h2>
                     <p className="text-sm text-gray-500 mt-1">
@@ -429,7 +429,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                     <button
                       type="button"
                       onClick={() => setMobilePanel('listas')}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
                       Voltar
                     </button>
@@ -444,19 +444,19 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
                       placeholder='Adicionar item (ex: "leite")'
-                      className="sm:col-span-6 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="sm:col-span-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <input
                       value={newItemQty}
                       onChange={(e) => setNewItemQty(e.target.value)}
                       placeholder="Qtd (opcional)"
-                      className="sm:col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="sm:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <input
                       value={newItemUnit}
                       onChange={(e) => setNewItemUnit(e.target.value)}
                       placeholder='Unid (ex: "litro")'
-                      className="sm:col-span-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                      className="sm:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <button
                       onClick={addItem}
@@ -485,7 +485,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                   <div className="space-y-6">
                     {/* Pendentes */}
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Pendentes</h3>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Pendentes</h3>
                       {view.pendentes.length === 0 ? (
                         <div className="text-sm text-gray-500">Nada pendente.</div>
                       ) : (
@@ -493,10 +493,10 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                           {view.pendentes.map((it) => (
                             <div
                               key={it.id}
-                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-3"
+                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-gradient-to-r from-gray-50 dark:from-gray-800 to-white dark:to-gray-800 px-4 py-3"
                             >
                               <div className="min-w-0">
-                                <div className="font-semibold text-gray-900 truncate">{it.nome}</div>
+                                <div className="font-semibold text-gray-900 dark:text-white truncate">{it.nome}</div>
                                 {(it.quantidade || it.unidade) && (
                                   <div className="text-xs text-gray-500">
                                     {[it.quantidade, it.unidade].filter(Boolean).join(' ')}
@@ -515,7 +515,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                                 <button
                                   onClick={() => removeItem(it.nome)}
                                   disabled={loading}
-                                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 ring-1 ring-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60"
                                 >
                                   <Trash2 className="h-4 w-4 text-gray-500" />
                                   Remover
@@ -529,7 +529,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
 
                     {/* Comprados */}
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Comprados</h3>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Comprados</h3>
                       {view.comprados.length === 0 ? (
                         <div className="text-sm text-gray-500">Nenhum ainda.</div>
                       ) : (
@@ -537,10 +537,10 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                           {view.comprados.map((it) => (
                             <div
                               key={it.id}
-                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white px-4 py-3 opacity-80"
+                              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-white px-4 py-3 opacity-80"
                             >
                               <div className="min-w-0">
-                                <div className="font-semibold text-gray-700 truncate line-through">{it.nome}</div>
+                                <div className="font-semibold text-gray-700 dark:text-gray-300 truncate line-through">{it.nome}</div>
                                 {(it.quantidade || it.unidade) && (
                                   <div className="text-xs text-gray-500">
                                     {[it.quantidade, it.unidade].filter(Boolean).join(' ')}
@@ -550,7 +550,7 @@ export function ListasClient({ isAuthenticated }: { isAuthenticated: boolean }) 
                               <button
                                 onClick={() => removeItem(it.nome)}
                                 disabled={loading}
-                                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 ring-1 ring-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60"
                               >
                                 <Trash2 className="h-4 w-4 text-gray-500" />
                                 Remover

@@ -48,16 +48,16 @@ export function FinanceiroTabs({
   return (
     <div id="financeiro-tabs" className="space-y-4 sm:space-y-6 w-full overflow-x-hidden">
       {/* Abas */}
-      <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden">
-        <div className="border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden">
+        <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="flex -mb-px" aria-label="Tabs">
             <button
               onClick={() => setActiveTab('todos')}
               className={`
                 flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                 ${activeTab === 'todos'
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-emerald-600 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }
               `}
               style={{ minHeight: '44px' }}
@@ -70,8 +70,8 @@ export function FinanceiroTabs({
               className={`
                 flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                 ${activeTab === 'receitas'
-                  ? 'border-green-600 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-green-600 dark:border-green-500 text-green-600 dark:text-green-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }
               `}
               style={{ minHeight: '44px' }}
@@ -84,8 +84,8 @@ export function FinanceiroTabs({
               className={`
                 flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                 ${activeTab === 'despesas'
-                  ? 'border-red-600 text-red-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-red-600 dark:border-red-500 text-red-600 dark:text-red-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }
               `}
               style={{ minHeight: '44px' }}

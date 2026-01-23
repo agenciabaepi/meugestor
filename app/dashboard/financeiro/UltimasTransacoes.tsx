@@ -35,9 +35,9 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm sm:shadow">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
             Todas as Transações do Mês
           </h2>
           {transacoes.length > 15 && (
@@ -78,7 +78,7 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
               return (
                 <div
                   key={transacao.id}
-                  className={`flex items-center gap-3 p-2.5 sm:p-3 rounded-md hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
+                  className={`flex items-center gap-3 p-2.5 sm:p-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
                     isDeleting ? 'opacity-50' : ''
                   }`}
                 >
@@ -104,15 +104,15 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                             {transacao.description}
                           </p>
                           {/* Badge de status de pagamento (apenas para despesas) */}
                           {!isReceita && (
                             <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                               transacao.pago !== false
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-orange-100 text-orange-800'
+                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+                                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                             }`}>
                               {transacao.pago !== false ? '✓ Pago' : '⏳ Pendente'}
                             </span>
@@ -121,7 +121,7 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
                       </div>
                       <div className="shrink-0">
                         <p className={`font-semibold text-sm whitespace-nowrap ${
-                          isReceita ? 'text-green-600' : 'text-red-600'
+                          isReceita ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                         }`}>
                           {isReceita ? '+' : '-'}{formatCurrency(Number(transacao.amount))}
                         </p>
@@ -129,26 +129,26 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
                     </div>
 
                     {/* Segunda linha: Informações compactas */}
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                       <span>{dataFormatada} {horaFormatada}</span>
-                      <span className="text-gray-300">•</span>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
                       <span>{transacao.category}</span>
                       {transacao.subcategory && (
                         <>
-                          <span className="text-gray-300">•</span>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
                           <span>{transacao.subcategory}</span>
                         </>
                       )}
                       {fornecedor && fornecedor.nome && (
                         <>
-                          <span className="text-gray-300">•</span>
-                          <span className="text-gray-600 font-medium">🏢 {fornecedor.nome}</span>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <span className="text-gray-600 dark:text-gray-300 font-medium">🏢 {fornecedor.nome}</span>
                         </>
                       )}
                       {transacao.tags && transacao.tags.length > 0 && (
                         <>
-                          <span className="text-gray-300">•</span>
-                          <span className="text-gray-400">
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <span className="text-gray-400 dark:text-gray-500">
                             {transacao.tags.slice(0, 2).map(tag => `#${tag}`).join(' ')}
                             {transacao.tags.length > 2 && ` +${transacao.tags.length - 2}`}
                           </span>
@@ -161,7 +161,7 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
                   <div className="flex items-center gap-2 shrink-0">
                     <Link
                       href={`/dashboard/financeiro/${transacao.id}`}
-                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
                       onClick={(e) => e.stopPropagation()}
                       title="Editar"
                     >
@@ -175,7 +175,7 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
                         setDeleteConfirmOpen(true)
                       }}
                       disabled={isDeleting}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                       title="Excluir"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -187,10 +187,10 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
           </div>
           
           {transacoes.length > 15 && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Link
                 href="/dashboard/financeiro/todas"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
               >
                 Ver todas as {transacoes.length} transações
                 <ArrowRight className="w-4 h-4" />
@@ -208,10 +208,10 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
         description="Esta ação não pode ser desfeita."
         size="sm"
       >
-        <p className="text-gray-700 mb-4">
+        <p className="text-gray-700 dark:text-gray-300 mb-4">
           Tem certeza que deseja excluir esta transação?
           {transacaoToDelete && (
-            <span className="block mt-2 text-sm text-gray-500">
+            <span className="block mt-2 text-sm text-gray-500 dark:text-gray-400">
               "{transacaoToDelete.description}"
             </span>
           )}
@@ -223,7 +223,7 @@ export function UltimasTransacoes({ transacoes }: UltimasTransacoesProps) {
               setDeleteConfirmOpen(false)
               setTransacaoToDelete(null)
             }}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             Cancelar
           </button>

@@ -166,9 +166,9 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
 
   return (
     <>
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 w-full overflow-x-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 w-full overflow-x-hidden">
       {/* Cabeçalho do calendário */}
-      <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
+      <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-4">
             <button
@@ -179,7 +179,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 capitalize truncate">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white capitalize truncate">
               {monthName}
             </h2>
             <button
@@ -209,7 +209,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
             {weekDays.map((day) => (
               <div
                 key={day}
-                className="text-center text-xs font-semibold text-gray-500 py-2"
+                className="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2"
               >
                 {day}
               </div>
@@ -223,7 +223,7 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
               return (
                 <div
                   key={`empty-${index}`}
-                  className="aspect-square bg-gray-50 rounded-lg"
+                  className="aspect-square bg-gray-50 dark:bg-gray-700/30 rounded-lg"
                 />
               )
             }
@@ -245,10 +245,10 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 onClick={() => handleDateClick(date)}
                 className={`aspect-square rounded-lg border-2 p-1 transition text-left touch-manipulation ${
                   today
-                    ? 'bg-emerald-50 border-emerald-500 active:bg-emerald-100'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 dark:border-emerald-600 active:bg-emerald-100 dark:active:bg-emerald-900/50'
                     : currentMonth
-                    ? 'bg-white border-gray-200 active:border-gray-300 active:bg-gray-50'
-                    : 'bg-gray-50 border-gray-100'
+                    ? 'bg-white dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 active:border-gray-300 dark:active:border-gray-500 active:bg-gray-50 dark:active:bg-gray-700'
+                    : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700'
                 } ${dayCompromissos.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}
                 style={{ minHeight: '60px' }}
               >
@@ -256,10 +256,10 @@ export function CalendarView({ compromissos }: { compromissos: Compromisso[] }) 
                 <div
                   className={`text-xs font-semibold mb-0.5 ${
                     today
-                      ? 'text-emerald-700'
+                      ? 'text-emerald-700 dark:text-emerald-400'
                       : currentMonth
-                      ? 'text-gray-900'
-                      : 'text-gray-400'
+                      ? 'text-gray-900 dark:text-white'
+                      : 'text-gray-400 dark:text-gray-500'
                   }`}
                 >
                   {date.getDate()}

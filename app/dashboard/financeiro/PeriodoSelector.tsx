@@ -104,9 +104,9 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm text-gray-700"
+          className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm text-gray-700 dark:text-gray-300"
         >
-          <Calendar className="w-4 h-4 text-gray-600" />
+          <Calendar className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           <span className="font-medium">
             {monthName}
           </span>
@@ -118,7 +118,7 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div 
             ref={modalRef}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-4 flex items-center justify-between">
@@ -137,19 +137,19 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
             </div>
             
             {/* Navegação de Ano */}
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <button
                 onClick={() => navigateYear('prev')}
-                className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
               >
-                <ChevronLeft className="w-5 h-5 text-gray-600" />
+                <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
-              <span className="text-2xl font-bold text-gray-900">{tempYear}</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">{tempYear}</span>
               <button
                 onClick={() => navigateYear('next')}
-                className="w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
               >
-                <ChevronRight className="w-5 h-5 text-gray-600" />
+                <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
             
@@ -169,8 +169,8 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
                         ${isSelected
                           ? 'bg-emerald-500 text-white shadow-lg scale-105'
                           : isCurrentMonth
-                          ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-300 hover:bg-emerald-100'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:scale-105'
+                          ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-2 border-emerald-300 dark:border-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                          : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 hover:scale-105'
                         }
                       `}
                     >
@@ -182,19 +182,19 @@ export function PeriodoSelector({ basePath }: PeriodoSelectorProps) {
             </div>
             
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3">
               <button
                 onClick={() => {
                   const today = new Date()
                   updatePeriod(today.getMonth(), today.getFullYear())
                 }}
-                className="px-4 py-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
               >
                 Hoje
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Cancelar
               </button>

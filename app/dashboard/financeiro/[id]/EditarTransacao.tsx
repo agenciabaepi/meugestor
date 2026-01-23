@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, X, User, Building2, Phone, Mail, MapPin, FileText } from 'lucide-react'
 import Link from 'next/link'
 import type { Financeiro } from '@/lib/db/types'
 import { Dialog, DialogActions, useToast } from '@/app/components/ui'
@@ -27,6 +27,70 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
     transactionType: (transacao as any).transaction_type || 'expense',
     pago: transacao.pago !== undefined ? transacao.pago : true,
   })
+
+  const [fornecedorDetalhes, setFornecedorDetalhes] = useState<any>(null)
+  const [funcionarioDetalhes, setFuncionarioDetalhes] = useState<any>(null)
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false)
+
+  // Verifica se a categoria é de fornecedores ou funcionários
+  const isFornecedoresCategory = (category: string): boolean => {
+    if (!category) return false
+    const normalized = category.toLowerCase().trim()
+    return normalized === 'fornecedores' || normalized === 'fornecedor'
+  }
+
+  const isFuncionariosCategory = (category: string): boolean => {
+    if (!category) return false
+    const normalized = category.toLowerCase().trim()
+    return (
+      normalized === 'funcionarios' ||
+      normalized === 'funcionário' ||
+      normalized === 'funcionario' ||
+      normalized === 'funcionários'
+    )
+  }
+
+  // Busca detalhes do fornecedor ou funcionário
+  useEffect(() => {
+    const fetchDetalhes = async () => {
+      const metadata = transacao.metadata || {}
+      const funcionarioId = (transacao as any).funcionario_id
+
+      if (isFornecedoresCategory(transacao.category)) {
+        // Busca fornecedor do metadata
+        if (metadata.fornecedor && metadata.fornecedor.id) {
+          setLoadingDetalhes(true)
+          try {
+            const response = await fetch(`/api/fornecedores/${metadata.fornecedor.id}`)
+            if (response.ok) {
+              const data = await response.json()
+              setFornecedorDetalhes(data.fornecedor)
+            }
+          } catch (error) {
+            console.error('Erro ao buscar fornecedor:', error)
+          } finally {
+            setLoadingDetalhes(false)
+          }
+        }
+      } else if (isFuncionariosCategory(transacao.category) && funcionarioId) {
+        // Busca funcionário pelo ID
+        setLoadingDetalhes(true)
+        try {
+          const response = await fetch(`/api/funcionarios/${funcionarioId}`)
+          if (response.ok) {
+            const data = await response.json()
+            setFuncionarioDetalhes(data.funcionario)
+          }
+        } catch (error) {
+          console.error('Erro ao buscar funcionário:', error)
+        } finally {
+          setLoadingDetalhes(false)
+        }
+      }
+    }
+
+    fetchDetalhes()
+  }, [transacao]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,6 +183,120 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
         </button>
       </div>
 
+      {/* Detalhes do Fornecedor ou Funcionário */}
+      {(fornecedorDetalhes || funcionarioDetalhes) && (
+        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            {fornecedorDetalhes ? (
+              <Building2 className="w-6 h-6 text-emerald-600" />
+            ) : (
+              <User className="w-6 h-6 text-emerald-600" />
+            )}
+            <h2 className="text-lg font-semibold text-gray-900">
+              {fornecedorDetalhes ? 'Detalhes do Fornecedor' : 'Detalhes do Funcionário'}
+            </h2>
+          </div>
+
+          {loadingDetalhes ? (
+            <div className="text-gray-500 text-sm">Carregando detalhes...</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Nome */}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                  {fornecedorDetalhes ? (
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <User className="w-4 h-4 text-emerald-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500 mb-1">Nome</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {fornecedorDetalhes?.nome || funcionarioDetalhes?.nome_original || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Telefone */}
+              {(fornecedorDetalhes?.telefone || funcionarioDetalhes?.telefone) && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                    <Phone className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">Telefone</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {fornecedorDetalhes?.telefone || funcionarioDetalhes?.telefone}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Email */}
+              {(fornecedorDetalhes?.email || funcionarioDetalhes?.email) && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">E-mail</p>
+                    <p className="text-sm font-medium text-gray-900 break-words">
+                      {fornecedorDetalhes?.email || funcionarioDetalhes?.email}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Endereço (apenas fornecedor) */}
+              {fornecedorDetalhes?.endereco && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">Endereço</p>
+                    <p className="text-sm font-medium text-gray-900 break-words">
+                      {fornecedorDetalhes.endereco}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* CNPJ (apenas fornecedor) */}
+              {fornecedorDetalhes?.cnpj && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">CNPJ</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {fornecedorDetalhes.cnpj}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Observação */}
+              {(fornecedorDetalhes?.observacao || funcionarioDetalhes?.observacao) && (
+                <div className="flex items-start gap-3 md:col-span-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-1">Observação</p>
+                    <p className="text-sm font-medium text-gray-900 break-words">
+                      {fornecedorDetalhes?.observacao || funcionarioDetalhes?.observacao}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Formulário */}
       <div className="bg-white rounded-lg shadow-sm sm:shadow p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -195,21 +373,6 @@ export function EditarTransacao({ transacao }: EditarTransacaoProps) {
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
               placeholder="Ex: Materiais"
-            />
-          </div>
-
-          {/* Subcategoria */}
-          <div>
-            <label htmlFor="subcategory" className="block text-sm font-medium text-gray-700 mb-2">
-              Subcategoria
-            </label>
-            <input
-              type="text"
-              id="subcategory"
-              value={formData.subcategory}
-              onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="Ex: Tinta"
             />
           </div>
 

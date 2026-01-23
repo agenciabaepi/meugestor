@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useId } from 'react'
 import { useCurrencyInput } from '@/lib/hooks/use-currency-input'
 
 interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> {
@@ -25,6 +25,7 @@ export function CurrencyInput({
   placeholder = '0,00',
   ...props
 }: CurrencyInputProps) {
+  const generatedId = useId()
   const {
     displayValue,
     handleChange: handleCurrencyChange,
@@ -108,7 +109,7 @@ export function CurrencyInput({
     }
   }, [])
 
-  const inputId = id || name || `currency-input-${Math.random().toString(36).substr(2, 9)}`
+  const inputId = id || name || generatedId
 
   return (
     <div className="w-full">

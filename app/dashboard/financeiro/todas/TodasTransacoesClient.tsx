@@ -55,8 +55,8 @@ export function TodasTransacoesClient({
     <>
       <div className="space-y-4 sm:space-y-6 w-full overflow-x-hidden">
         {/* Abas */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden">
-          <div className="border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex -mb-px" aria-label="Tabs">
               <button
                 onClick={() => setActiveTab('todos')}
@@ -64,7 +64,7 @@ export function TodasTransacoesClient({
                   flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                   ${activeTab === 'todos'
                     ? 'border-emerald-600 text-emerald-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }
                 `}
                 style={{ minHeight: '44px' }}
@@ -78,7 +78,7 @@ export function TodasTransacoesClient({
                   flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                   ${activeTab === 'receitas'
                     ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }
                 `}
                 style={{ minHeight: '44px' }}
@@ -92,7 +92,7 @@ export function TodasTransacoesClient({
                   flex-1 px-2 sm:px-4 py-3 text-center text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation
                   ${activeTab === 'despesas'
                     ? 'border-red-600 text-red-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }
                 `}
                 style={{ minHeight: '44px' }}
@@ -105,9 +105,9 @@ export function TodasTransacoesClient({
         </div>
 
         {/* Lista de Transações */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow">
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
               {title} do Mês
             </h2>
           </div>
@@ -166,7 +166,7 @@ export function TodasTransacoesClient({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-gray-900 truncate">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                 {transacao.description}
                               </p>
                               {/* Badge de status de pagamento (apenas para despesas) */}
@@ -191,7 +191,7 @@ export function TodasTransacoesClient({
                         </div>
 
                         {/* Segunda linha: Informações compactas */}
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                           <span>{dataFormatada} {horaFormatada}</span>
                           <span className="text-gray-300">•</span>
                           <span>{transacao.category}</span>
@@ -248,7 +248,7 @@ export function TodasTransacoesClient({
                 })}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
+              <p className="text-gray-500 dark:text-gray-400 text-center py-6 sm:py-8 text-sm sm:text-base">
                 {activeTab === 'despesas' && 'Nenhuma despesa registrada este mês'}
                 {activeTab === 'receitas' && 'Nenhuma receita registrada este mês'}
                 {activeTab === 'todos' && 'Nenhuma transação registrada este mês'}
@@ -269,7 +269,7 @@ export function TodasTransacoesClient({
         <p className="text-gray-700 mb-4">
           Tem certeza que deseja excluir esta transação?
           {transacaoToDelete && (
-            <span className="block mt-2 text-sm text-gray-500">
+            <span className="block mt-2 text-sm text-gray-500 dark:text-gray-400">
               "{transacaoToDelete.description}"
             </span>
           )}

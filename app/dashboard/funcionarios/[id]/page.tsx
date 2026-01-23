@@ -6,10 +6,12 @@ import { FuncionarioDetalhes } from './FuncionarioDetalhes'
 import { formatCurrency } from '@/lib/utils/format-currency'
 import { ArrowLeft, User, Briefcase, DollarSign, Calendar } from 'lucide-react'
 import Link from 'next/link'
+import { PeriodoSelector } from '@/app/dashboard/financeiro/PeriodoSelector'
+import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-async function getFuncionarioData(funcionarioId: string) {
+async function getFuncionarioData(funcionarioId: string, searchParams?: { mes?: string; ano?: string }) {
   const ctx = await getSessionContext()
 
   if (!ctx || ctx.mode !== 'empresa' || !ctx.empresa_id) {
@@ -24,7 +26,20 @@ async function getFuncionarioData(funcionarioId: string) {
     redirect('/dashboard/funcionarios')
   }
 
-  // Busca todos os pagamentos do funcionário (sem filtro de data)
+  // Determina o período a ser exibido (padrão: mês atual)
+  const now = new Date()
+  const monthParam = searchParams?.mes
+  const yearParam = searchParams?.ano
+  
+  const selectedMonth = monthParam ? parseInt(monthParam) : now.getMonth() + 1
+  const selectedYear = yearParam ? parseInt(yearParam) : now.getFullYear()
+  
+  // Calcula início e fim do período selecionado (formato YYYY-MM-DD para comparação)
+  const startOfPeriodStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`
+  const endOfPeriod = new Date(selectedYear, selectedMonth, 0)
+  const endOfPeriodStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(endOfPeriod.getDate()).padStart(2, '0')}`
+
+  // Busca todos os pagamentos do funcionário
   const pagamentos = await getFinanceiroEmpresaByFuncionario(
     ctx.tenant_id,
     ctx.empresa_id,
@@ -36,22 +51,18 @@ async function getFuncionarioData(funcionarioId: string) {
   // Filtra apenas despesas (pagamentos)
   const pagamentosFiltrados = pagamentos.filter((p) => p.transaction_type === 'expense')
 
-  // Calcula totais
+  // Calcula totais gerais (todos os pagamentos)
   const totalGeral = pagamentosFiltrados.reduce((sum, p) => sum + Number(p.amount), 0)
   
-  // Calcula total do mês atual
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const pagamentosMesAtual = pagamentosFiltrados.filter((p) => {
-    const pagamentoDate = new Date(p.date)
-    return pagamentoDate >= startOfMonth && pagamentoDate <= endOfMonth
+  // Filtra pagamentos do período selecionado (compara strings YYYY-MM-DD para evitar problemas de timezone)
+  const pagamentosPeriodo = pagamentosFiltrados.filter((p) => {
+    return p.date >= startOfPeriodStr && p.date <= endOfPeriodStr
   })
-  const totalMesAtual = pagamentosMesAtual.reduce((sum, p) => sum + Number(p.amount), 0)
+  const totalPeriodo = pagamentosPeriodo.reduce((sum, p) => sum + Number(p.amount), 0)
 
   // Ordena por data (mais recente primeiro)
   // Compara strings diretamente (YYYY-MM-DD) para evitar problemas de timezone
-  const pagamentosOrdenados = [...pagamentosFiltrados].sort((a, b) => {
+  const pagamentosOrdenados = [...pagamentosPeriodo].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date)
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
@@ -60,18 +71,24 @@ async function getFuncionarioData(funcionarioId: string) {
     funcionario,
     pagamentos: pagamentosOrdenados,
     totalGeral,
-    totalMesAtual,
-    quantidadePagamentos: pagamentosFiltrados.length,
+    totalPeriodo,
+    quantidadePagamentos: pagamentosPeriodo.length,
+    quantidadePagamentosTotal: pagamentosFiltrados.length,
+    selectedMonth,
+    selectedYear,
   }
 }
 
 export default async function FuncionarioDetalhesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams?: Promise<{ mes?: string; ano?: string }>
 }) {
   const { id } = await params
-  const data = await getFuncionarioData(id)
+  const paramsSearch = await searchParams
+  const data = await getFuncionarioData(id, paramsSearch)
 
   const getTipoLabel = (tipo: string | null) => {
     switch (tipo) {
@@ -107,6 +124,15 @@ export default async function FuncionarioDetalhesPage({
         </div>
       </div>
 
+      {/* Seletor de Período */}
+      <Suspense fallback={
+        <div className="bg-white rounded-lg shadow-sm p-4 animate-pulse">
+          <div className="h-10 bg-gray-200 rounded w-64"></div>
+        </div>
+      }>
+        <PeriodoSelector basePath={`/dashboard/funcionarios/${id}`} />
+      </Suspense>
+
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Total Geral */}
@@ -117,19 +143,19 @@ export default async function FuncionarioDetalhesPage({
           <p className="text-sm font-medium opacity-90 mb-1">Total Pago</p>
           <p className="text-3xl font-bold">{formatCurrency(data.totalGeral)}</p>
           <p className="text-xs opacity-75 mt-2">
-            {data.quantidadePagamentos} {data.quantidadePagamentos === 1 ? 'pagamento' : 'pagamentos'}
+            {data.quantidadePagamentosTotal} {data.quantidadePagamentosTotal === 1 ? 'pagamento' : 'pagamentos'}
           </p>
         </div>
 
-        {/* Mês Atual */}
+        {/* Período Selecionado */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
           <div className="flex items-center justify-between mb-2">
             <Calendar className="w-8 h-8 opacity-90" />
           </div>
-          <p className="text-sm font-medium opacity-90 mb-1">Este Mês</p>
-          <p className="text-3xl font-bold">{formatCurrency(data.totalMesAtual)}</p>
+          <p className="text-sm font-medium opacity-90 mb-1">Período Selecionado</p>
+          <p className="text-3xl font-bold">{formatCurrency(data.totalPeriodo)}</p>
           <p className="text-xs opacity-75 mt-2">
-            {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            {new Date(data.selectedYear, data.selectedMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
           </p>
         </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/ui'
 import { CurrencyInput } from '@/app/components/ui/CurrencyInput'
+import { getTodayLocalDate } from '@/lib/utils/format-date'
 
 interface Categoria {
   nome: string
@@ -25,14 +26,17 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
   const [loadingCategorias, setLoadingCategorias] = useState(true)
   const [funcionarios, setFuncionarios] = useState<Array<{ id: string; nome_original: string }>>([])
   const [loadingFuncionarios, setLoadingFuncionarios] = useState(false)
+  const [fornecedores, setFornecedores] = useState<Array<{ id: string; nome: string }>>([])
+  const [loadingFornecedores, setLoadingFornecedores] = useState(false)
   const [formData, setFormData] = useState({
     amount: 0,
     description: '',
     category: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayLocalDate(),
     subcategory: '',
     pago: true, // Por padrão, considera como pago/recebido
     funcionario_id: '' as string | '',
+    fornecedor_id: '' as string | '',
   })
 
   // Atualiza pago baseado no tipo quando o modal abre
@@ -45,11 +49,12 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     }
   }, [isOpen, tipo])
 
-  // Busca categorias e funcionários ao abrir o modal
+  // Busca categorias, funcionários e fornecedores ao abrir o modal
   useEffect(() => {
     if (isOpen) {
       fetchCategorias()
       fetchFuncionarios()
+      fetchFornecedores()
     }
   }, [isOpen])
 
@@ -62,6 +67,18 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     } else {
       // Limpa funcionário selecionado se mudou de categoria
       setFormData((prev) => ({ ...prev, funcionario_id: '' }))
+    }
+  }, [formData.category]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Busca fornecedores quando categoria muda para "fornecedores" ou "fornecedor"
+  useEffect(() => {
+    if (isFornecedoresCategory(formData.category)) {
+      if (fornecedores.length === 0) {
+        fetchFornecedores()
+      }
+    } else {
+      // Limpa fornecedor selecionado se mudou de categoria
+      setFormData((prev) => ({ ...prev, fornecedor_id: '' }))
     }
   }, [formData.category]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -83,6 +100,24 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     }
   }
 
+  const fetchFornecedores = async () => {
+    try {
+      setLoadingFornecedores(true)
+      const response = await fetch('/api/fornecedores')
+      if (response.ok) {
+        const data = await response.json()
+        setFornecedores((data.fornecedores || []).map((f: any) => ({
+          id: f.id,
+          nome: f.nome,
+        })))
+      }
+    } catch (error) {
+      console.error('Erro ao buscar fornecedores:', error)
+    } finally {
+      setLoadingFornecedores(false)
+    }
+  }
+
   // Função helper para verificar se a categoria é de funcionários
   const isFuncionariosCategory = (category: string): boolean => {
     if (!category) return false
@@ -95,16 +130,31 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
     )
   }
 
+  // Função helper para verificar se a categoria é de fornecedores
+  const isFornecedoresCategory = (category: string): boolean => {
+    if (!category) return false
+    const normalized = category.toLowerCase().trim()
+    return (
+      normalized === 'fornecedores' ||
+      normalized === 'fornecedor'
+    )
+  }
+
   const fetchCategorias = async () => {
     try {
       setLoadingCategorias(true)
       const response = await fetch('/api/financeiro/categorias')
       if (response.ok) {
         const data = await response.json()
-        setCategorias(data.categorias || [])
+        // Remove categorias duplicadas baseado no nome
+        const categoriasUnicas = (data.categorias || []).filter(
+          (cat: Categoria, index: number, self: Categoria[]) =>
+            index === self.findIndex((c) => c.nome === cat.nome)
+        )
+        setCategorias(categoriasUnicas)
         // Seleciona primeira categoria por padrão
-        if (data.categorias && data.categorias.length > 0) {
-          setFormData((prev) => ({ ...prev, category: data.categorias[0].nome }))
+        if (categoriasUnicas.length > 0) {
+          setFormData((prev) => ({ ...prev, category: categoriasUnicas[0].nome }))
         }
       }
     } catch (error) {
@@ -128,8 +178,28 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
       return
     }
 
+    // Valida fornecedor se categoria for fornecedores
+    if (isFornecedoresCategory(formData.category) && !formData.fornecedor_id) {
+      toast.error('Fornecedor obrigatório', 'Selecione um fornecedor para esta categoria.')
+      return
+    }
+
     setLoading(true)
     try {
+      // Prepara metadata com fornecedor se necessário
+      let metadata: Record<string, any> | null = null
+      if (isFornecedoresCategory(formData.category) && formData.fornecedor_id) {
+        const fornecedorSelecionado = fornecedores.find(f => f.id === formData.fornecedor_id)
+        if (fornecedorSelecionado) {
+          metadata = {
+            fornecedor: {
+              id: fornecedorSelecionado.id,
+              nome: fornecedorSelecionado.nome,
+            }
+          }
+        }
+      }
+
       const response = await fetch('/api/financeiro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,6 +212,7 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           transactionType: tipo,
           pago: formData.pago, // Usa o valor do checkbox para ambos os tipos
           funcionario_id: isFuncionariosCategory(formData.category) && formData.funcionario_id ? formData.funcionario_id : null,
+          metadata: metadata,
         }),
       })
 
@@ -154,10 +225,11 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
           amount: 0,
           description: '',
           category: categorias[0]?.nome || '',
-          date: new Date().toISOString().split('T')[0],
+          date: getTodayLocalDate(),
           subcategory: '',
           pago: tipo === 'expense' ? true : false, // Despesas padrão pago, receitas padrão não recebido
           funcionario_id: '',
+          fornecedor_id: '',
         })
       } else {
         const error = await response.json()
@@ -239,27 +311,13 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm bg-white"
                 >
-                  {categorias.map((cat) => (
-                    <option key={cat.nome} value={cat.nome}>
+                  {categorias.map((cat, index) => (
+                    <option key={`${cat.nome}-${index}`} value={cat.nome}>
                       {cat.nome}
                     </option>
                   ))}
                 </select>
               )}
-            </div>
-
-            {/* Subcategoria */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subcategoria (opcional)
-              </label>
-              <input
-                type="text"
-                value={formData.subcategory}
-                onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
-                placeholder="Ex: Supermercado"
-              />
             </div>
 
             {/* Funcionário (apenas quando categoria for funcionarios) */}
@@ -287,6 +345,38 @@ export function AddTransacaoModal({ isOpen, onClose, tipo }: AddTransacaoModalPr
                     {funcionarios.map((func) => (
                       <option key={func.id} value={func.id}>
                         {func.nome_original}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Fornecedor (apenas quando categoria for fornecedores) */}
+            {isFornecedoresCategory(formData.category) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fornecedor <span className="text-red-500">*</span>
+                </label>
+                {loadingFornecedores ? (
+                  <div className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 shadow-sm">
+                    Carregando fornecedores...
+                  </div>
+                ) : fornecedores.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 border border-orange-300 rounded-lg bg-orange-50 text-orange-700 text-sm shadow-sm">
+                    Nenhum fornecedor cadastrado. Cadastre um fornecedor primeiro.
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={formData.fornecedor_id}
+                    onChange={(e) => setFormData({ ...formData, fornecedor_id: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm bg-white"
+                  >
+                    <option value="">Selecione um fornecedor</option>
+                    {fornecedores.map((forn) => (
+                      <option key={forn.id} value={forn.id}>
+                        {forn.nome}
                       </option>
                     ))}
                   </select>

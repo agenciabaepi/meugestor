@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ThemeToggle } from '@/app/components/ThemeToggle'
-import { User } from 'lucide-react'
+import { User, Building2 as BuildingIcon } from 'lucide-react'
 import { LOGO_URL } from '@/lib/constants'
+import { useToast } from '@/app/components/ui'
 import {
   LayoutDashboard,
   Wallet,
@@ -78,9 +79,29 @@ const menuItems = [
 
 export function Header({ sessionContext }: { sessionContext: SessionContext | null }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const toast = useToast()
   const isEmpresa = sessionContext?.mode === 'empresa'
   const [isVisible, setIsVisible] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
+  const [empresas, setEmpresas] = useState<Array<{ id: string; nome_fantasia: string }>>([])
+  const [loadingMode, setLoadingMode] = useState(false)
+
+  // Carrega empresas ao montar o componente
+  useEffect(() => {
+    const loadEmpresas = async () => {
+      try {
+        const response = await fetch('/api/empresas')
+        if (response.ok) {
+          const data = await response.json()
+          setEmpresas(data.empresas || [])
+        }
+      } catch (error) {
+        console.error('Erro ao carregar empresas:', error)
+      }
+    }
+    loadEmpresas()
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -103,6 +124,72 @@ export function Header({ sessionContext }: { sessionContext: SessionContext | nu
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [lastScrollY])
+
+  const handleToggleMode = async (targetMode: 'pessoal' | 'empresa', e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Se já está no modo selecionado, não faz nada
+    if ((targetMode === 'empresa' && isEmpresa) || (targetMode === 'pessoal' && !isEmpresa)) {
+      return
+    }
+    
+    console.log('[Header] Toggle mode:', { currentMode: isEmpresa ? 'empresa' : 'pessoal', targetMode, empresasCount: empresas.length })
+    
+    // Se está mudando para empresa, precisa ter pelo menos uma empresa
+    if (targetMode === 'empresa' && empresas.length === 0) {
+      toast.error('Nenhuma empresa', 'Cadastre uma empresa primeiro no perfil.')
+      return
+    }
+
+    setLoadingMode(true)
+    try {
+      // Se mudando para empresa, usa a primeira empresa ou a empresa_id atual
+      const empresaId = targetMode === 'empresa' 
+        ? (sessionContext?.empresa_id || empresas[0]?.id || null)
+        : null
+
+      if (targetMode === 'empresa' && !empresaId) {
+        toast.error('Erro', 'Nenhuma empresa disponível.')
+        setLoadingMode(false)
+        return
+      }
+
+      console.log('[Header] Enviando requisição:', { mode: targetMode, empresaId })
+
+      const response = await fetch('/api/auth/context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: targetMode,
+          empresaId: empresaId,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        console.error('[Header] Erro na resposta:', data)
+        toast.error('Erro ao alterar modo', data.error || 'Não foi possível alterar o modo.')
+        setLoadingMode(false)
+        return
+      }
+
+      console.log('[Header] Modo alterado com sucesso:', data)
+      toast.success('Modo alterado', `Modo alterado para ${targetMode === 'empresa' ? 'Empresa' : 'Pessoal'}.`)
+      
+      // Recarrega a página para atualizar o contexto
+      router.refresh()
+      // Pequeno delay para garantir que o toast apareça
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
+    } catch (error) {
+      console.error('[Header] Erro ao alterar modo:', error)
+      toast.error('Erro', 'Ocorreu um erro ao tentar alterar o modo.')
+      setLoadingMode(false)
+    }
+  }
 
   return (
     <header 
@@ -167,6 +254,57 @@ export function Header({ sessionContext }: { sessionContext: SessionContext | nu
 
         {/* Ações do Header */}
         <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Toggle Modo Pessoal/Empresa - Design Segmentado */}
+          <div className="relative inline-flex items-center rounded-full bg-gray-800 dark:bg-gray-700 p-0.5">
+            {/* Pessoal */}
+            <button
+              type="button"
+              onClick={(e) => handleToggleMode('pessoal', e)}
+              disabled={loadingMode}
+              className={`
+                relative px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${
+                  !isEmpresa
+                    ? 'bg-emerald-600 text-gray-900 shadow-sm'
+                    : 'text-emerald-400 border border-emerald-500 hover:bg-emerald-500/10'
+                }
+              `}
+              title="Modo Pessoal"
+              aria-label="Modo Pessoal"
+            >
+              <div className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                <span className="hidden sm:inline text-[10px]">Pessoal</span>
+              </div>
+            </button>
+            
+            {/* Empresa */}
+            <button
+              type="button"
+              onClick={(e) => handleToggleMode('empresa', e)}
+              disabled={loadingMode}
+              className={`
+                relative px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900
+                disabled:opacity-50 disabled:cursor-not-allowed
+                ${
+                  isEmpresa
+                    ? 'bg-emerald-600 text-gray-900 shadow-sm'
+                    : 'text-emerald-400 border border-emerald-500 hover:bg-emerald-500/10'
+                }
+              `}
+              title="Modo Empresa"
+              aria-label="Modo Empresa"
+            >
+              <div className="flex items-center gap-1">
+                <BuildingIcon className="w-3 h-3" />
+                <span className="hidden sm:inline text-[10px]">Empresa</span>
+              </div>
+            </button>
+          </div>
+
           {/* Theme Toggle */}
           <ThemeToggle />
 

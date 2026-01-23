@@ -79,7 +79,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
+    
     if (!formData.nome_original.trim()) {
       toast.error('Campo obrigatório', 'O nome é obrigatório.')
       return
@@ -172,8 +172,8 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Funcionários</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Funcionários</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Cadastre funcionários e visualize o histórico de pagamentos
           </p>
         </div>
@@ -189,21 +189,21 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
       {/* Estatísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Total</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{funcionarios.length}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Total</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1">{funcionarios.length}</p>
             </div>
             <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
               <Users className="w-6 h-6 text-emerald-600" />
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Ativos</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Ativos</p>
               <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1">{ativos.length}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -211,81 +211,81 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-500">Inativos</p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-600 mt-1">{inativos.length}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Inativos</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-600 dark:text-gray-400 mt-1">{inativos.length}</p>
             </div>
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-gray-600" />
-            </div>
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              <Users className="w-6 h-6 text-gray-600 dark:text-gray-400" />
           </div>
+        </div>
         </div>
       </div>
 
       {/* Funcionários Ativos */}
       {ativos.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Funcionários Ativos</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Funcionários Ativos</h2>
           </div>
           <div className="divide-y divide-gray-200">
             {ativos.map((funcionario) => (
               <div
                 key={funcionario.id}
-                className="p-4 sm:p-6 hover:bg-gray-50 transition-colors group"
+                className="p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
               >
                 <div className="flex items-center justify-between gap-4">
                   <Link
                     href={`/dashboard/funcionarios/${funcionario.id}`}
                     className="flex-1 min-w-0"
                   >
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
-                        {funcionario.nome_original}
-                      </h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                        Ativo
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600">
-                      {funcionario.cargo && (
-                        <div>
-                          <span className="font-medium">Cargo:</span> {funcionario.cargo}
-                        </div>
-                      )}
-                      {funcionario.tipo && (
-                        <div>
-                          <span className="font-medium">Tipo:</span> {getTipoLabel(funcionario.tipo)}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">
+                          {funcionario.nome_original}
+                        </h3>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                          Ativo
+                        </span>
+                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        {funcionario.cargo && (
+                          <div>
+                            <span className="font-medium">Cargo:</span> {funcionario.cargo}
+                          </div>
+                        )}
+                        {funcionario.tipo && (
+                          <div>
+                            <span className="font-medium">Tipo:</span> {getTipoLabel(funcionario.tipo)}
+                          </div>
+                        )}
                       {funcionario.salario_base && (
                         <div>
                           <span className="font-medium">Salário Base:</span>{' '}
-                          <span className="text-gray-900 font-semibold">
+                          <span className="text-gray-900 dark:text-white font-semibold">
                             {formatCurrency(funcionario.salario_base)}
                           </span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
                   </Link>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleOpenModal(funcionario)}
-                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir"
-                      disabled={loading}
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleOpenModal(funcionario)}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir"
+                        disabled={loading}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     <Link
                       href={`/dashboard/funcionarios/${funcionario.id}`}
                       className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors"
@@ -293,9 +293,9 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                     >
                       <ArrowRight className="w-5 h-5" />
                     </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
             ))}
           </div>
         </div>
@@ -303,58 +303,58 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
       {/* Funcionários Inativos */}
       {inativos.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Funcionários Inativos</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Funcionários Inativos</h2>
           </div>
           <div className="divide-y divide-gray-200">
             {inativos.map((funcionario) => (
               <div
                 key={funcionario.id}
-                className="p-4 sm:p-6 hover:bg-gray-50 transition-colors group opacity-60"
+                className="p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group opacity-60"
               >
                 <div className="flex items-center justify-between gap-4">
                   <Link
                     href={`/dashboard/funcionarios/${funcionario.id}`}
                     className="flex-1 min-w-0"
                   >
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
-                        {funcionario.nome_original}
-                      </h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                        Inativo
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600">
-                      {funcionario.cargo && (
-                        <div>
-                          <span className="font-medium">Cargo:</span> {funcionario.cargo}
+                      <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white group-hover:text-emerald-600 transition-colors">
+                          {funcionario.nome_original}
+                        </h3>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800">
+                          Inativo
+                        </span>
+                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        {funcionario.cargo && (
+                          <div>
+                            <span className="font-medium">Cargo:</span> {funcionario.cargo}
+                          </div>
+                        )}
+                        {funcionario.tipo && (
+                          <div>
+                            <span className="font-medium">Tipo:</span> {getTipoLabel(funcionario.tipo)}
+                          </div>
+                        )}
                         </div>
-                      )}
-                      {funcionario.tipo && (
-                        <div>
-                          <span className="font-medium">Tipo:</span> {getTipoLabel(funcionario.tipo)}
-                        </div>
-                      )}
-                    </div>
                   </Link>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleOpenModal(funcionario)}
-                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir"
-                      disabled={loading}
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleOpenModal(funcionario)}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(funcionario.id, funcionario.nome_original)}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir"
+                        disabled={loading}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     <Link
                       href={`/dashboard/funcionarios/${funcionario.id}`}
                       className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors"
@@ -362,9 +362,9 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                     >
                       <ArrowRight className="w-5 h-5" />
                     </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
             ))}
           </div>
         </div>
@@ -372,10 +372,10 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
       {/* Mensagem quando não há funcionários */}
       {funcionarios.length === 0 && (
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-8 sm:p-12 text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-8 sm:p-12 text-center">
           <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum funcionário cadastrado</h3>
-          <p className="text-gray-600 mb-6">Comece adicionando seu primeiro funcionário</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nenhum funcionário cadastrado</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">Comece adicionando seu primeiro funcionário</p>
           <button
             onClick={() => handleOpenModal()}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
@@ -393,12 +393,12 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
             <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={handleCloseModal} />
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {editingFuncionario ? 'Editar Funcionário' : 'Adicionar Funcionário'}
                 </h2>
                 <button
                   onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
+                  className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors p-1 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -409,7 +409,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                 {/* Nome */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Nome <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -424,7 +424,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
                 {/* Cargo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cargo (opcional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cargo (opcional)</label>
                   <input
                     type="text"
                     value={formData.cargo}
@@ -444,7 +444,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
 
                 {/* Tipo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo (opcional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo (opcional)</label>
                   <select
                     value={formData.tipo}
                     onChange={(e) =>
@@ -471,7 +471,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                     onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                     className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                   />
-                  <label htmlFor="ativo" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="ativo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Funcionário ativo
                   </label>
                 </div>
@@ -481,7 +481,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={loading}
                   >
                     Cancelar
@@ -509,10 +509,10 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
           description="Esta ação não pode ser desfeita."
           size="sm"
         >
-          <p className="text-gray-700 mb-4">
+          <p className="text-gray-700 dark:text-gray-300 mb-4">
             Tem certeza que deseja excluir o funcionário?
             {funcionarioToDelete && (
-              <span className="block mt-2 text-sm text-gray-500">"{funcionarioToDelete.nome}"</span>
+              <span className="block mt-2 text-sm text-gray-500 dark:text-gray-400">"{funcionarioToDelete.nome}"</span>
             )}
           </p>
 
@@ -522,7 +522,7 @@ export function FuncionariosClient({ funcionarios: initialFuncionarios }: Funcio
                 setDeleteConfirmOpen(false)
                 setFuncionarioToDelete(null)
               }}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Cancelar
             </button>

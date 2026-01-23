@@ -203,19 +203,19 @@ export default async function FinanceiroPage({
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Financeiro</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
-            Controle suas despesas e receitas
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Financeiro</h1>
+        <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Controle suas despesas e receitas
+        </p>
+      </div>
         <AddTransacaoButton />
       </div>
 
       {/* Seletor de Período */}
       <Suspense fallback={
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6 animate-pulse">
-          <div className="h-10 bg-gray-200 rounded w-64"></div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6 animate-pulse">
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
         </div>
       }>
         <PeriodoSelector />
@@ -224,45 +224,45 @@ export default async function FinanceiroPage({
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* Saldo */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Saldo do Mês</p>
-          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 wrap-break-word ${data.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Saldo do Mês</p>
+          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 wrap-break-word ${data.saldo >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {data.saldo >= 0 ? '+' : ''}{formatCurrency(data.saldo)}
           </p>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 sm:mt-2">
             {data.totalReceitas >= 0 ? 'Receitas' : 'Despesas'} - {data.totalDespesas >= 0 ? 'Despesas' : 'Receitas'}
           </p>
         </div>
 
         {/* Receitas */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Receitas</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-1 sm:mt-2 wrap-break-word">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Receitas</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400 mt-1 sm:mt-2 wrap-break-word">
             {formatCurrency(data.totalReceitas)}
           </p>
-          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoReceitas) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoReceitas) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {Number(variacaoReceitas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoReceitas))}% vs mês anterior
           </p>
         </div>
 
         {/* Despesas */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Despesas</p>
-          <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2 wrap-break-word">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Despesas</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-600 dark:text-red-400 mt-1 sm:mt-2 wrap-break-word">
             {formatCurrency(data.totalDespesas)}
           </p>
-          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoDespesas) >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+          <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${Number(variacaoDespesas) >= 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
             {Number(variacaoDespesas) >= 0 ? '↑' : '↓'} {Math.abs(Number(variacaoDespesas))}% vs mês anterior
           </p>
         </div>
 
         {/* Registros */}
-        <div className="bg-white rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Registros</p>
-          <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm sm:shadow p-4 sm:p-6">
+          <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">Registros</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-1 sm:mt-2">
             {data.todasTransacoes.length}
           </p>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 sm:mt-2">
             {data.receitasMes.length} receitas • {data.despesasMes.length} despesas
           </p>
         </div>
